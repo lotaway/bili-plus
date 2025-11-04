@@ -1,0 +1,26 @@
+body {
+  width: 240px;
+  padding: 10px;
+  font-family: system-ui;
+}
+
+button {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  background: #00a1d6;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #40C5F1;
+}
+
+#msg {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #444;
+}
