@@ -53,7 +53,7 @@ function bilisub2srt(j) {
         .join("\n\n")
 }
 
-function bilisub2text() {
+function bilisub2text(j) {
     return j.body.map((s) => s.content).join("\n\n")
 }
 
