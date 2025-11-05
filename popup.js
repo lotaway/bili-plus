@@ -29,16 +29,17 @@ class PopupController {
 
     async loadConfig() {
         const config = await chrome.storage.sync.get([
-            'aiProvider',
-            'aiEndpoint', 
-            'aiKey',
-            'aiModel'
+            "aiProvider",
+            "aiEndpoint",
+            "aiKey",
+            "aiModel",
         ])
-        
-        document.getElementById('aiProvider').value = config.aiProvider || ''
-        document.getElementById('aiEndpoint').value = config.aiEndpoint || ''
-        document.getElementById('aiKey').value = config.aiKey || ''
-        document.getElementById('aiModel').value = config.aiModel || 'gpt-3.5-turbo'
+
+        document.getElementById("aiProvider").value = config.aiProvider || ""
+        document.getElementById("aiEndpoint").value = config.aiEndpoint || ""
+        document.getElementById("aiKey").value = config.aiKey || ""
+        document.getElementById("aiModel").value =
+            config.aiModel || "gpt-3.5-turbo"
     }
 
     initButton() {
@@ -68,46 +69,52 @@ class PopupController {
     }
 
     async saveConfig() {
-        const provider = document.getElementById('aiProvider').value
-        const endpoint = document.getElementById('aiEndpoint').value
-        const key = document.getElementById('aiKey').value
-        const model = document.getElementById('aiModel').value
+        const provider = document.getElementById("aiProvider").value
+        const endpoint = document.getElementById("aiEndpoint").value
+        const key = document.getElementById("aiKey").value
+        const model = document.getElementById("aiModel").value
 
         await chrome.storage.sync.set({
             aiProvider: provider,
             aiEndpoint: endpoint,
             aiKey: key,
-            aiModel: model
+            aiModel: model,
         })
 
-        this.setMessage('配置已保存')
+        this.setMessage("配置已保存")
     }
 
     async summarize() {
         this.setMessage("正在总结视频内容...")
-        const config = await chrome.storage.sync.get(['aiProvider', 'aiEndpoint', 'aiKey', 'aiModel'])
+        const config = await chrome.storage.sync.get([
+            "aiProvider",
+            "aiEndpoint",
+            "aiKey",
+            "aiModel",
+        ])
         if (!config.aiProvider || !config.aiEndpoint || !config.aiKey) {
-            this.setMessage('请先配置AI服务')
+            this.setMessage("请先配置AI服务")
             return
         }
-        chrome.runtime.sendMessage(
-            {
-                type: "fetchSubtitles",
-                payload: {
-                    mode: "text"
+        this.setMessage("正在使用AI处理字幕...")
+        const res = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+                {
+                    type: "fetchSubtitles",
+                    payload: {
+                        mode: "text",
+                    },
                 },
-            },
-            async (res) => {
-                if (res?.error) {
-                    alert(res.error)
-                    return
-                }
-                this.setMessage("正在使用AI处理字幕...")
-                setTimeout(() => {
-                    this.setMessage("总结完成，请查看下载的文件")
-                }, 2000)
-            }
-        )
+                async (res) => resolve(res)
+            )
+        })
+        if (res?.error) {
+            this.setMessage(res.error)
+            return
+        }
+        setTimeout(() => {
+            this.setMessage("总结完成，请查看下载的文件")
+        }, 2000)
     }
 
     setMessage(msg) {
@@ -134,7 +141,7 @@ class PopupController {
         let downloadId = -1
         switch (mode) {
             case "text":
-                const textData = this.text2url(res.data)
+                const textData = this.text2url(res.data, "md")
                 const textFilePromise = this.downloadFile(
                     textData.url,
                     `${res.bvid}.md`
@@ -157,8 +164,15 @@ class PopupController {
         this.afterDownload(downloadId)
     }
 
-    text2url(text) {
-        const blob = new Blob([text], { type: "text/plain" })
+    text2url(text, fileType = "txt") {
+        const fileType2MediaType = new Map([
+            ["txt", "text/plain"],
+            ["md", "text/markdown"],
+            ["xmd", "text/x-markdown"],
+        ])
+        const blob = new Blob([text], {
+            type: fileType2MediaType.get(fileType),
+        })
         const url = URL.createObjectURL(blob)
         return {
             url,

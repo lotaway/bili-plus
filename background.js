@@ -33,6 +33,7 @@ class DownloadManager {
             case "fetchSubtitles":
                 message.payload.aid = message.payload.aid ?? this.#videoInfo.aid
                 message.payload.cid = message.payload.cid ?? this.#videoInfo.cid
+                message.payload.bvid = message.payload.bvid ?? this.#videoInfo.bvid
                 if (!message.payload.cid || !message.payload.aid) {
                     let msg = "视频信息获取失败，请刷新页面重试"
                     if (!this.#videoInfo.isInit) {
@@ -43,10 +44,10 @@ class DownloadManager {
                 this.#videoInfo.aid = message.payload.aid
                 this.#videoInfo.cid = message.payload.cid
                 this.#videoInfo.bvid = message.payload.bvid
-                this.fetchSubtitles(message.payload, sendResponse)
+                this.fetchSubtitlesHandler(message.payload, sendResponse)
                 return true
             case "summarize":
-                this.summarizeSubtitles(message.payload, sendResponse)
+                this.summarizeSubtitlesHandler(message.payload, sendResponse)
                 return true
             case "VideoInfoUpdate":
                 const { aid, cid, bvid } = message.payload
@@ -57,7 +58,7 @@ class DownloadManager {
         }
     }
 
-    async summarizeSubtitles(payload, sendResponse) {
+    async summarizeSubtitlesHandler(payload, sendResponse) {
         try {
             const config = await chrome.storage.sync.get([
                 'aiProvider', 
@@ -131,10 +132,10 @@ ${text}`
         return await fetch(subUrl, { headers }).then((r) => r.json())
     }
 
-    async fetchSubtitles(payload, sendResponse) {
+    async fetchSubtitlesHandler(payload, sendResponse) {
         payload.mode = payload.mode ?? "srt"
         const { mode } = payload
-        const bvid = payload.bvid ?? Number.parseInt(Math.random() * 1000)
+        const bvid = payload.bvid ?? Number.parseInt(Math.random() * 10000)
         const subJson = await this.getSubtitlesText(payload)
         switch (mode) {
             case "text":
