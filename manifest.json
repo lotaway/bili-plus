@@ -16,7 +16,8 @@
     "https://aisubtitle.hdslb.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {

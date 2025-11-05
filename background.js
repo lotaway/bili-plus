@@ -1,3 +1,5 @@
+// import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg'
+
 class DownloadManager {
     #videoInfo = {
         isInit: false,
@@ -138,7 +140,7 @@ ${text}`
         const bvid = payload.bvid ?? Number.parseInt(Math.random() * 10000)
         const subJson = await this.getSubtitlesText(payload)
         switch (mode) {
-            case "text":
+            case "md":
                 const text = this.bilisub2text(subJson)
                 sendResponse({data: text, bvid,})
                 break
@@ -163,7 +165,7 @@ ${text}`
     }
 
     bilisub2text(j) {
-        return j.body.map((s) => s.content).join("\n\n")
+        return j.body.map((s) => s.content).join("\n")
     }
 
     bilisub2srt(j) {

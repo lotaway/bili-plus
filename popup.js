@@ -52,7 +52,7 @@ class PopupController {
         document
             .getElementById("extract-only-text")
             .addEventListener("click", async () => {
-                await this.extract("text")
+                await this.extract("md")
             })
 
         document
@@ -102,7 +102,7 @@ class PopupController {
                 {
                     type: "fetchSubtitles",
                     payload: {
-                        mode: "text",
+                        mode: "md",
                     },
                 },
                 async (res) => resolve(res)
@@ -140,8 +140,8 @@ class PopupController {
         }
         let downloadId = -1
         switch (mode) {
-            case "text":
-                const textData = this.text2url(res.data, "md")
+            case "md":
+                const textData = this.text2url(res.data, mode)
                 const textFilePromise = this.downloadFile(
                     textData.url,
                     `${res.bvid}.md`
@@ -150,7 +150,7 @@ class PopupController {
                 downloadId = await textFilePromise
                 break
             case "srt":
-                const srtData = this.text2url(res.data)
+                const srtData = this.text2url(res.data, mode)
                 const srtFilePromise = this.downloadFile(
                     srtData.url,
                     `${res.bvid}.srt`
@@ -169,6 +169,7 @@ class PopupController {
             ["txt", "text/plain"],
             ["md", "text/markdown"],
             ["xmd", "text/x-markdown"],
+            ["srt", "application/x-subrip"],
         ])
         const blob = new Blob([text], {
             type: fileType2MediaType.get(fileType),
