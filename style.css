@@ -4,6 +4,38 @@ body {
   font-family: system-ui;
 }
 
+.config-section {
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.config-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: #666;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 6px;
+  font-size: 13px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
 button {
   width: 100%;
   padding: 8px;
@@ -13,10 +45,23 @@ button {
   background: #00a1d6;
   color: #fff;
   cursor: pointer;
+  margin-bottom: 8px;
 }
 
 button:hover {
   background: #40C5F1;
+}
+
+#saveConfig {
+  background: #4CAF50;
+}
+
+#saveConfig:hover {
+  background: #66BB6A;
+}
+
+.action-section {
+  margin-top: 10px;
 }
 
 #msg {

@@ -20,14 +20,14 @@ class DownloadManager {
     }
 
     onDownloadChanged(args) {
-        console.log(`Download changed: ${args}`)
+        console.debug(`Download changed: ${args}`)
     }
 
     onDownloadCreated(args) {
-        console.log(`Download created: ${args}`)
+        console.debug(`Download created: ${args}`)
     }
 
-    handleMessage(message, sender, sendResponse) {
+    async handleMessage(message, sender, sendResponse) {
         switch (message.type) {
             case "fetchSubtitles":
                 message.payload.aid = message.payload.aid ?? this.#videoInfo.aid
@@ -44,6 +44,9 @@ class DownloadManager {
                 this.#videoInfo.cid = message.payload.cid
                 this.fetchSubtitles(message.payload, sendResponse)
                 return true
+            case "summarize":
+                this.summarizeSubtitles(message.payload, sendResponse)
+                return true
             case "VideoInfoUpdate":
                 this.setMessage("视频信息获取成功")
                 const { aid, cid } = message.payload
@@ -54,7 +57,69 @@ class DownloadManager {
         }
     }
 
-    async fetchSubtitles(payload, sendResponse) {
+    async summarizeSubtitles(payload, sendResponse) {
+        try {
+            const config = await chrome.storage.sync.get([
+                'aiProvider', 
+                'aiEndpoint',
+                'aiKey',
+                'aiModel'
+            ])
+            
+            if (!config.aiKey || !config.aiEndpoint) {
+                return sendResponse({ error: "请先配置AI服务" })
+            }
+
+            const subtitles = await this.getSubtitlesText(payload)
+            if (subtitles.error) {
+                return sendResponse({ error: subtitles.error })
+            }
+
+            const summary = await this.processWithAI(subtitles, config)
+            
+            const downloadId = await this.downloadFile(
+                summary,
+                `${payload.bvid || 'summary'}_processed.md`
+            )
+            
+            return sendResponse({ downloadId })
+        } catch (error) {
+            console.error("Summarize error:", error)
+            return sendResponse({ error: "AI处理失败: " + error.message })
+        }
+    }
+
+    async processWithAI(text, config) {
+        const prompt = `请将以下视频字幕内容进行总结和提炼：
+1. 去除所有礼貌用语、介绍、玩笑话、广告、评价和不客观的观点
+2. 保留对核心问题的介绍、解析、可行方式、步骤和示例
+3. 可以轻度补充缺失的内容
+4. 输出为结构清晰的Markdown格式
+
+字幕内容：
+${text}`
+
+        const response = await fetch(`${config.aiEndpoint}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.aiKey}`
+            },
+            body: JSON.stringify({
+                model: config.aiModel || "gpt-3.5-turbo",
+                messages: [{
+                    role: "user",
+                    content: prompt
+                }],
+                temperature: 0.7
+            })
+        })
+
+        const data = await response.json()
+        return data.choices[0].message.content
+    }
+
+    async getSubtitlesText(payload) {
         const { aid, cid } = payload
         const cookieStore = await chrome.cookies.getAll({
             domain: ".bilibili.com",
@@ -69,22 +134,33 @@ class DownloadManager {
         const pref = subtitles.find((s) =>
             ["ai-zh", "zh", "zh-CN"].includes(s.lan)
         )
-        if (!pref) return sendResponse({ error: "无可用字幕" })
+        if (!pref) return { error: "无可用字幕" }
         const subUrl = "https:" + pref.subtitle_url
         const subJson = await fetch(subUrl, { headers }).then((r) => r.json())
+        return this.bilisub2text(subJson)
+    }
+
+    async fetchSubtitles(payload, sendResponse) {
+        const { aid, cid, mode = "srt" } = payload
+        const subtitles = await this.getSubtitlesText(payload)
+        if (subtitles.error) {
+            return sendResponse({ error: subtitles.error })
+        }
+
         let downloadId = -1
         switch (mode) {
             case "text":
                 downloadId = await this.downloadFile(
-                    this.bilisub2text(subJson),
-                    `${match.bvid}.md`
+                    subtitles,
+                    `${payload.bvid || 'subtitles'}.md`
                 )
                 break
             case "srt":
             default:
+                const subJson = await this.getSubtitlesJson(payload)
                 downloadId = await this.downloadFile(
                     this.bilisub2srt(subJson),
-                    `${match.bvid}.srt`
+                    `${payload.bvid || 'subtitles'}.srt`
                 )
                 break
         }
@@ -116,23 +192,6 @@ class DownloadManager {
                     )} --> ${this.float2hhmmss(s.to)}\n${s.content}`
             )
             .join("\n\n")
-    }
-
-    async downloadSrt(srt, name, ext = "srt") {
-        const blob = new Blob([srt], { type: "text/plain" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `${name}.${ext}`
-        a.style.display = "none"
-        document.documentElement.appendChild(a)
-        requestAnimationFrame(() => {
-            a.click()
-            setTimeout(() => {
-                a.remove()
-                URL.revokeObjectURL(url)
-            }, 3000)
-        })
     }
 
     async downloadFile(url, filename) {

@@ -1,5 +1,5 @@
 function main() {
-    console.info("Start video content.js")
+    console.debug("Start video content.js")
 
     globalThis.addEventListener("message", event => {
         if (event.source != globalThis) {
@@ -19,7 +19,7 @@ function main() {
     script.src = url
     document.documentElement.appendChild(script)
 
-    console.info("End video content.js")
+    console.debug("End video content.js")
 }
 
 main()
