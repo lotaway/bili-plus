@@ -1,9 +1,25 @@
 function main() {
-    console.info("Starting video content.js")
-    const script = document.createElement('script')
+    console.info("Start video content.js")
+
+    globalThis.addEventListener("message", event => {
+        if (event.source != globalThis) {
+            return
+        }
+        if (event.data?.source !== "VIDEO_PAGE_INJECT") {
+            return
+        }
+        chrome.runtime.sendMessage({
+            type: "VideoInfoUpdate",
+            payload: event.payload,
+        })
+    })
+
+    const script = document.createElement("script")
     const url = chrome.runtime.getURL("utils/video_page_inject.js")
     script.src = url
     document.documentElement.appendChild(script)
+
+    console.info("End video content.js")
 }
 
 main()

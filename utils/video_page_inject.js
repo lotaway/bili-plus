@@ -1,5 +1,5 @@
 async function main() {
-    console.info("Starting video inject.js")
+    console.info("Start video inject.js")
     const match = globalThis.__INITIAL_STATE__?.videoData
     if (!match) {
         console.error("No video data found in window.__INITIAL_STATE__")
@@ -7,13 +7,23 @@ async function main() {
     }
     const aid = match.aid
     const cid = match.cid
-    await chrome.runtime.sendMessage({
-        type: "VideoInfoUpdate",
-        detail: {
+    // globalThis.dispatchEvent(
+    //     new CustomEvent("VideoInfoUpdate", {
+    //         detail: {
+    //             aid,
+    //             cid,
+    //         },
+    //     })
+    // )
+    window.postMessage({
+        source: "VIDEO_PAGE_INJECT",
+        payload: {
             aid,
             cid,
         },
     })
+
+    console.info("End video inject.js")
 }
 
 main()

@@ -1,4 +1,10 @@
 class DownloadManager {
+    #videoInfo = {
+        isInit: false,
+        aid: null,
+        cid: null,
+    }
+
     constructor() {
         this.setupEventListeners()
     }
@@ -21,17 +27,35 @@ class DownloadManager {
         console.log(`Download created: ${args}`)
     }
 
-    handleMessage(request, sender, sendResponse) {
-        switch (request.action) {
+    handleMessage(message, sender, sendResponse) {
+        switch (message.type) {
             case "fetchSubtitles":
+                message.payload.aid = message.payload.aid ?? this.#videoInfo.aid
+                message.payload.cid = message.payload.cid ?? this.#videoInfo.cid
+                if (!message.payload.cid || !message.payload.aid) {
+                    if (this.#videoInfo.isInit) {
+                        this.setMessage("视频信息获取失败，请刷新页面重试")
+                    } else {
+                        this.setMessage("content.js maybe not trigger")
+                    }
+                    return
+                }
+                this.#videoInfo.aid = message.payload.aid
+                this.#videoInfo.cid = message.payload.cid
+                this.fetchSubtitles(message.payload, sendResponse)
+                return true
+            case "VideoInfoUpdate":
+                this.setMessage("视频信息获取成功")
+                const { aid, cid } = message.payload
+                this.#videoInfo = { isInit: true, aid, cid }
+                break
             default:
-                this.fetchSubtitles(request.msg, sendResponse)
                 break
         }
     }
 
-    async fetchSubtitles(msg, sendResponse) {
-        const { aid, cid } = msg
+    async fetchSubtitles(payload, sendResponse) {
+        const { aid, cid } = payload
         const cookieStore = await chrome.cookies.getAll({
             domain: ".bilibili.com",
         })
@@ -51,11 +75,17 @@ class DownloadManager {
         let downloadId = -1
         switch (mode) {
             case "text":
-                downloadId = await this.downloadFile(this.bilisub2text(subJson), `${match.bvid}.md`)
+                downloadId = await this.downloadFile(
+                    this.bilisub2text(subJson),
+                    `${match.bvid}.md`
+                )
                 break
             case "srt":
             default:
-                downloadId = await this.downloadFile(this.bilisub2srt(subJson), `${match.bvid}.srt`)
+                downloadId = await this.downloadFile(
+                    this.bilisub2srt(subJson),
+                    `${match.bvid}.srt`
+                )
                 break
         }
         return sendResponse({ downloadId })

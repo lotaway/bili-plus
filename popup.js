@@ -1,9 +1,4 @@
 class PopupController {
-    #videoInfo = {
-        isInit: false,
-        aid: null,
-        cid: null,
-    }
 
     constructor() {
         void this.init()
@@ -17,23 +12,19 @@ class PopupController {
     }
 
     async initEventHandle() {
+        this.setMessage("正在初始化...")
+        // const [tab] = await chrome.tabs.query({
+        //     active: true,
+        //     currentWindow: true,
+        // })
+        // await chrome.scripting.executeScript({
+        //     target: {
+        //         tabId: tab.id,
+        //     },
+        //     files: ["utils/video_page_inject.js"],
+        //     world: "MAIN",
+        // })
         this.setMessage("正在获取视频信息...")
-        const [tab] = await chrome.tabs.query({
-            active: true,
-            currentWindow: true,
-        })
-        await chrome.scripting.executeScript({
-            target: {
-                tabId: tab.id,
-            },
-            files: ["utils/page_inject.js"],
-            world: "MAIN",
-        })
-        document.addEventListener("VideoInfoUpdate", (event) => {
-            this.setMessage("视频信息获取成功")
-            const { aid, cid } = event.detail
-            this.#videoInfo = { isInit: true, aid, cid }
-        })
     }
 
     initButton() {
@@ -56,22 +47,10 @@ class PopupController {
 
     async extract(mode = "srt") {
         this.setMessage("正在提取字幕...")
-        let aid = this.#videoInfo.aid
-        let cid = this.#videoInfo.cid
-        if (!cid || !aid) {
-            if (this.#videoInfo.isInit) {
-                this.setMessage("视频信息获取失败，请刷新页面重试")
-            } else {
-                this.setMessage("content.js maybe not trigger")
-            }
-            return
-        }
         chrome.runtime.sendMessage(
             {
                 type: "fetchSubtitles",
-                msg: {
-                    aid,
-                    cid,
+                payload: {
                     mode,
                 },
             },
