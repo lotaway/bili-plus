@@ -7,11 +7,13 @@ async function main() {
     }
     const aid = match.aid
     const cid = match.cid
+    const bvid = match.bvid
     // globalThis.dispatchEvent(
     //     new CustomEvent("VideoInfoUpdate", {
     //         detail: {
     //             aid,
     //             cid,
+    //             bvid,
     //         },
     //     })
     // )
@@ -20,6 +22,7 @@ async function main() {
         payload: {
             aid,
             cid,
+            bvid,
         },
     })
 

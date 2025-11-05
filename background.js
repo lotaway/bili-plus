@@ -3,6 +3,7 @@ class DownloadManager {
         isInit: false,
         aid: null,
         cid: null,
+        bvid: null,
     }
 
     constructor() {
@@ -28,26 +29,26 @@ class DownloadManager {
     }
 
     handleMessage(message, sender, sendResponse) {
+        console.info("background.js got message", message, sender?.documentId)
         switch (message.type) {
             case "fetchSubtitles":
                 message.payload.aid = message.payload.aid ?? this.#videoInfo.aid
                 message.payload.cid = message.payload.cid ?? this.#videoInfo.cid
                 if (!message.payload.cid || !message.payload.aid) {
-                    if (this.#videoInfo.isInit) {
-                        this.setMessage("视频信息获取失败，请刷新页面重试")
-                    } else {
-                        this.setMessage("content.js maybe not trigger")
+                    let msg = "视频信息获取失败，请刷新页面重试"
+                    if (!this.#videoInfo.isInit) {
+                        msg = "content.js maybe not trigger"
                     }
-                    return
+                    return sendResponse({ error: msg })
                 }
                 this.#videoInfo.aid = message.payload.aid
                 this.#videoInfo.cid = message.payload.cid
+                this.#videoInfo.bvid = message.payload.bvid
                 this.fetchSubtitles(message.payload, sendResponse)
                 return true
             case "VideoInfoUpdate":
-                this.setMessage("视频信息获取成功")
-                const { aid, cid } = message.payload
-                this.#videoInfo = { isInit: true, aid, cid }
+                const { aid, cid, bvid } = message.payload
+                this.#videoInfo = { isInit: true, aid, cid, bvid }
                 break
             default:
                 break
@@ -55,7 +56,8 @@ class DownloadManager {
     }
 
     async fetchSubtitles(payload, sendResponse) {
-        const { aid, cid } = payload
+        const { aid, cid, mode } = payload
+        const bvid = payload.bvid ?? Number.parseInt(Math.random() * 1000)
         const cookieStore = await chrome.cookies.getAll({
             domain: ".bilibili.com",
         })
@@ -72,23 +74,17 @@ class DownloadManager {
         if (!pref) return sendResponse({ error: "无可用字幕" })
         const subUrl = "https:" + pref.subtitle_url
         const subJson = await fetch(subUrl, { headers }).then((r) => r.json())
-        let downloadId = -1
         switch (mode) {
             case "text":
-                downloadId = await this.downloadFile(
-                    this.bilisub2text(subJson),
-                    `${match.bvid}.md`
-                )
+                const text = this.bilisub2text(subJson)
+                sendResponse({data: text, bvid,})
                 break
             case "srt":
             default:
-                downloadId = await this.downloadFile(
-                    this.bilisub2srt(subJson),
-                    `${match.bvid}.srt`
-                )
+                const srt = this.bilisub2srt(subJson)
+                sendResponse({data: srt, bvid,})
                 break
         }
-        return sendResponse({ downloadId })
     }
 
     float2hhmmss(num) {
@@ -116,32 +112,6 @@ class DownloadManager {
                     )} --> ${this.float2hhmmss(s.to)}\n${s.content}`
             )
             .join("\n\n")
-    }
-
-    async downloadSrt(srt, name, ext = "srt") {
-        const blob = new Blob([srt], { type: "text/plain" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `${name}.${ext}`
-        a.style.display = "none"
-        document.documentElement.appendChild(a)
-        requestAnimationFrame(() => {
-            a.click()
-            setTimeout(() => {
-                a.remove()
-                URL.revokeObjectURL(url)
-            }, 3000)
-        })
-    }
-
-    async downloadFile(url, filename) {
-        return await chrome.downloads.download({
-            url: url,
-            filename,
-            conflictAction: "uniquify",
-            saveAs: false,
-        })
     }
 }
 
