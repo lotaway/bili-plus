@@ -3,6 +3,7 @@ class DownloadManager {
         isInit: false,
         aid: null,
         cid: null,
+        bvid: null,
     }
 
     constructor() {
@@ -27,30 +28,29 @@ class DownloadManager {
         console.debug(`Download created: ${args}`)
     }
 
-    async handleMessage(message, sender, sendResponse) {
+    handleMessage(message, sender, sendResponse) {
         switch (message.type) {
             case "fetchSubtitles":
                 message.payload.aid = message.payload.aid ?? this.#videoInfo.aid
                 message.payload.cid = message.payload.cid ?? this.#videoInfo.cid
                 if (!message.payload.cid || !message.payload.aid) {
-                    if (this.#videoInfo.isInit) {
-                        this.setMessage("视频信息获取失败，请刷新页面重试")
-                    } else {
-                        this.setMessage("content.js maybe not trigger")
+                    let msg = "视频信息获取失败，请刷新页面重试"
+                    if (!this.#videoInfo.isInit) {
+                        msg = "content.js maybe not trigger"
                     }
-                    return
+                    return sendResponse({ error: msg })
                 }
                 this.#videoInfo.aid = message.payload.aid
                 this.#videoInfo.cid = message.payload.cid
+                this.#videoInfo.bvid = message.payload.bvid
                 this.fetchSubtitles(message.payload, sendResponse)
                 return true
             case "summarize":
                 this.summarizeSubtitles(message.payload, sendResponse)
                 return true
             case "VideoInfoUpdate":
-                this.setMessage("视频信息获取成功")
-                const { aid, cid } = message.payload
-                this.#videoInfo = { isInit: true, aid, cid }
+                const { aid, cid, bvid } = message.payload
+                this.#videoInfo = { isInit: true, aid, cid, bvid }
                 break
             default:
                 break
@@ -65,23 +65,15 @@ class DownloadManager {
                 'aiKey',
                 'aiModel'
             ])
-            
             if (!config.aiKey || !config.aiEndpoint) {
                 return sendResponse({ error: "请先配置AI服务" })
             }
-
-            const subtitles = await this.getSubtitlesText(payload)
-            if (subtitles.error) {
-                return sendResponse({ error: subtitles.error })
-            }
-
+            const subtitles = this.bilisub2text(await this.getSubtitlesText(payload))
             const summary = await this.processWithAI(subtitles, config)
-            
             const downloadId = await this.downloadFile(
                 summary,
                 `${payload.bvid || 'summary'}_processed.md`
             )
-            
             return sendResponse({ downloadId })
         } catch (error) {
             console.error("Summarize error:", error)
@@ -136,35 +128,25 @@ ${text}`
         )
         if (!pref) return { error: "无可用字幕" }
         const subUrl = "https:" + pref.subtitle_url
-        const subJson = await fetch(subUrl, { headers }).then((r) => r.json())
-        return this.bilisub2text(subJson)
+        return await fetch(subUrl, { headers }).then((r) => r.json())
     }
 
     async fetchSubtitles(payload, sendResponse) {
-        const { aid, cid, mode = "srt" } = payload
-        const subtitles = await this.getSubtitlesText(payload)
-        if (subtitles.error) {
-            return sendResponse({ error: subtitles.error })
-        }
-
-        let downloadId = -1
+        payload.mode = payload.mode ?? "srt"
+        const { mode } = payload
+        const bvid = payload.bvid ?? Number.parseInt(Math.random() * 1000)
+        const subJson = await this.getSubtitlesText(payload)
         switch (mode) {
             case "text":
-                downloadId = await this.downloadFile(
-                    subtitles,
-                    `${payload.bvid || 'subtitles'}.md`
-                )
+                const text = this.bilisub2text(subJson)
+                sendResponse({data: text, bvid,})
                 break
             case "srt":
             default:
-                const subJson = await this.getSubtitlesJson(payload)
-                downloadId = await this.downloadFile(
-                    this.bilisub2srt(subJson),
-                    `${payload.bvid || 'subtitles'}.srt`
-                )
+                const srt = this.bilisub2srt(subJson)
+                sendResponse({data: srt, bvid,})
                 break
         }
-        return sendResponse({ downloadId })
     }
 
     float2hhmmss(num) {
@@ -192,15 +174,6 @@ ${text}`
                     )} --> ${this.float2hhmmss(s.to)}\n${s.content}`
             )
             .join("\n\n")
-    }
-
-    async downloadFile(url, filename) {
-        return await chrome.downloads.download({
-            url: url,
-            filename,
-            conflictAction: "uniquify",
-            saveAs: false,
-        })
     }
 }
 
