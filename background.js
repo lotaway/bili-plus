@@ -51,11 +51,11 @@ class DownloadManager {
         let downloadId = -1
         switch (mode) {
             case "text":
-                downloadId = this.downloadFile(this.bilisub2text(subJson), `${match.bvid}.md`)
+                downloadId = await this.downloadFile(this.bilisub2text(subJson), `${match.bvid}.md`)
                 break
             case "srt":
             default:
-                downloadId = this.downloadFile(this.bilisub2srt(subJson), `${match.bvid}.srt`)
+                downloadId = await this.downloadFile(this.bilisub2srt(subJson), `${match.bvid}.srt`)
                 break
         }
         return sendResponse({ downloadId })
