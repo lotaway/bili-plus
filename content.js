@@ -13,12 +13,10 @@ function addListener() {
         if (event.data?.source !== "VIDEO_PAGE_INJECT") {
             return
         }
-        console.debug("video content.js got message", event.data)
         const result = await chrome.runtime.sendMessage({
             type: "VideoInfoUpdate",
             payload: event.data.payload,
         })
-        console.debug("video content.js got result", result)
     })
 }
 
@@ -27,7 +25,6 @@ function injectScript() {
     const url = chrome.runtime.getURL("utils/video_page_inject.js")
     script.src = url
     document.documentElement.appendChild(script)
-    console.debug("End video content.js")
 }
 
 main()

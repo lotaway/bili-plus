@@ -137,7 +137,7 @@ class SubtitleFetcher {
     }
 
     async getTitle() {
-        const data = chrome.storage.local.get(this.#videoInfo.bvid)
+        const data = (await chrome.storage.local.get([this.#videoInfo.bvid]))[this.#videoInfo.bvid]
         if (!data) {
             return ""
         }
@@ -263,7 +263,7 @@ class AISubtitleHandler {
         const subtitles = fetcher.bilisub2text(
             await fetcher.getSubtitlesText()
         )
-        const title = await fetcher.getTitle()
+        const title = await fetcher.getTitle().catch(() => "")
         const summary = await this.processWithAI(title, subtitles, config)
         return { data: summary }
     }
@@ -293,12 +293,14 @@ ${text}`
             }),
             signal,
         })
-
-        let data = await response.json()
-        if (!data.choices) {
-            throw new Error(data.message ?? "AI服务调用失败")
+        let data = await response.clone().json().catch(err => response.text())
+        if (typeof data === "string") {
+            data = new Error(data)
         }
-        const arr = data.choices[0].message.content.split("</think>")
+        if (!data?.choices) {
+            throw new Error(data?.message ?? data?.error?.message ?? "AI服务调用失败")
+        }
+        const arr = data?.choices?.[0]?.message?.content?.split("</think>") ?? [""]
         data = arr[1] ?? arr[0]
         const matchs = data.match(/```markdown([\s\S]+?)```/)
         return `# ${title}\n\n${matchs ? matchs[1] : data}`
