@@ -1,7 +1,8 @@
 // import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg'
 
 class DownloadManager {
-    #sibtitleFetcher = new SubtitleFetcher()
+    #subtitleFetcher = new SubtitleFetcher()
+    #aiSubtitleHandler = new AISubtitleHandler(this.#subtitleFetcher)
 
     constructor() {
         this.setupEventListeners()
@@ -28,23 +29,38 @@ class DownloadManager {
     handleMessage(message, sender, sendResponse) {
         switch (message.type) {
             case "fetchSubtitles":
-                if (!this.#sibtitleFetcher.cid || !this.#sibtitleFetcher.aid) {
+                if (!this.#subtitleFetcher.cid || !this.#subtitleFetcher.aid) {
                     let msg = "视频信息获取失败，请刷新页面重试"
-                    if (!this.#sibtitleFetcher.isInit) {
+                    if (!this.#subtitleFetcher.isInit) {
                         msg = "content.js maybe not trigger"
                     }
                     return sendResponse({ error: msg })
                 }
-                this.#sibtitleFetcher.fetchSubtitlesHandler(
-                    message.payload,
-                    sendResponse
-                )
+                this.#subtitleFetcher
+                    .fetchSubtitlesHandler(message.payload)
+                    .then((subtitleResult) => {
+                        sendResponse({
+                            data: subtitleResult,
+                            bvid: this.#subtitleFetcher.bvid,
+                            cid: this.#subtitleFetcher.cid,
+                        })
+                    })
+                    .catch((error) => sendResponse({ error: error instanceof Error ? error.message : JSON.stringify(error) }))
                 return true
             case "summarize":
-                this.summarizeSubtitlesHandler(message.payload, sendResponse)
+                this.#aiSubtitleHandler
+                    .summarizeSubtitlesHandler(message.payload)
+                    .then((summaryResult) => {
+                        sendResponse({
+                            ...summaryResult,
+                            bvid: this.#subtitleFetcher.bvid,
+                            cid: this.#subtitleFetcher.cid,
+                        })
+                    })
+                    .catch((error) => sendResponse({ error: error instanceof Error ? error.message : JSON.stringify(error) }))
                 return true
             case "VideoInfoUpdate":
-                this.#sibtitleFetcher.init(message.payload)
+                this.#subtitleFetcher.init(message.payload)
                 break
             default:
                 break
@@ -75,7 +91,7 @@ class SubtitleFetcher {
     }
 
     get bvid() {
-        return this.#videoInfo.bvid
+        return this.#videoInfo.bvid ?? Number.parseInt(Math.random() * 10000)
     }
 
     init(data) {
@@ -86,77 +102,22 @@ class SubtitleFetcher {
         this.#videoInfo.bvid = data.bvid ?? this.#videoInfo.bvid
         this.#videoInfo.isInit = this.#videoInfo.cid && this.#videoInfo.aid
         if (this.#videoInfo.bvid) {
-            chrome.storage.local.set(this.#videoInfo.bvid, data)
+            chrome.storage.local.set({
+                [this.#videoInfo.bvid]: data,
+            })
         }
     }
 
-    async summarizeSubtitlesHandler(payload, sendResponse) {
-        try {
-            const config = await chrome.storage.sync.get([
-                "aiProvider",
-                "aiEndpoint",
-                "aiKey",
-                "aiModel",
-            ])
-            if (!config.aiKey || !config.aiEndpoint) {
-                return sendResponse({ error: "请先配置AI服务" })
-            }
-            const subtitles = this.bilisub2text(
-                await this.getSubtitlesText(payload)
-            )
-            const summary = await this.processWithAI(subtitles, config)
-            const downloadId = await this.downloadFile(
-                summary,
-                `${payload.bvid || "summary"}_processed.md`
-            )
-            return sendResponse({ downloadId })
-        } catch (error) {
-            console.error("Summarize error:", error)
-            return sendResponse({ error: "AI处理失败: " + error.message })
-        }
-    }
-
-    async processWithAI(text, config) {
-        const prompt = `请将以下视频字幕内容进行总结和提炼：
-1. 去除所有礼貌用语、介绍、玩笑话、广告、评价和不客观的观点
-2. 保留对核心问题的介绍、解析、可行方式、步骤和示例
-3. 可以轻度补充缺失的内容
-4. 输出为结构清晰的Markdown格式
-
-字幕内容：
-${text}`
-
-        const response = await fetch(`${config.aiEndpoint}/chat/completions`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${config.aiKey}`,
-            },
-            body: JSON.stringify({
-                model: config.aiModel || "gpt-3.5-turbo",
-                messages: [
-                    {
-                        role: "user",
-                        content: prompt,
-                    },
-                ],
-                temperature: 0.7,
-            }),
-        })
-
-        const data = await response.json()
-        return data.choices[0].message.content
-    }
-
-    async getSubtitlesText(payload) {
-        const { aid, cid } = payload
+    async getSubtitlesText() {
         const cookieStore = await chrome.cookies.getAll({
             domain: ".bilibili.com",
         })
         const cookieHeader = cookieStore
             .map((c) => `${c.name}=${c.value}`)
             .join("; ")
-        const url = `https://api.bilibili.com/x/player/wbi/v2?aid=${aid}&cid=${cid}`
+        const url = `https://api.bilibili.com/x/player/wbi/v2?aid=${
+            this.#videoInfo.aid
+        }&cid=${this.#videoInfo.cid}`
         const headers = { Cookie: cookieHeader }
         const j = await fetch(url, { headers }).then((r) => r.json())
         const subtitles = j?.data?.subtitle?.subtitles || []
@@ -168,34 +129,16 @@ ${text}`
         return await fetch(subUrl, { headers }).then((r) => r.json())
     }
 
-    async fetchSubtitlesHandler(payload, sendResponse) {
+    async fetchSubtitlesHandler(payload) {
         payload.mode = payload.mode ?? "srt"
-        payload.aid = payload.aid ?? this.#videoInfo.aid
-        payload.cid = payload.cid ?? this.#videoInfo.cid
-        payload.bvid =
-            payload.bvid ??
-            this.#videoInfo.bvid ??
-            Number.parseInt(Math.random() * 10000)
         const { mode } = payload
-        const subJson = await this.getSubtitlesText(payload)
+        const subJson = await this.getSubtitlesText()
         switch (mode) {
             case "md":
-                const text = this.bilisub2text(subJson)
-                sendResponse({
-                    data: text,
-                    bvid: payload.bvid,
-                    cid: payload.cid,
-                })
-                break
+                return this.bilisub2text(subJson)
             case "srt":
             default:
-                const srt = this.bilisub2srt(subJson)
-                sendResponse({
-                    data: srt,
-                    bvid: payload.bvid,
-                    cid: payload.cid,
-                })
-                break
+                return this.bilisub2srt(subJson)
         }
     }
 
@@ -224,6 +167,74 @@ ${text}`
                     )} --> ${this.float2hhmmss(s.to)}\n${s.content}`
             )
             .join("\n\n")
+    }
+}
+
+class AISubtitleHandler {
+    #fetcher = new SubtitleFetcher()
+
+    static defaultModelName() {
+        return "gpt-3.5-turbo"
+    }
+
+    constructor(fetcher) {
+        this.#fetcher = fetcher
+    }
+
+    get prompt() {
+        return `你是一个学霸，能很好地发掘视频提供的知识，请将以下视频字幕内容进行总结和提炼：
+1. 去除所有礼貌用语、空泛介绍、玩笑话、广告、评价和不客观的观点
+2. 保留对核心问题的介绍、解析、可行方式、步骤和示例
+3. 可以轻度补充缺失的内容
+4. 输出为结构清晰的Markdown格式`
+    }
+
+    async summarizeSubtitlesHandler(payload) {
+        const config = await chrome.storage.sync.get([
+            "aiProvider",
+            "aiEndpoint",
+            "aiKey",
+            "aiModel",
+        ])
+        if (!config.aiKey || !config.aiEndpoint) {
+            return { error: "请先配置AI服务" }
+        }
+        const subtitles = this.#fetcher.bilisub2text(
+            await this.#fetcher.getSubtitlesText(payload)
+        )
+        const summary = await this.processWithAI(subtitles, config)
+        return { data: summary }
+    }
+
+    async processWithAI(text, config) {
+        const completePrompt = `${this.prompt}
+
+字幕内容：
+${text}`
+
+        const response = await fetch(`${config.aiEndpoint}/chat/completions`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${config.aiKey}`,
+            },
+            body: JSON.stringify({
+                model: config.aiModel ?? AISubtitleHandler.defaultModelName(),
+                messages: [
+                    {
+                        role: "user",
+                        content: completePrompt,
+                    },
+                ],
+                temperature: 0.7,
+            }),
+        })
+
+        const data = await response.json()
+        if (!data.choices) {
+            throw new Error(data.message ?? "AI服务调用失败")
+        }
+        return data.choices[0].message.content
     }
 }
 

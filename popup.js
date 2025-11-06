@@ -85,22 +85,11 @@ class PopupController {
     }
 
     async summarize() {
-        this.setMessage("正在总结视频内容...")
-        const config = await chrome.storage.sync.get([
-            "aiProvider",
-            "aiEndpoint",
-            "aiKey",
-            "aiModel",
-        ])
-        if (!config.aiProvider || !config.aiEndpoint || !config.aiKey) {
-            this.setMessage("请先配置AI服务")
-            return
-        }
         this.setMessage("正在使用AI处理字幕...")
         const res = await new Promise((resolve, reject) => {
             chrome.runtime.sendMessage(
                 {
-                    type: "fetchSubtitles",
+                    type: "summarize",
                     payload: {
                         mode: "md",
                     },
@@ -112,8 +101,15 @@ class PopupController {
             this.setMessage(res.error)
             return
         }
+        const textData = this.text2url(res.data, mode)
+        const textFilePromise = this.downloadFile(
+            textData.url,
+            `${res.bvid}-${res.cid}-summary.md`
+        )
+        textFilePromise.finally(textData.destory)
+        const downloadId = await textFilePromise
         setTimeout(() => {
-            this.setMessage("总结完成，请查看下载的文件")
+            this.setMessage(`总结完成，请查看下载的文件, ${downloadId}`)
         }, 2000)
     }
 
