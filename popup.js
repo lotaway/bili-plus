@@ -90,9 +90,6 @@ class PopupController {
             chrome.runtime.sendMessage(
                 {
                     type: "summarize",
-                    payload: {
-                        mode: "md",
-                    },
                 },
                 async (res) => resolve(res)
             )
@@ -101,7 +98,7 @@ class PopupController {
             this.setMessage(res.error)
             return
         }
-        const textData = this.text2url(res.data, mode)
+        const textData = this.text2url(res.data, "md")
         const textFilePromise = this.downloadFile(
             textData.url,
             `${res.bvid}-${res.cid}-summary.md`

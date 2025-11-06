@@ -2,7 +2,7 @@
 
 class DownloadManager {
     #subtitleFetcher = new SubtitleFetcher()
-    #aiSubtitleHandler = new AISubtitleHandler(this.#subtitleFetcher)
+    #aiSubtitleHandler = new AISubtitleHandler()
 
     constructor() {
         this.setupEventListeners()
@@ -26,15 +26,25 @@ class DownloadManager {
         console.debug(`Download created: ${args}`)
     }
 
+    checkVideoInfo() {
+        if (!this.#subtitleFetcher.cid || !this.#subtitleFetcher.aid) {
+            let msg = "视频信息获取失败，请刷新页面重试"
+            if (!this.#subtitleFetcher.isInit) {
+                msg = "content.js maybe not trigger"
+            }
+            return {
+                error: msg,
+            }
+        }
+        return true
+    }
+
     handleMessage(message, sender, sendResponse) {
         switch (message.type) {
             case "fetchSubtitles":
-                if (!this.#subtitleFetcher.cid || !this.#subtitleFetcher.aid) {
-                    let msg = "视频信息获取失败，请刷新页面重试"
-                    if (!this.#subtitleFetcher.isInit) {
-                        msg = "content.js maybe not trigger"
-                    }
-                    return sendResponse({ error: msg })
+                const preResult = this.checkVideoInfo()
+                if (preResult?.error) {
+                    return sendResponse(preResult)
                 }
                 this.#subtitleFetcher
                     .fetchSubtitlesHandler(message.payload)
@@ -45,11 +55,23 @@ class DownloadManager {
                             cid: this.#subtitleFetcher.cid,
                         })
                     })
-                    .catch((error) => sendResponse({ error: error instanceof Error ? error.message : JSON.stringify(error) }))
+                    .catch((error) => {
+                        console.error(error)
+                        sendResponse({
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : JSON.stringify(error),
+                        })
+                    })
                 return true
             case "summarize":
+                const preResult2 = this.checkVideoInfo()
+                if (preResult2?.error) {
+                    return sendResponse(preResult2)
+                }
                 this.#aiSubtitleHandler
-                    .summarizeSubtitlesHandler(message.payload)
+                    .summarizeSubtitlesHandler(this.#subtitleFetcher)
                     .then((summaryResult) => {
                         sendResponse({
                             ...summaryResult,
@@ -57,7 +79,15 @@ class DownloadManager {
                             cid: this.#subtitleFetcher.cid,
                         })
                     })
-                    .catch((error) => sendResponse({ error: error instanceof Error ? error.message : JSON.stringify(error) }))
+                    .catch((error) => {
+                        console.error(error)
+                        sendResponse({
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : JSON.stringify(error),
+                        })
+                    })
                 return true
             case "VideoInfoUpdate":
                 this.#subtitleFetcher.init(message.payload)
@@ -97,7 +127,7 @@ class SubtitleFetcher {
     init(data) {
         this.#videoInfo.aid = data.aid ?? this.#videoInfo.aid
         this.#videoInfo.cid =
-            (data.p ? data.pages?.[data.p]?.cid : data.cid) ??
+            (data.p ? data.pages?.[data.p - 1]?.cid : data.cid) ??
             this.#videoInfo.cid
         this.#videoInfo.bvid = data.bvid ?? this.#videoInfo.bvid
         this.#videoInfo.isInit = this.#videoInfo.cid && this.#videoInfo.aid
@@ -171,14 +201,9 @@ class SubtitleFetcher {
 }
 
 class AISubtitleHandler {
-    #fetcher = new SubtitleFetcher()
 
     static defaultModelName() {
         return "gpt-3.5-turbo"
-    }
-
-    constructor(fetcher) {
-        this.#fetcher = fetcher
     }
 
     get prompt() {
@@ -189,7 +214,7 @@ class AISubtitleHandler {
 4. 输出为结构清晰的Markdown格式`
     }
 
-    async summarizeSubtitlesHandler(payload) {
+    async summarizeSubtitlesHandler(fetcher) {
         const config = await chrome.storage.sync.get([
             "aiProvider",
             "aiEndpoint",
@@ -199,8 +224,8 @@ class AISubtitleHandler {
         if (!config.aiKey || !config.aiEndpoint) {
             return { error: "请先配置AI服务" }
         }
-        const subtitles = this.#fetcher.bilisub2text(
-            await this.#fetcher.getSubtitlesText(payload)
+        const subtitles = fetcher.bilisub2text(
+            await fetcher.getSubtitlesText()
         )
         const summary = await this.processWithAI(subtitles, config)
         return { data: summary }
@@ -230,11 +255,14 @@ ${text}`
             }),
         })
 
-        const data = await response.json()
+        let data = await response.json()
         if (!data.choices) {
             throw new Error(data.message ?? "AI服务调用失败")
         }
-        return data.choices[0].message.content
+        const arr = data.choices[0].message.content.split("</think>")
+        data = arr[1] ?? arr[0]
+        const matchs = data.match(/```markdown([\s\S]+?)```/)
+        return matchs ? matchs[1] : data
     }
 }
 
