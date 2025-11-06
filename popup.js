@@ -144,7 +144,7 @@ class PopupController {
                 const textData = this.text2url(res.data, mode)
                 const textFilePromise = this.downloadFile(
                     textData.url,
-                    `${res.bvid}.md`
+                    `${res.bvid}-${res.cid}.md`
                 )
                 textFilePromise.finally(textData.destory)
                 downloadId = await textFilePromise
@@ -153,7 +153,7 @@ class PopupController {
                 const srtData = this.text2url(res.data, mode)
                 const srtFilePromise = this.downloadFile(
                     srtData.url,
-                    `${res.bvid}.srt`
+                    `${res.bvid}-${res.cid}.srt`
                 )
                 srtFilePromise.finally(srtData.destory)
                 downloadId = await srtFilePromise

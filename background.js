@@ -1,12 +1,7 @@
 // import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg'
 
 class DownloadManager {
-    #videoInfo = {
-        isInit: false,
-        aid: null,
-        cid: null,
-        bvid: null,
-    }
+    #sibtitleFetcher = new SubtitleFetcher()
 
     constructor() {
         this.setupEventListeners()
@@ -33,49 +28,86 @@ class DownloadManager {
     handleMessage(message, sender, sendResponse) {
         switch (message.type) {
             case "fetchSubtitles":
-                message.payload.aid = message.payload.aid ?? this.#videoInfo.aid
-                message.payload.cid = message.payload.cid ?? this.#videoInfo.cid
-                message.payload.bvid = message.payload.bvid ?? this.#videoInfo.bvid
-                if (!message.payload.cid || !message.payload.aid) {
+                if (!this.#sibtitleFetcher.cid || !this.#sibtitleFetcher.aid) {
                     let msg = "视频信息获取失败，请刷新页面重试"
-                    if (!this.#videoInfo.isInit) {
+                    if (!this.#sibtitleFetcher.isInit) {
                         msg = "content.js maybe not trigger"
                     }
                     return sendResponse({ error: msg })
                 }
-                this.#videoInfo.aid = message.payload.aid
-                this.#videoInfo.cid = message.payload.cid
-                this.#videoInfo.bvid = message.payload.bvid
-                this.fetchSubtitlesHandler(message.payload, sendResponse)
+                this.#sibtitleFetcher.fetchSubtitlesHandler(
+                    message.payload,
+                    sendResponse
+                )
                 return true
             case "summarize":
                 this.summarizeSubtitlesHandler(message.payload, sendResponse)
                 return true
             case "VideoInfoUpdate":
-                const { aid, cid, bvid } = message.payload
-                this.#videoInfo = { isInit: true, aid, cid, bvid }
+                this.#sibtitleFetcher.init(message.payload)
                 break
             default:
                 break
+        }
+    }
+}
+
+class SubtitleFetcher {
+    #videoInfo = {
+        isInit: false,
+        aid: null,
+        cid: null,
+        bvid: null,
+    }
+
+    constructor() {}
+
+    get isInit() {
+        return this.#videoInfo.isInit
+    }
+
+    get aid() {
+        return this.#videoInfo.aid
+    }
+
+    get cid() {
+        return this.#videoInfo.cid
+    }
+
+    get bvid() {
+        return this.#videoInfo.bvid
+    }
+
+    init(data) {
+        this.#videoInfo.aid = data.aid ?? this.#videoInfo.aid
+        this.#videoInfo.cid =
+            (data.p ? data.pages?.[data.p]?.cid : data.cid) ??
+            this.#videoInfo.cid
+        this.#videoInfo.bvid = data.bvid ?? this.#videoInfo.bvid
+        this.#videoInfo.isInit = this.#videoInfo.cid && this.#videoInfo.aid
+        if (this.#videoInfo.bvid) {
+            chrome.storage.local.set(this.#videoInfo.bvid, data)
         }
     }
 
     async summarizeSubtitlesHandler(payload, sendResponse) {
         try {
             const config = await chrome.storage.sync.get([
-                'aiProvider', 
-                'aiEndpoint',
-                'aiKey',
-                'aiModel'
+                "aiProvider",
+                "aiEndpoint",
+                "aiKey",
+                "aiModel",
             ])
             if (!config.aiKey || !config.aiEndpoint) {
                 return sendResponse({ error: "请先配置AI服务" })
             }
-            const subtitles = this.bilisub2text(await this.getSubtitlesText(payload))
+            const subtitles = this.bilisub2text(
+                await this.getSubtitlesText(payload)
+            )
             const summary = await this.processWithAI(subtitles, config)
             const downloadId = await this.downloadFile(
                 summary,
-                `${payload.bvid || 'summary'}_processed.md`
+                `${payload.bvid || "summary"}_processed.md`
             )
             return sendResponse({ downloadId })
         } catch (error) {
@@ -95,19 +127,21 @@ class DownloadManager {
 ${text}`
 
         const response = await fetch(`${config.aiEndpoint}/chat/completions`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.aiKey}`
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${config.aiKey}`,
             },
             body: JSON.stringify({
                 model: config.aiModel || "gpt-3.5-turbo",
-                messages: [{
-                    role: "user",
-                    content: prompt
-                }],
-                temperature: 0.7
-            })
+                messages: [
+                    {
+                        role: "user",
+                        content: prompt,
+                    },
+                ],
+                temperature: 0.7,
+            }),
         })
 
         const data = await response.json()
@@ -127,7 +161,7 @@ ${text}`
         const j = await fetch(url, { headers }).then((r) => r.json())
         const subtitles = j?.data?.subtitle?.subtitles || []
         const pref = subtitles.find((s) =>
-            ["ai-zh", "zh", "zh-CN"].includes(s.lan)
+            ["zh-CN", "zh", "ai-zh"].includes(s.lan)
         )
         if (!pref) return { error: "无可用字幕" }
         const subUrl = "https:" + pref.subtitle_url
@@ -136,18 +170,31 @@ ${text}`
 
     async fetchSubtitlesHandler(payload, sendResponse) {
         payload.mode = payload.mode ?? "srt"
+        payload.aid = payload.aid ?? this.#videoInfo.aid
+        payload.cid = payload.cid ?? this.#videoInfo.cid
+        payload.bvid =
+            payload.bvid ??
+            this.#videoInfo.bvid ??
+            Number.parseInt(Math.random() * 10000)
         const { mode } = payload
-        const bvid = payload.bvid ?? Number.parseInt(Math.random() * 10000)
         const subJson = await this.getSubtitlesText(payload)
         switch (mode) {
             case "md":
                 const text = this.bilisub2text(subJson)
-                sendResponse({data: text, bvid,})
+                sendResponse({
+                    data: text,
+                    bvid: payload.bvid,
+                    cid: payload.cid,
+                })
                 break
             case "srt":
             default:
                 const srt = this.bilisub2srt(subJson)
-                sendResponse({data: srt, bvid,})
+                sendResponse({
+                    data: srt,
+                    bvid: payload.bvid,
+                    cid: payload.cid,
+                })
                 break
         }
     }

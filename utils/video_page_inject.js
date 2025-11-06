@@ -5,27 +5,19 @@ async function main() {
         console.error("No video data found in window.__INITIAL_STATE__")
         return
     }
-    const aid = match.aid
-    const cid = match.cid
-    const bvid = match.bvid
     // globalThis.dispatchEvent(
     //     new CustomEvent("VideoInfoUpdate", {
-    //         detail: {
-    //             aid,
-    //             cid,
-    //             bvid,
-    //         },
+    //         detail: match,
     //     })
     // )
+    let p = Number(
+        new URLSearchParams(globalThis.location.search).get("p") ?? 0
+    )
+    match.p = p
     window.postMessage({
         source: "VIDEO_PAGE_INJECT",
-        payload: {
-            aid,
-            cid,
-            bvid,
-        },
+        payload: match,
     })
-
     console.info("End video inject.js")
 }
 
