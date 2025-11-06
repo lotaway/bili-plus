@@ -136,6 +136,27 @@ class SubtitleFetcher {
         return this.#videoInfo.bvid ?? Number.parseInt(Math.random() * 10000)
     }
 
+    async getTitle() {
+        const data = chrome.storage.local.get(this.#videoInfo.bvid)
+        if (!data) {
+            return ""
+        }
+        const pages = data?.pages ?? []
+        if (pages.length <= 1) {
+            return data?.title ?? ""
+        }
+        const page = pages.find((p) => p.cid === this.#videoInfo.cid)
+        return `${data?.title ?? ""}-${page?.part ?? ""}`
+    }
+
+    /**
+     * init the required status such as video identity info
+     * @param {object} data
+     * @param {number | undefined} data.aid 
+     * @param {number | undefined} data.cid 
+     * @param {number | undefined} data.bvid
+     * @param {Array<{cid:number, part:string}>} data.pages
+     */
     init(data) {
         this.#videoInfo.aid = data.aid ?? null
         this.#videoInfo.cid =
@@ -224,6 +245,11 @@ class AISubtitleHandler {
 4. 输出为结构清晰的Markdown格式`
     }
 
+    /**
+     * 
+     * @param {SubtitleFetcher} fetcher 
+     * @returns 
+     */
     async summarizeSubtitlesHandler(fetcher) {
         const config = await chrome.storage.sync.get([
             "aiProvider",
@@ -237,16 +263,18 @@ class AISubtitleHandler {
         const subtitles = fetcher.bilisub2text(
             await fetcher.getSubtitlesText()
         )
-        const summary = await this.processWithAI(subtitles, config)
+        const title = await fetcher.getTitle()
+        const summary = await this.processWithAI(title, subtitles, config)
         return { data: summary }
     }
 
-    async processWithAI(text, config) {
+    async processWithAI(title, text, config) {
         const completePrompt = `${this.prompt}
 
+视频标题：${title}
 字幕内容：
 ${text}`
-
+        const signal = AbortSignal.timeout(60 * 1000)
         const response = await fetch(`${config.aiEndpoint}/chat/completions`, {
             method: "POST",
             headers: {
@@ -263,6 +291,7 @@ ${text}`
                 ],
                 temperature: 0.7,
             }),
+            signal,
         })
 
         let data = await response.json()
@@ -272,7 +301,7 @@ ${text}`
         const arr = data.choices[0].message.content.split("</think>")
         data = arr[1] ?? arr[0]
         const matchs = data.match(/```markdown([\s\S]+?)```/)
-        return matchs ? matchs[1] : data
+        return `# ${title}\n\n${matchs ? matchs[1] : data}`
     }
 }
 
