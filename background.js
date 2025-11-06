@@ -33,62 +33,76 @@ class DownloadManager {
                 msg = "content.js maybe not trigger"
             }
             return {
+                isOk: false,
                 error: msg,
             }
         }
-        return true
+        return {
+            isOk: true,
+        }
     }
 
+    /**
+     * handle income message
+     * @param {Object} message 
+     * @param {Object} sender 
+     * @param {Function} sendResponse 
+     * @returns {Boolean | undefined}
+     */
     handleMessage(message, sender, sendResponse) {
         switch (message.type) {
             case "fetchSubtitles":
-                const preResult = this.checkVideoInfo()
-                if (preResult?.error) {
-                    return sendResponse(preResult)
+                {
+                    const preResult = this.checkVideoInfo()
+                    if (preResult?.error) {
+                        return sendResponse(preResult)
+                    }
+                    this.#subtitleFetcher
+                        .fetchSubtitlesHandler(message.payload)
+                        .then((subtitleResult) => {
+                            sendResponse({
+                                data: subtitleResult,
+                                bvid: this.#subtitleFetcher.bvid,
+                                cid: this.#subtitleFetcher.cid,
+                            })
+                        })
+                        .catch((error) => {
+                            console.error(error)
+                            sendResponse({
+                                error:
+                                    error instanceof Error
+                                        ? error.message
+                                        : JSON.stringify(error),
+                            })
+                        })
+                    return true
                 }
-                this.#subtitleFetcher
-                    .fetchSubtitlesHandler(message.payload)
-                    .then((subtitleResult) => {
-                        sendResponse({
-                            data: subtitleResult,
-                            bvid: this.#subtitleFetcher.bvid,
-                            cid: this.#subtitleFetcher.cid,
-                        })
-                    })
-                    .catch((error) => {
-                        console.error(error)
-                        sendResponse({
-                            error:
-                                error instanceof Error
-                                    ? error.message
-                                    : JSON.stringify(error),
-                        })
-                    })
-                return true
             case "summarize":
-                const preResult2 = this.checkVideoInfo()
-                if (preResult2?.error) {
-                    return sendResponse(preResult2)
+                {
+                    const preResult = this.checkVideoInfo()
+                    if (preResult?.error) {
+                        return sendResponse(preResult)
+                    }
+                    this.#aiSubtitleHandler
+                        .summarizeSubtitlesHandler(this.#subtitleFetcher)
+                        .then((summaryResult) => {
+                            sendResponse({
+                                ...summaryResult,
+                                bvid: this.#subtitleFetcher.bvid,
+                                cid: this.#subtitleFetcher.cid,
+                            })
+                        })
+                        .catch((error) => {
+                            console.error(error)
+                            sendResponse({
+                                error:
+                                    error instanceof Error
+                                        ? error.message
+                                        : JSON.stringify(error),
+                            })
+                        })
+                    return true
                 }
-                this.#aiSubtitleHandler
-                    .summarizeSubtitlesHandler(this.#subtitleFetcher)
-                    .then((summaryResult) => {
-                        sendResponse({
-                            ...summaryResult,
-                            bvid: this.#subtitleFetcher.bvid,
-                            cid: this.#subtitleFetcher.cid,
-                        })
-                    })
-                    .catch((error) => {
-                        console.error(error)
-                        sendResponse({
-                            error:
-                                error instanceof Error
-                                    ? error.message
-                                    : JSON.stringify(error),
-                        })
-                    })
-                return true
             case "VideoInfoUpdate":
                 this.#subtitleFetcher.init(message.payload)
                 break
@@ -105,8 +119,6 @@ class SubtitleFetcher {
         cid: null,
         bvid: null,
     }
-
-    constructor() {}
 
     get isInit() {
         return this.#videoInfo.isInit
@@ -125,11 +137,10 @@ class SubtitleFetcher {
     }
 
     init(data) {
-        this.#videoInfo.aid = data.aid ?? this.#videoInfo.aid
+        this.#videoInfo.aid = data.aid ?? null
         this.#videoInfo.cid =
-            (data.p ? data.pages?.[data.p - 1]?.cid : data.cid) ??
-            this.#videoInfo.cid
-        this.#videoInfo.bvid = data.bvid ?? this.#videoInfo.bvid
+            (data.p ? data.pages?.[data.p - 1]?.cid : data.cid) ?? null
+        this.#videoInfo.bvid = data.bvid ?? null
         this.#videoInfo.isInit = this.#videoInfo.cid && this.#videoInfo.aid
         if (this.#videoInfo.bvid) {
             chrome.storage.local.set({
@@ -145,9 +156,8 @@ class SubtitleFetcher {
         const cookieHeader = cookieStore
             .map((c) => `${c.name}=${c.value}`)
             .join("; ")
-        const url = `https://api.bilibili.com/x/player/wbi/v2?aid=${
-            this.#videoInfo.aid
-        }&cid=${this.#videoInfo.cid}`
+        const url = `https://api.bilibili.com/x/player/wbi/v2?aid=${this.#videoInfo.aid
+            }&cid=${this.#videoInfo.cid}`
         const headers = { Cookie: cookieHeader }
         const j = await fetch(url, { headers }).then((r) => r.json())
         const subtitles = j?.data?.subtitle?.subtitles || []

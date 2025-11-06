@@ -2,7 +2,7 @@ function main() {
     console.debug("Start video content.js")
     addListener()
     injectScript()
-    console.info("End video content.js")
+    console.debug("End video content.js")
 }
 
 function addListener() {
@@ -13,12 +13,12 @@ function addListener() {
         if (event.data?.source !== "VIDEO_PAGE_INJECT") {
             return
         }
-        console.info("video content.js got message", event.data)
+        console.debug("video content.js got message", event.data)
         const result = await chrome.runtime.sendMessage({
             type: "VideoInfoUpdate",
             payload: event.data.payload,
         })
-        console.info("video content.js got result", result)
+        console.debug("video content.js got result", result)
     })
 }
 
