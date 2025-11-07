@@ -105,9 +105,7 @@ class PopupController {
         )
         textFilePromise.finally(textData.destory)
         const downloadId = await textFilePromise
-        setTimeout(() => {
-            this.setMessage(`总结完成，请查看下载的文件, ${downloadId}`)
-        }, 2000)
+        this.setMessage(`总结完成，请查看下载的文件, ${downloadId}`)
     }
 
     setMessage(msg) {
