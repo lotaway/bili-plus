@@ -1,10 +1,13 @@
 async function main() {
     console.info("Start video inject.js")
     syncVideoInfo()
-    setInterval(() => {
+    const timer = setInterval(() => {
         syncVideoInfo()
     }, 5 * 1000)
     console.info("End video inject.js")
+    window.addEventListener("unload", () => {
+        clearInterval(timer)
+    })
 }
 
 function syncVideoInfo() {

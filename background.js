@@ -112,6 +112,56 @@ class DownloadManager {
     }
 }
 
+class BilibiliApi {
+    #host = ""
+    constructor(host = "https://api.bilibili.com") {
+        this.#host = host
+    }
+
+    async getCookies() {
+        return await chrome.cookies.getAll({
+            domain: this.#host.replace("https://api", ""),
+        })
+    }
+
+    async getVideoInfo(bvid) {
+        const cookieHeader = (await this.getCookies())
+            .map((c) => `${c.name}=${c.value}`)
+            .join("; ")
+        const url = `${this.#host}/x/web-interface/view?bvid=${bvid
+            }`
+        const headers = { Cookie: cookieHeader }
+        return await fetch(url, { headers }).then((r) => r.json())
+    }
+
+    /**
+     * get video detail info
+     * @param {string} aid 
+     * @param {string} cid 
+     * @returns {Promise<JSON>}
+     */
+    async getVideoDetailInfo(aid, cid) {
+        const cookieHeader = (await this.getCookies())
+            .map((c) => `${c.name}=${c.value}`)
+            .join("; ")
+        const url = `${this.#host}/x/player/wbi/v2?aid=${aid
+            }&cid=${cid}`
+        const headers = { Cookie: cookieHeader }
+        return await fetch(url, { headers }).then((r) => r.json())
+    }
+
+    /**
+     * get video subtitle info (by call `getVideoDetailInfo`)
+     * @param {string} aid 
+     * @param {string} cid 
+     * @returns {Promise<Array>}
+     */
+    async getVideoSubtitle(aid, cid) {
+        const res = await this.getVideoDetailInfo(aid, cid)
+        return res?.data?.subtitle?.subtitles || []
+    }
+}
+
 class SubtitleFetcher {
     #videoInfo = {
         isInit: false,
@@ -119,6 +169,7 @@ class SubtitleFetcher {
         cid: null,
         bvid: null,
     }
+    #api = new BilibiliApi()
 
     get isInit() {
         return this.#videoInfo.isInit
@@ -171,17 +222,7 @@ class SubtitleFetcher {
     }
 
     async getSubtitlesText() {
-        const cookieStore = await chrome.cookies.getAll({
-            domain: ".bilibili.com",
-        })
-        const cookieHeader = cookieStore
-            .map((c) => `${c.name}=${c.value}`)
-            .join("; ")
-        const url = `https://api.bilibili.com/x/player/wbi/v2?aid=${this.#videoInfo.aid
-            }&cid=${this.#videoInfo.cid}`
-        const headers = { Cookie: cookieHeader }
-        const j = await fetch(url, { headers }).then((r) => r.json())
-        const subtitles = j?.data?.subtitle?.subtitles || []
+        const subtitles = await this.#api.getVideoSubtitle(this.#videoInfo.aid, this.#videoInfo.cid)
         const pref = subtitles.find((s) =>
             ["zh-CN", "zh", "ai-zh"].includes(s.lan)
         )
