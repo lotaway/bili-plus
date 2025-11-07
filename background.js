@@ -118,19 +118,58 @@ class BilibiliApi {
         this.#host = host
     }
 
+    /**
+     * 
+     * @returns {Promise<Array>}
+     */
     async getCookies() {
         return await chrome.cookies.getAll({
             domain: this.#host.replace("https://api", ""),
         })
     }
 
-    async getVideoInfo(bvid) {
-        const cookieHeader = (await this.getCookies())
-            .map((c) => `${c.name}=${c.value}`)
+    /**
+     * 
+     * @param {Array} cookies 
+     * @returns {string}
+     */
+    buildCookieHeader(cookies) {
+        return cookies.map((c) => `${c.name}=${c.value}`)
             .join("; ")
+    }
+
+    /**
+     * 
+     * @param {string} cookies 
+     * @returns {headers}
+     */
+    buildHeader(cookies) {
+        return { Cookie: cookies }
+    }
+
+    /**
+     * 
+     * @param {Headers | undefined} headers 
+     * @returns {Promise<Headers>}
+     */
+    async fillHeader(headers) {
+        if (!headers) {
+            const cookieHeader = this.buildCookieHeader(await this.getCookies())
+            headers = this.buildHeader(cookieHeader)
+        }
+        return headers
+    }
+
+    /**
+     * 
+     * @param {string} bvid 
+     * @param {Headers | undefined} headers 
+     * @returns 
+     */
+    async getVideoInfo(bvid, headers) {
+        headers = await this.fillHeader(headers)
         const url = `${this.#host}/x/web-interface/view?bvid=${bvid
             }`
-        const headers = { Cookie: cookieHeader }
         return await fetch(url, { headers }).then((r) => r.json())
     }
 
@@ -138,15 +177,13 @@ class BilibiliApi {
      * get video detail info
      * @param {string} aid 
      * @param {string} cid 
+     * @param {Headers | undefined} headers 
      * @returns {Promise<JSON>}
      */
-    async getVideoDetailInfo(aid, cid) {
-        const cookieHeader = (await this.getCookies())
-            .map((c) => `${c.name}=${c.value}`)
-            .join("; ")
+    async getVideoDetailInfo(aid, cid, headers) {
+        headers = await this.fillHeader(headers)
         const url = `${this.#host}/x/player/wbi/v2?aid=${aid
             }&cid=${cid}`
-        const headers = { Cookie: cookieHeader }
         return await fetch(url, { headers }).then((r) => r.json())
     }
 
@@ -159,6 +196,17 @@ class BilibiliApi {
     async getVideoSubtitle(aid, cid) {
         const res = await this.getVideoDetailInfo(aid, cid)
         return res?.data?.subtitle?.subtitles || []
+    }
+
+    /**
+     * 
+     * @param {string} url 
+     * @param {Headers | undefined} headers 
+     */
+    async getSubtitleJson(url, headers) {
+        headers = await this.fillHeader(headers)
+        const subUrl = url.startsWith("http") ? url : "https:" + url
+        return await fetch(subUrl, { headers }).then((r) => r.json())
     }
 }
 
@@ -221,14 +269,19 @@ class SubtitleFetcher {
         }
     }
 
-    async getSubtitlesText() {
-        const subtitles = await this.#api.getVideoSubtitle(this.#videoInfo.aid, this.#videoInfo.cid)
+    /**
+     * 
+     * @param {Headers | undefined} headers 
+     * @returns 
+     */
+    async getSubtitlesText(headers) {
+        headers = await this.#api.fillHeader(headers)
+        const subtitles = await this.#api.getVideoSubtitle(this.#videoInfo.aid, this.#videoInfo.cid, headers)
         const pref = subtitles.find((s) =>
             ["zh-CN", "zh", "ai-zh"].includes(s.lan)
         )
         if (!pref) return { error: "无可用字幕" }
-        const subUrl = "https:" + pref.subtitle_url
-        return await fetch(subUrl, { headers }).then((r) => r.json())
+        return await this.#api.getSubtitleJson(pref.subtitle_url, headers)
     }
 
     async fetchSubtitlesHandler(payload) {
