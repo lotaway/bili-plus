@@ -1,5 +1,6 @@
 async function main() {
     console.info("Start video inject.js")
+    syncVideoInfo()
     setInterval(() => {
         syncVideoInfo()
     }, 5 * 1000)
