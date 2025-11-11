@@ -7,10 +7,7 @@ function main() {
 
 function addListener() {
     globalThis.addEventListener("message", async event => {
-        if (event.source != globalThis) {
-            return
-        }
-        if (event.data?.source !== "VIDEO_PAGE_INJECT") {
+        if (event.source != globalThis || event.data?.source !== "VIDEO_PAGE_INJECT") {
             return
         }
         const result = await chrome.runtime.sendMessage({
