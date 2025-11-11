@@ -22,7 +22,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.bilibili.com/video/*"
+        "*://www.bilibili.com/video/*",
+        "*://www.bilibili.com/list/watchlater?*"
       ],
       "js": [
         "content.js"
