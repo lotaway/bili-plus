@@ -368,7 +368,7 @@ class AISubtitleHandler {
 视频标题：${title}
 字幕内容：
 ${text}`
-        const signal = AbortSignal.timeout(60 * 1000)
+        const signal = AbortSignal.timeout(5 * 60 * 1000)
         const response = await fetch(`${config.aiEndpoint}/chat/completions`, {
             method: "POST",
             headers: {
