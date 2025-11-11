@@ -257,7 +257,7 @@ class AISubtitleHandler {
             "aiKey",
             "aiModel",
         ])
-        if (!config.aiKey || !config.aiEndpoint) {
+        if (!config.aiEndpoint) {
             return { error: "请先配置AI服务" }
         }
         const subtitles = fetcher.bilisub2text(
@@ -279,7 +279,9 @@ ${text}`
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${config.aiKey}`,
+                ...(config.aiKey ? {
+                    Authorization: `Bearer ${config.aiKey}`
+                } : {}),
             },
             body: JSON.stringify({
                 model: config.aiModel ?? AISubtitleHandler.defaultModelName(),
