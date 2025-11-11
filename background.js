@@ -373,9 +373,7 @@ ${text}`
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                ...(config.aiKey ? {
-                    Authorization: `Bearer ${config.aiKey}`
-                } : {}),
+                "Authorization": `Bearer ${config.aiKey ?? ""}`,
             },
             body: JSON.stringify({
                 model: config.aiModel ?? AISubtitleHandler.defaultModelName(),
