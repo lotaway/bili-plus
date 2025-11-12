@@ -90,7 +90,17 @@ class DownloadManager {
 
                     // 流式处理总结
                     this.#aiSubtitleHandler
-                        .summarizeSubtitlesHandler(this.#subtitleFetcher)
+                        .summarizeSubtitlesHandler(this.#subtitleFetcher, chunk => {
+                            chrome.runtime.sendMessage(senderId, {
+                                type: "keepAlive",
+                                data: {
+                                    content: chunk,
+                                    bvid,
+                                    cid,
+                                    done: false,
+                                },
+                            })
+                        })
                         .then((summaryResult) => {
                             // 发送完整结果
                             chrome.runtime.sendMessage(senderId, {
@@ -99,7 +109,7 @@ class DownloadManager {
                                     ...summaryResult,
                                     bvid,
                                     cid,
-                                    done: true
+                                    done: true,
                                 }
                             })
                             sendResponse({ done: true })
@@ -124,6 +134,9 @@ class DownloadManager {
                 }
             case "VideoInfoUpdate":
                 this.#subtitleFetcher.init(message.payload)
+                break
+            case "openSidePanel":
+                chrome.sidePanel.open({ windowId: sender?.tab?.windowId })
                 break
             default:
                 break
@@ -361,9 +374,10 @@ class AISubtitleHandler {
     /**
      * 
      * @param {SubtitleFetcher} fetcher 
-     * @returns 
+     * @param {Function | undefined} onProgress 
+     * @returns
      */
-    async summarizeSubtitlesHandler(fetcher) {
+    async summarizeSubtitlesHandler(fetcher, onProgress) {
         const config = await chrome.storage.sync.get([
             "aiProvider",
             "aiEndpoint",
@@ -377,10 +391,18 @@ class AISubtitleHandler {
             await fetcher.getSubtitlesText()
         )
         const title = await fetcher.getTitle().catch(() => "")
-        const summary = await this.processWithAI(title, subtitles, config)
+        const summary = await this.processWithAI(title, subtitles, config, onProgress)
         return { data: summary }
     }
 
+    /**
+     * 
+     * @param {String} title 
+     * @param {String} text 
+     * @param {Object} config 
+     * @param {Function | undefined} onProgress 
+     * @returns 
+     */
     async processWithAI(title, text, config, onProgress) {
         const completePrompt = `${this.prompt}
 
@@ -428,9 +450,7 @@ ${text}`
                         const content = data.choices[0]?.delta?.content
                         if (content) {
                             fullResponse += content
-                            if (onProgress) {
-                                onProgress(content)
-                            }
+                            onProgress?.(content)
                         }
                     } catch (e) {
                         console.error('Error parsing stream data:', e)

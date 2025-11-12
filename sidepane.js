@@ -13,7 +13,7 @@ class SidePaneController {
             // 设置消息监听
             chrome.runtime.onMessage.addListener((message) => {
                 if (message.type === 'keepAlive') {
-                    handleKeepAliveMessage(message.data);
+                    this.handleKeepAliveMessage(message.data);
                 }
             })
             document
@@ -145,17 +145,16 @@ class SidePaneController {
             return
         }
 
-        if (data.done) {
+        if (data.done && data.content) {
             // 处理完成
+            // 完整结果
+            this.showStreamResult(data.data)
             return
         }
 
         if (data.content) {
             // 流式内容
-            resultContainer.innerHTML += data.content;
-        } else if (data.data) {
-            // 完整结果
-            this.showStreamResult(data.data)
+            resultContainer.innerHTML += data.content
         }
     }
 
