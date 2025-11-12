@@ -1,0 +1,175 @@
+
+class SidePaneController {
+    constructor() {
+        this.init()
+    }
+
+    init() {
+        this.initButton()
+    }
+
+    initButton() {
+        document.addEventListener('DOMContentLoaded', () => {
+            // 设置消息监听
+            chrome.runtime.onMessage.addListener((message) => {
+                if (message.type === 'keepAlive') {
+                    handleKeepAliveMessage(message.data);
+                }
+            })
+            document
+                .getElementById("extract")
+                .addEventListener("click", async () => {
+                    await this.extract("srt")
+                })
+            document
+                .getElementById("extract-only-text")
+                .addEventListener("click", async () => {
+                    await this.extract("md")
+                })
+            document.getElementById('summary').addEventListener('click', async () => {
+                await this.summarize();
+            })
+        })
+    }
+
+    async summarize(requireDownload = false) {
+        this.setMessage("正在使用AI处理字幕...")
+        const res = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+                {
+                    type: "summarize",
+                },
+                async (res) => resolve(res)
+            )
+        })
+        if (res?.error) {
+            this.setMessage(res.error)
+            return
+        }
+        if (!requireDownload) {
+            return
+        }
+        const textData = this.text2url(res.data, "md")
+        const textFilePromise = this.downloadFile(
+            textData.url,
+            `${res.bvid}-${res.cid}-summary.md`
+        )
+        textFilePromise.finally(textData.destory)
+        const downloadId = await textFilePromise
+        this.setMessage(`总结完成，请查看下载的文件, ${downloadId}`)
+    }
+
+    setMessage(msg) {
+        document.getElementById("result-container").textContent = msg
+    }
+
+    async extract(mode = "srt") {
+        this.setMessage("正在提取字幕...")
+        const res = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+                {
+                    type: "fetchSubtitles",
+                    payload: {
+                        mode,
+                    },
+                },
+                async (res) => resolve(res)
+            )
+        })
+        if (res?.error) {
+            this.setMessage(res.error)
+            return
+        }
+        let downloadId = -1
+        switch (mode) {
+            case "md":
+                const textData = this.text2url(res.data, mode)
+                const textFilePromise = this.downloadFile(
+                    textData.url,
+                    `${res.bvid}-${res.cid}.md`
+                )
+                textFilePromise.finally(textData.destory)
+                downloadId = await textFilePromise
+                break
+            case "srt":
+                const srtData = this.text2url(res.data, mode)
+                const srtFilePromise = this.downloadFile(
+                    srtData.url,
+                    `${res.bvid}-${res.cid}.srt`
+                )
+                srtFilePromise.finally(srtData.destory)
+                downloadId = await srtFilePromise
+                break
+            default:
+                break
+        }
+        this.afterDownload(downloadId)
+    }
+
+    text2url(text, fileType = "txt") {
+        const fileType2MediaType = new Map([
+            ["txt", "text/plain"],
+            ["md", "text/markdown"],
+            ["xmd", "text/x-markdown"],
+            ["srt", "application/x-subrip"],
+        ])
+        const blob = new Blob([text], {
+            type: fileType2MediaType.get(fileType),
+        })
+        const url = URL.createObjectURL(blob)
+        return {
+            url,
+            destory: () => URL.revokeObjectURL(url),
+        }
+    }
+
+    async downloadFile(url, filename) {
+        return await chrome.downloads.download({
+            url,
+            filename,
+            conflictAction: "uniquify",
+            saveAs: false,
+        })
+    }
+
+    afterDownload(id) {
+        this.setMessage(`字幕提取完成:${id}`)
+    }
+
+    // 处理keepAlive消息
+    handleKeepAliveMessage(data) {
+        const resultContainer = document.getElementById('result-container')
+
+        if (data.error) {
+            this.setMessage(data.error)
+            return
+        }
+
+        if (data.done) {
+            // 处理完成
+            return
+        }
+
+        if (data.content) {
+            // 流式内容
+            resultContainer.innerHTML += data.content;
+        } else if (data.data) {
+            // 完整结果
+            this.showStreamResult(data.data)
+        }
+    }
+
+    showStreamResult(data) {
+        const resultContainer = document.getElementById('result-container')
+        // 简单markdown渲染
+        resultContainer.innerHTML = data
+            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>')
+    }
+}
+
+new SidePaneController()

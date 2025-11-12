@@ -1,7 +1,10 @@
 body {
-  width: 240px;
   padding: 10px;
   font-family: system-ui;
+
+  &.popup {
+    width: 240px;
+  }
 }
 
 .config-section {
@@ -37,6 +40,7 @@ body {
 }
 
 button {
+  display: block;
   width: 100%;
   padding: 8px;
   font-size: 14px;

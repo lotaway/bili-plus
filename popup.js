@@ -43,17 +43,6 @@ class PopupController {
     }
 
     initButton() {
-        document
-            .getElementById("extract")
-            .addEventListener("click", async () => {
-                await this.extract("srt")
-            })
-
-        document
-            .getElementById("extract-only-text")
-            .addEventListener("click", async () => {
-                await this.extract("md")
-            })
 
         document
             .getElementById("saveConfig")
@@ -62,9 +51,9 @@ class PopupController {
             })
 
         document
-            .getElementById("summary")
+            .getElementById("openSidePanel")
             .addEventListener("click", async () => {
-                await this.summarize()
+                await this.openSidePanel()
             })
     }
 
@@ -84,106 +73,15 @@ class PopupController {
         this.setMessage("配置已保存")
     }
 
-    async summarize() {
-        this.setMessage("正在使用AI处理字幕...")
-        const res = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(
-                {
-                    type: "summarize",
-                },
-                async (res) => resolve(res)
-            )
-        })
-        if (res?.error) {
-            this.setMessage(res.error)
-            return
-        }
-        const textData = this.text2url(res.data, "md")
-        const textFilePromise = this.downloadFile(
-            textData.url,
-            `${res.bvid}-${res.cid}-summary.md`
-        )
-        textFilePromise.finally(textData.destory)
-        const downloadId = await textFilePromise
-        this.setMessage(`总结完成，请查看下载的文件, ${downloadId}`)
-    }
-
-    setMessage(msg) {
-        document.getElementById("msg").textContent = msg
-    }
-
-    async extract(mode = "srt") {
-        this.setMessage("正在提取字幕...")
-        const res = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(
-                {
-                    type: "fetchSubtitles",
-                    payload: {
-                        mode,
-                    },
-                },
-                async (res) => resolve(res)
-            )
-        })
-        if (res?.error) {
-            this.setMessage(res.error)
-            return
-        }
-        let downloadId = -1
-        switch (mode) {
-            case "md":
-                const textData = this.text2url(res.data, mode)
-                const textFilePromise = this.downloadFile(
-                    textData.url,
-                    `${res.bvid}-${res.cid}.md`
-                )
-                textFilePromise.finally(textData.destory)
-                downloadId = await textFilePromise
-                break
-            case "srt":
-                const srtData = this.text2url(res.data, mode)
-                const srtFilePromise = this.downloadFile(
-                    srtData.url,
-                    `${res.bvid}-${res.cid}.srt`
-                )
-                srtFilePromise.finally(srtData.destory)
-                downloadId = await srtFilePromise
-                break
-            default:
-                break
-        }
-        this.afterDownload(downloadId)
-    }
-
-    text2url(text, fileType = "txt") {
-        const fileType2MediaType = new Map([
-            ["txt", "text/plain"],
-            ["md", "text/markdown"],
-            ["xmd", "text/x-markdown"],
-            ["srt", "application/x-subrip"],
-        ])
-        const blob = new Blob([text], {
-            type: fileType2MediaType.get(fileType),
-        })
-        const url = URL.createObjectURL(blob)
-        return {
-            url,
-            destory: () => URL.revokeObjectURL(url),
+    async openSidePanel() {
+        try {
+            const window = await chrome.windows.getCurrent()
+            chrome.sidePanel.open({ windowId: window.id })
+        } catch (error) {
+            console.error("Failed to open side panel:", error)
         }
     }
 
-    async downloadFile(url, filename) {
-        return await chrome.downloads.download({
-            url,
-            filename,
-            conflictAction: "uniquify",
-            saveAs: false,
-        })
-    }
-
-    afterDownload(id) {
-        this.setMessage(`字幕提取完成:${id}`)
-    }
 }
 
 new PopupController()

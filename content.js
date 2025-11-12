@@ -10,10 +10,22 @@ function addListener() {
         if (event.source != globalThis || event.data?.source !== "VIDEO_PAGE_INJECT") {
             return
         }
-        const result = await chrome.runtime.sendMessage({
-            type: "VideoInfoUpdate",
-            payload: event.data.payload,
-        })
+
+        switch (event.data.type) {
+            case "videoInfoInit":
+                await chrome.runtime.sendMessage({
+                    type: "VideoInfoUpdate",
+                    payload: event.data.payload,
+                })
+                break
+            case "openSidePanel":
+                chrome.runtime.sendMessage({
+                    type: "openSidePanel"
+                })
+                break
+            default:
+                break
+        }
     })
 }
 

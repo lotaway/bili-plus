@@ -83,24 +83,43 @@ class DownloadManager {
                     if (preResult?.error) {
                         return sendResponse(preResult)
                     }
+
+                    const senderId = sender.id
+                    const bvid = this.#subtitleFetcher.bvid
+                    const cid = this.#subtitleFetcher.cid
+
+                    // 流式处理总结
                     this.#aiSubtitleHandler
                         .summarizeSubtitlesHandler(this.#subtitleFetcher)
                         .then((summaryResult) => {
-                            sendResponse({
-                                ...summaryResult,
-                                bvid: this.#subtitleFetcher.bvid,
-                                cid: this.#subtitleFetcher.cid,
+                            // 发送完整结果
+                            chrome.runtime.sendMessage(senderId, {
+                                type: "keepAlive",
+                                data: {
+                                    ...summaryResult,
+                                    bvid,
+                                    cid,
+                                    done: true
+                                }
                             })
+                            sendResponse({ done: true })
                         })
                         .catch((error) => {
                             console.error(error)
-                            sendResponse({
-                                error:
-                                    error instanceof Error
+                            // 发送错误信息
+                            chrome.runtime.sendMessage(senderId, {
+                                type: "keepAlive",
+                                data: {
+                                    error: error instanceof Error
                                         ? error.message
                                         : JSON.stringify(error),
+                                    bvid,
+                                    cid
+                                }
                             })
+                            sendResponse({ done: true })
                         })
+
                     return true
                 }
             case "VideoInfoUpdate":
@@ -362,7 +381,7 @@ class AISubtitleHandler {
         return { data: summary }
     }
 
-    async processWithAI(title, text, config) {
+    async processWithAI(title, text, config, onProgress) {
         const completePrompt = `${this.prompt}
 
 视频标题：${title}
@@ -384,20 +403,44 @@ ${text}`
                     },
                 ],
                 temperature: 0.7,
+                stream: true
             }),
             signal,
         })
-        let data = await response.clone().json().catch(err => response.text())
-        if (typeof data === "string") {
-            data = new Error(data)
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let fullResponse = ""
+
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop()
+
+            for (const line of lines) {
+                if (line.startsWith('data:') && !line.includes('[DONE]')) {
+                    try {
+                        const data = JSON.parse(line.substring(5))
+                        const content = data.choices[0]?.delta?.content
+                        if (content) {
+                            fullResponse += content
+                            if (onProgress) {
+                                onProgress(content)
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing stream data:', e)
+                    }
+                }
+            }
         }
-        if (!data?.choices) {
-            throw new Error(data?.message ?? data?.error?.message ?? "AI服务调用失败")
-        }
-        const arr = data?.choices?.[0]?.message?.content?.split("</think>") ?? [""]
-        data = arr[1] ?? arr[0]
-        const matchs = data.match(/```markdown([\s\S]+?)```/)
-        return `# ${title}\n\n${matchs ? matchs[1] : data}`
+
+        const matchs = fullResponse.match(/```markdown([\s\S]+?)```/)
+        return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`
     }
 }
 

@@ -8,7 +8,8 @@
     "activeTab",
     "downloads",
     "scripting",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://www.bilibili.com/*",
@@ -44,11 +45,16 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "utils/*"
+        "utils/*",
+        "sidepane.html",
+        "sidepane.js"
       ],
       "matches": [
         "<all_urls>"
       ]
     }
-  ]
+  ],
+  "side_panel": {
+    "default_path": "sidepane.html"
+  }
 }
