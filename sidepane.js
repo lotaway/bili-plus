@@ -29,18 +29,25 @@ class SidePaneController {
             document.getElementById('summary').addEventListener('click', async () => {
                 await this.summarize();
             })
+            document.getElementById("assistant").addEventListener("click", async () => {
+                let agentRunner = AgentRunner.getInstance()
+                await this.sendMessage({
+                    type: "startAssistant",
+                })
+            })
+        })
+    }
+
+    async sendMessage(payload) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(payload, resolve)
         })
     }
 
     async summarize(requireDownload = false) {
         this.setMessage("正在使用AI处理字幕...")
-        const res = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(
-                {
-                    type: "summarize",
-                },
-                async (res) => resolve(res)
-            )
+        const res = this.sendMessage({
+                type: "summarize",
         })
         if (res?.error) {
             this.setMessage(res.error)
@@ -169,6 +176,19 @@ class SidePaneController {
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/\n/g, '<br>')
     }
+}
+
+class AgentRunner {
+    constructor() {
+        throw new Error("AgentRunner is a singleton class, please use getInstance() method to get the instance.")
+    }
+}
+
+AgentRunner.getInstance = function() {
+    if (!AgentRunner.instance) {
+        AgentRunner.instance = new AgentRunner()
+    }
+    return AgentRunner.instance
 }
 
 new SidePaneController()

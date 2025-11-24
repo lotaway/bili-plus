@@ -3,6 +3,7 @@
 class DownloadManager {
     #subtitleFetcher = new SubtitleFetcher()
     #aiSubtitleHandler = new AISubtitleHandler()
+    #aiAgentRunner = new AIAgentRunner()
 
     constructor() {
         this.setupEventListeners()
@@ -138,6 +139,19 @@ class DownloadManager {
             case "openSidePanel":
                 chrome.sidePanel.open({ windowId: sender?.tab?.windowId })
                 break
+            case "startAssistant":
+                this.#aiAgentRunner.runAgent(message.payload)
+                    .then((result) => sendResponse(result))
+                    .catch((error) => {
+                        console.error(error)
+                        sendResponse({
+                            error: error instanceof Error
+                                ? error.message
+                                : "Agent调用发生未知错误"
+                        })
+                    })
+                return true
+                
             default:
                 break
         }
@@ -357,7 +371,86 @@ class SubtitleFetcher {
     }
 }
 
+class AIAgentRunner {
+    isBusy = false
+
+    static defaultModelName() {
+        return "gpt-3.5-turbo"
+    }
+
+    async runAgent(payload) {
+        if (this.isBusy) {
+            return { error: "当前正在处理中，请稍后再试" }
+        }
+
+        const config = await chrome.storage.sync.get([
+            "aiProvider",
+            "aiEndpoint",
+            "aiKey",
+            "aiModel",
+        ])
+
+        if (!config.aiEndpoint) {
+            return { error: "请先配置AI服务" }
+        }
+
+        this.isBusy = true
+        try {
+            // 调用agent端点
+            const agentResponse = await fetch(`${config.aiEndpoint}/agent`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${config.aiKey ?? ""}`,
+                },
+                body: JSON.stringify({
+                    message: payload.message || "测试消息",
+                    model: config.aiModel || AIAgentRunner.defaultModelName(),
+                }),
+            })
+
+            if (!agentResponse.ok) {
+                throw new Error(`Agent请求失败: ${agentResponse.status}`)
+            }
+
+            // 调用agent/chat端点
+            const chatResponse = await fetch(`${config.aiEndpoint}/agent/chat`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${config.aiKey ?? ""}`,
+                },
+                body: JSON.stringify({
+                    message: payload.message || "测试聊天消息",
+                    model: config.aiModel || AIAgentRunner.defaultModelName(),
+                }),
+            })
+
+            if (!chatResponse.ok) {
+                throw new Error(`Chat请求失败: ${chatResponse.status}`)
+            }
+
+            return {
+                success: true,
+                message: "Agent调用成功",
+                data: await chatResponse.json()
+            }
+        } catch (error) {
+            console.error("Agent调用错误:", error)
+            return {
+                error: error instanceof Error 
+                    ? error.message 
+                    : "Agent调用发生未知错误"
+            }
+        } finally {
+            this.isBusy = false
+        }
+    }
+}
+
 class AISubtitleHandler {
+
+    isBusy = false
 
     static defaultModelName() {
         return "gpt-3.5-turbo"
@@ -378,6 +471,9 @@ class AISubtitleHandler {
      * @returns
      */
     async summarizeSubtitlesHandler(fetcher, onProgress) {
+        if (this.isBusy) {
+            return { error: "当前正在处理中，请稍后再试" }
+        }
         const config = await chrome.storage.sync.get([
             "aiProvider",
             "aiEndpoint",
@@ -391,7 +487,10 @@ class AISubtitleHandler {
             await fetcher.getSubtitlesText()
         )
         const title = await fetcher.getTitle().catch(() => "")
-        const summary = await this.processWithAI(title, subtitles, config, onProgress)
+        this.isBusy = true
+        const summary = await this.processWithAI(title, subtitles, config, onProgress).finally(() => {
+            this.isBusy = false
+        })
         return { data: summary }
     }
 
