@@ -397,14 +397,14 @@ class AIAgentRunner {
         this.isBusy = true
         try {
             // 调用agent端点
-            const agentResponse = await fetch(`${config.aiEndpoint}/agent`, {
+            const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${config.aiKey ?? ""}`,
                 },
                 body: JSON.stringify({
-                    message: payload.message || "测试消息",
+                    messages: [payload.message],
                     model: config.aiModel || AIAgentRunner.defaultModelName(),
                 }),
             })
@@ -413,27 +413,10 @@ class AIAgentRunner {
                 throw new Error(`Agent请求失败: ${agentResponse.status}`)
             }
 
-            // 调用agent/chat端点
-            const chatResponse = await fetch(`${config.aiEndpoint}/agent/chat`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${config.aiKey ?? ""}`,
-                },
-                body: JSON.stringify({
-                    message: payload.message || "测试聊天消息",
-                    model: config.aiModel || AIAgentRunner.defaultModelName(),
-                }),
-            })
-
-            if (!chatResponse.ok) {
-                throw new Error(`Chat请求失败: ${chatResponse.status}`)
-            }
-
             return {
                 success: true,
                 message: "Agent调用成功",
-                data: await chatResponse.json()
+                data: await agentResponse.json()
             }
         } catch (error) {
             console.error("Agent调用错误:", error)

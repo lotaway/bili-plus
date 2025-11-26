@@ -30,9 +30,11 @@ class SidePaneController {
                 await this.summarize();
             })
             document.getElementById("assistant").addEventListener("click", async () => {
-                let agentRunner = AgentRunner.getInstance()
                 await this.sendMessage({
                     type: "startAssistant",
+                    payload: {
+                        message: "帮我做一个视频观看规划"
+                    }
                 })
             })
         })
@@ -176,19 +178,6 @@ class SidePaneController {
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/\n/g, '<br>')
     }
-}
-
-class AgentRunner {
-    constructor() {
-        throw new Error("AgentRunner is a singleton class, please use getInstance() method to get the instance.")
-    }
-}
-
-AgentRunner.getInstance = function() {
-    if (!AgentRunner.instance) {
-        AgentRunner.instance = new AgentRunner()
-    }
-    return AgentRunner.instance
 }
 
 new SidePaneController()
