@@ -155,8 +155,6 @@ class SidePaneController {
         }
 
         if (data.done && data.content) {
-            // 处理完成
-            // 完整结果
             this.showStreamResult(data.data)
             return
         }

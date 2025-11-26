@@ -140,18 +140,47 @@ class DownloadManager {
                 chrome.sidePanel.open({ windowId: sender?.tab?.windowId })
                 break
             case "startAssistant":
-                this.#aiAgentRunner.runAgent(message.payload)
-                    .then((result) => sendResponse(result))
-                    .catch((error) => {
-                        console.error(error)
-                        sendResponse({
-                            error: error instanceof Error
-                                ? error.message
-                                : "Agent调用发生未知错误"
+                this.#aiAgentRunner.runAgent(message.payload, chunk => {
+                            chrome.runtime.sendMessage(senderId, {
+                                type: "keepAlive",
+                                data: {
+                                    content: chunk,
+                                    bvid,
+                                    cid,
+                                    done: false,
+                                },
+                            })
                         })
-                    })
+                        .then((summaryResult) => {
+                            // 发送完整结果
+                            chrome.runtime.sendMessage(senderId, {
+                                type: "keepAlive",
+                                data: {
+                                    ...summaryResult,
+                                    bvid,
+                                    cid,
+                                    done: true,
+                                }
+                            })
+                            sendResponse({ done: true })
+                        })
+                        .catch((error) => {
+                            console.error(error)
+                            // 发送错误信息
+                            chrome.runtime.sendMessage(senderId, {
+                                type: "keepAlive",
+                                data: {
+                                    error: error instanceof Error
+                                        ? error.message
+                                        : JSON.stringify(error),
+                                    bvid,
+                                    cid
+                                }
+                            })
+                            sendResponse({ done: true })
+                        })
                 return true
-                
+
             default:
                 break
         }
@@ -378,7 +407,7 @@ class AIAgentRunner {
         return "gpt-3.5-turbo"
     }
 
-    async runAgent(payload) {
+    async runAgent(payload, onProgress) {
         if (this.isBusy) {
             return { error: "当前正在处理中，请稍后再试" }
         }
@@ -408,21 +437,21 @@ class AIAgentRunner {
                     model: config.aiModel || AIAgentRunner.defaultModelName(),
                 }),
             })
-
             if (!agentResponse.ok) {
-                throw new Error(`Agent请求失败: ${agentResponse.status}`)
+                throw new Error(`Agent请求失败: ${agentResponse.text}`, {
+                    cause: agentResponse,
+                })
             }
-
+            const reader = agentResponse.body.getReader()
+            const fullResponse = await this.readStream(reader, onProgress)
             return {
-                success: true,
-                message: "Agent调用成功",
-                data: await agentResponse.json()
+                data: fullResponse
             }
         } catch (error) {
             console.error("Agent调用错误:", error)
             return {
-                error: error instanceof Error 
-                    ? error.message 
+                error: error instanceof Error
+                    ? error.message
                     : "Agent调用发生未知错误"
             }
         } finally {
@@ -513,10 +542,16 @@ ${text}`
         })
 
         const reader = response.body.getReader()
+
+        const fullResponse = await this.readStream(reader, onProgress)
+        const matchs = fullResponse.match(/```markdown([\s\S]+?)```/)
+        return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`
+    }
+
+    async readStream(reader, onProgress = content => { console.debug(content) }) {
         const decoder = new TextDecoder()
         let buffer = ""
         let fullResponse = ""
-
         while (true) {
             const { done, value } = await reader.read()
             if (done) break
@@ -540,9 +575,6 @@ ${text}`
                 }
             }
         }
-
-        const matchs = fullResponse.match(/```markdown([\s\S]+?)```/)
-        return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`
     }
 }
 
