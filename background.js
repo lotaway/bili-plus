@@ -432,7 +432,7 @@ class AIAgentRunner {
             })
         }
         const reader = agentResponse.body.getReader()
-        const fullResponse = await this.readStream(reader, onProgress).finally(() => {
+        const fullResponse = await new Utils().readStream(reader, onProgress).finally(() => {
             this.isBusy = false
         })
         return {
@@ -524,11 +524,13 @@ ${text}`
 
         const reader = response.body.getReader()
 
-        const fullResponse = await this.readStream(reader, onProgress)
+        const fullResponse = await new Utils().readStream(reader, onProgress)
         const matchs = fullResponse.match(/```markdown([\s\S]+?)```/)
         return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`
     }
+}
 
+class Utils {
     async readStream(reader, onProgress = content => { console.debug(content) }) {
         const decoder = new TextDecoder()
         let buffer = ""

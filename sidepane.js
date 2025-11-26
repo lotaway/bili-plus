@@ -1,27 +1,28 @@
 
 class SidePaneController {
+
+    #ventTypes = new Map()
+
     constructor() {
         this.init()
     }
 
     init() {
         this.initButton()
+        this.#ventTypes.set("summarize:keepAlive", {
+            type: "summarize:keepAlive",
+            handler: this.handleSummarizeKeepAliveMessage,
+        })
+        this.#ventTypes.set("assistant:keepAlive", {
+            type: "assistant:keepAlive",
+            handler: this.handleAssistantKeepAliveMessage,
+        })
     }
 
     initButton() {
         document.addEventListener('DOMContentLoaded', () => {
-            // 设置消息监听
             chrome.runtime.onMessage.addListener((message) => {
-                switch (message.type) {
-                    case 'summarize:keepAlive':
-                        this.handleSummarizeKeepAliveMessage(message.data)
-                        break
-                    case "assistant:keepAlive":
-                        this.handleAssistantKeepAliveMessage(message.data)
-                        break
-                    default:
-                        break
-                }
+                this.#ventTypes.get(message.type)?.handler(message.data)
             })
             document
                 .getElementById("extract")
