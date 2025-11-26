@@ -12,8 +12,15 @@ class SidePaneController {
         document.addEventListener('DOMContentLoaded', () => {
             // 设置消息监听
             chrome.runtime.onMessage.addListener((message) => {
-                if (message.type === 'keepAlive') {
-                    this.handleKeepAliveMessage(message.data);
+                switch (message.type) {
+                    case 'summarize:keepAlive':
+                        this.handleSummarizeKeepAliveMessage(message.data)
+                        break
+                    case "assistant:keepAlive":
+                        this.handleAssistantKeepAliveMessage(message.data)
+                        break
+                    default:
+                        break
                 }
             })
             document
@@ -26,17 +33,8 @@ class SidePaneController {
                 .addEventListener("click", async () => {
                     await this.extract("md")
                 })
-            document.getElementById('summary').addEventListener('click', async () => {
-                await this.summarize();
-            })
-            document.getElementById("assistant").addEventListener("click", async () => {
-                await this.sendMessage({
-                    type: "startAssistant",
-                    payload: {
-                        message: "帮我做一个视频观看规划"
-                    }
-                })
-            })
+            document.getElementById('summary').addEventListener('click', () => this.summarize())
+            document.getElementById("assistant").addEventListener("click", () => this.assistant())
         })
     }
 
@@ -49,7 +47,7 @@ class SidePaneController {
     async summarize(requireDownload = false) {
         this.setMessage("正在使用AI处理字幕...")
         const res = this.sendMessage({
-                type: "summarize",
+            type: "summarize",
         })
         if (res?.error) {
             this.setMessage(res.error)
@@ -66,6 +64,16 @@ class SidePaneController {
         textFilePromise.finally(textData.destory)
         const downloadId = await textFilePromise
         this.setMessage(`总结完成，请查看下载的文件, ${downloadId}`)
+    }
+
+    async assistant() {
+        this.setMessage("正在启动AI智能体...")
+        await this.sendMessage({
+            type: "startAssistant",
+            payload: {
+                message: "帮我做一个视频观看规划"
+            }
+        })
     }
 
     setMessage(msg) {
@@ -145,22 +153,32 @@ class SidePaneController {
         this.setMessage(`字幕提取完成:${id}`)
     }
 
-    // 处理keepAlive消息
-    handleKeepAliveMessage(data) {
+    handleSummarizeKeepAliveMessage(data) {
         const resultContainer = document.getElementById('result-container')
-
         if (data.error) {
             this.setMessage(data.error)
             return
         }
-
         if (data.done && data.content) {
             this.showStreamResult(data.data)
             return
         }
-
         if (data.content) {
-            // 流式内容
+            resultContainer.innerHTML += data.content
+        }
+    }
+
+    handleAssistantKeepAliveMessage(data) {
+        const resultContainer = document.getElementById('result-container')
+        if (data.error) {
+            this.setMessage(data.error)
+            return
+        }
+        if (data.done && data.content) {
+            this.showStreamResult(data.data)
+            return
+        }
+        if (data.content) {
             resultContainer.innerHTML += data.content
         }
     }

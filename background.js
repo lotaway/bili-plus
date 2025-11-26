@@ -84,16 +84,13 @@ class DownloadManager {
                     if (preResult?.error) {
                         return sendResponse(preResult)
                     }
-
-                    const senderId = sender.id
                     const bvid = this.#subtitleFetcher.bvid
                     const cid = this.#subtitleFetcher.cid
-
-                    // 流式处理总结
+                    const EVENT_TYPE = "summarize:keepAlive"
                     this.#aiSubtitleHandler
                         .summarizeSubtitlesHandler(this.#subtitleFetcher, chunk => {
-                            chrome.runtime.sendMessage(senderId, {
-                                type: "keepAlive",
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
                                 data: {
                                     content: chunk,
                                     bvid,
@@ -103,9 +100,8 @@ class DownloadManager {
                             })
                         })
                         .then((summaryResult) => {
-                            // 发送完整结果
-                            chrome.runtime.sendMessage(senderId, {
-                                type: "keepAlive",
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
                                 data: {
                                     ...summaryResult,
                                     bvid,
@@ -117,9 +113,8 @@ class DownloadManager {
                         })
                         .catch((error) => {
                             console.error(error)
-                            // 发送错误信息
-                            chrome.runtime.sendMessage(senderId, {
-                                type: "keepAlive",
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
                                 data: {
                                     error: error instanceof Error
                                         ? error.message
@@ -130,9 +125,8 @@ class DownloadManager {
                             })
                             sendResponse({ done: true })
                         })
-
-                    return true
                 }
+                return true
             case "VideoInfoUpdate":
                 this.#subtitleFetcher.init(message.payload)
                 break
@@ -140,25 +134,22 @@ class DownloadManager {
                 chrome.sidePanel.open({ windowId: sender?.tab?.windowId })
                 break
             case "startAssistant":
-                this.#aiAgentRunner.runAgent(message.payload, chunk => {
-                            chrome.runtime.sendMessage(senderId, {
-                                type: "keepAlive",
-                                data: {
-                                    content: chunk,
-                                    bvid,
-                                    cid,
-                                    done: false,
-                                },
-                            })
+                {
+                    const EVENT_TYPE = "assistant:keepAlive"
+                    this.#aiAgentRunner.runAgent(message.payload, chunk => {
+                        chrome.runtime.sendMessage(sender.id, {
+                            type: EVENT_TYPE,
+                            data: {
+                                content: chunk,
+                                done: false,
+                            },
                         })
+                    })
                         .then((summaryResult) => {
-                            // 发送完整结果
-                            chrome.runtime.sendMessage(senderId, {
-                                type: "keepAlive",
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
                                 data: {
                                     ...summaryResult,
-                                    bvid,
-                                    cid,
                                     done: true,
                                 }
                             })
@@ -166,19 +157,17 @@ class DownloadManager {
                         })
                         .catch((error) => {
                             console.error(error)
-                            // 发送错误信息
-                            chrome.runtime.sendMessage(senderId, {
-                                type: "keepAlive",
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
                                 data: {
                                     error: error instanceof Error
                                         ? error.message
                                         : JSON.stringify(error),
-                                    bvid,
-                                    cid
                                 }
                             })
                             sendResponse({ done: true })
                         })
+                }
                 return true
 
             default:
@@ -424,38 +413,30 @@ class AIAgentRunner {
         }
 
         this.isBusy = true
-        try {
-            // 调用agent端点
-            const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${config.aiKey ?? ""}`,
-                },
-                body: JSON.stringify({
-                    messages: [payload.message],
-                    model: config.aiModel || AIAgentRunner.defaultModelName(),
-                }),
-            })
-            if (!agentResponse.ok) {
-                throw new Error(`Agent请求失败: ${agentResponse.text}`, {
-                    cause: agentResponse,
-                })
-            }
-            const reader = agentResponse.body.getReader()
-            const fullResponse = await this.readStream(reader, onProgress)
-            return {
-                data: fullResponse
-            }
-        } catch (error) {
-            console.error("Agent调用错误:", error)
-            return {
-                error: error instanceof Error
-                    ? error.message
-                    : "Agent调用发生未知错误"
-            }
-        } finally {
+        const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${config.aiKey ?? ""}`,
+            },
+            body: JSON.stringify({
+                messages: [payload.message],
+                model: config.aiModel || AIAgentRunner.defaultModelName(),
+            }),
+        }).finally(() => {
             this.isBusy = false
+        })
+        if (!agentResponse.ok) {
+            throw new Error(`Agent请求失败: ${agentResponse.text}`, {
+                cause: agentResponse,
+            })
+        }
+        const reader = agentResponse.body.getReader()
+        const fullResponse = await this.readStream(reader, onProgress).finally(() => {
+            this.isBusy = false
+        })
+        return {
+            data: fullResponse
         }
     }
 }
