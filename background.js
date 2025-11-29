@@ -136,14 +136,28 @@ class DownloadManager {
             case "startAssistant":
                 {
                     const EVENT_TYPE = "assistant:keepAlive"
-                    this.#aiAgentRunner.runAgent(message.payload, chunk => {
-                        chrome.runtime.sendMessage(sender.id, {
-                            type: EVENT_TYPE,
-                            data: {
-                                content: chunk,
-                                done: false,
-                            },
-                        })
+                    this.#aiAgentRunner.runAgent(message.payload, (content, metadata) => {
+                        if (metadata?.type === "decision_required") {
+                            // Send decision request to frontend
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
+                                data: {
+                                    decision_required: true,
+                                    ...metadata,
+                                    done: false,
+                                },
+                            })
+                        } else {
+                            // Normal content update
+                            chrome.runtime.sendMessage(sender.id, {
+                                type: EVENT_TYPE,
+                                data: {
+                                    content: content,
+                                    metadata: metadata,
+                                    done: false,
+                                },
+                            })
+                        }
                     })
                         .then((summaryResult) => {
                             chrome.runtime.sendMessage(sender.id, {
@@ -413,30 +427,45 @@ class AIAgentRunner {
         }
 
         this.isBusy = true
-        const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${config.aiKey ?? ""}`,
-            },
-            body: JSON.stringify({
-                messages: [payload.message],
-                model: config.aiModel || AIAgentRunner.defaultModelName(),
-            }),
-        }).finally(() => {
-            this.isBusy = false
-        })
-        if (!agentResponse.ok) {
-            throw new Error(`Agent请求失败: ${agentResponse.text}`, {
-                cause: agentResponse,
+        try {
+            const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${config.aiKey ?? ""}`,
+                },
+                body: JSON.stringify({
+                    messages: [payload.message],
+                    model: config.aiModel || AIAgentRunner.defaultModelName(),
+                }),
             })
-        }
-        const reader = agentResponse.body.getReader()
-        const fullResponse = await new Utils().readStream(reader, onProgress).finally(() => {
+
+            if (!agentResponse.ok) {
+                throw new Error(`Agent请求失败: ${await agentResponse.text()}`, {
+                    cause: agentResponse,
+                })
+            }
+
+            const reader = agentResponse.body.getReader()
+            const fullResponse = await new Utils().readStream(reader, (content, metadata) => {
+                // Handle human-in-loop cases
+                if (metadata?.event_type === "needs_decision") {
+                    // Send decision request to frontend
+                    onProgress?.(null, {
+                        type: "decision_required",
+                        ...metadata
+                    })
+                } else {
+                    // Normal progress update
+                    onProgress?.(content, metadata)
+                }
+            })
+
+            return {
+                data: fullResponse
+            }
+        } finally {
             this.isBusy = false
-        })
-        return {
-            data: fullResponse
         }
     }
 }
@@ -531,7 +560,9 @@ ${text}`
 }
 
 class Utils {
-    async readStream(reader, onProgress = content => { console.debug(content) }) {
+    async readStream(reader, onProgress = (content, metadata) => { 
+        console.debug('Content:', content, 'Metadata:', metadata) 
+    }) {
         const decoder = new TextDecoder()
         let buffer = ""
         let fullResponse = ""
@@ -547,10 +578,20 @@ class Utils {
                 if (line.startsWith('data:') && !line.includes('[DONE]')) {
                     try {
                         const data = JSON.parse(line.substring(5))
+                        
+                        // Handle agent metadata
+                        const agentMetadata = data.agent_metadata
+                        if (agentMetadata) {
+                            // Send agent metadata to progress callback
+                            onProgress?.("", agentMetadata)
+                            continue
+                        }
+                        
+                        // Handle regular content
                         const content = data.choices[0]?.delta?.content
                         if (content) {
                             fullResponse += content
-                            onProgress?.(content)
+                            onProgress?.(content, null)
                         }
                     } catch (e) {
                         console.error('Error parsing stream data:', e)
@@ -558,6 +599,7 @@ class Utils {
                 }
             }
         }
+        return fullResponse
     }
 }
 
