@@ -3,7 +3,7 @@ body {
   font-family: system-ui;
 
   &.popup {
-    width: 240px;
+    width: 320px;
   }
 }
 
