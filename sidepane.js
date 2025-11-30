@@ -11,11 +11,11 @@ class SidePaneController {
         this.initButton()
         this.#ventTypes.set("summarize:keepAlive", {
             type: "summarize:keepAlive",
-            handler: this.handleSummarizeKeepAliveMessage,
+            handler: this.handleSummarizeKeepAliveMessage.bind(this),
         })
         this.#ventTypes.set("assistant:keepAlive", {
             type: "assistant:keepAlive",
-            handler: this.handleAssistantKeepAliveMessage,
+            handler: this.handleAssistantKeepAliveMessage.bind(this),
         })
     }
 
