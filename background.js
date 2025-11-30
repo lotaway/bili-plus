@@ -296,6 +296,7 @@ class SubtitleFetcher {
         bvid: null,
     }
     #api = new BilibiliApi()
+    #MAX_STORED_VIDEOS = 50
 
     get isInit() {
         return this.#videoInfo.isInit
@@ -326,6 +327,23 @@ class SubtitleFetcher {
         return `${data?.title ?? ""}-${page?.part ?? ""}`
     }
 
+    async cleanupOldStorage() {
+        try {
+            const allData = await chrome.storage.local.get(null)
+            const videoKeys = Object.keys(allData).filter(key => 
+                key.startsWith('BV') || /^\d+$/.test(key)
+            )
+            
+            if (videoKeys.length > this.#MAX_STORED_VIDEOS) {
+                const keysToRemove = videoKeys.slice(0, videoKeys.length - this.#MAX_STORED_VIDEOS)
+                await chrome.storage.local.remove(keysToRemove)
+                console.log(`清理了 ${keysToRemove.length} 个过期的视频存储`)
+            }
+        } catch (error) {
+            console.error('清理存储时出错:', error)
+        }
+    }
+
     /**
      * init the required status such as video identity info
      * @param {object} data
@@ -334,15 +352,19 @@ class SubtitleFetcher {
      * @param {number | undefined} data.bvid
      * @param {Array<{cid:number, part:string}>} data.pages
      */
-    init(data) {
+    async init(data) {
         this.#videoInfo.aid = data.aid ?? null
         this.#videoInfo.cid =
             (data.p ? data.pages?.[data.p - 1]?.cid : data.cid) ?? null
         this.#videoInfo.bvid = data.bvid ?? null
         this.#videoInfo.isInit = this.#videoInfo.cid && this.#videoInfo.aid
         if (this.#videoInfo.bvid) {
+            await this.cleanupOldStorage()
             chrome.storage.local.set({
-                [this.#videoInfo.bvid]: data,
+                [this.#videoInfo.bvid]: {
+                    ...data,
+                    timestamp: Date.now()
+                },
             })
         }
     }
