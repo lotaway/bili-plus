@@ -176,27 +176,14 @@ class DownloadManager {
                 {
                     const EVENT_TYPE = "assistant:keepAlive"
                     this.#aiAgentRunner.runAgent(message.payload, (content, metadata) => {
-                        if (metadata?.type === "decision_required") {
-                            // Send decision request to frontend
-                            chrome.runtime.sendMessage(sender.id, {
-                                type: EVENT_TYPE,
-                                data: {
-                                    decision_required: true,
-                                    ...metadata,
-                                    done: false,
-                                },
-                            })
-                        } else {
-                            // Normal content update
-                            chrome.runtime.sendMessage(sender.id, {
-                                type: EVENT_TYPE,
-                                data: {
-                                    content: content,
-                                    metadata: metadata,
-                                    done: false,
-                                },
-                            })
-                        }
+                        chrome.runtime.sendMessage(sender.id, {
+                            type: EVENT_TYPE,
+                            data: {
+                                content: content,
+                                metadata: metadata,
+                                done: false,
+                            },
+                        })
                     })
                         .then((summaryResult) => {
                             chrome.runtime.sendMessage(sender.id, {
@@ -506,7 +493,7 @@ class AIAgentRunner {
                     cause: agentResponse,
                 })
             }
-
+            onProgress?.("正在尝试读取流。。。")
             const reader = agentResponse.body.getReader()
             const fullResponse = await new Utils().readStream(reader, (content, metadata) => {
                 // Handle human-in-loop cases

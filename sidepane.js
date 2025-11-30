@@ -172,9 +172,13 @@ class SidePaneController {
     handleAssistantKeepAliveMessage(data) {
         const resultContainer = document.getElementById('result-container')
         
-        // Handle decision required case
-        if (data.decision_required) {
-            this.showDecisionUI(data)
+        // Handle decision required case (new format: metadata.type, old format: decision_required)
+        if (data.metadata?.type === "decision_required") {
+            this.showDecisionUI({
+                ...data,
+                ...data.metadata,
+                reason: data.metadata?.reason || data.reason
+            })
             return
         }
         
@@ -194,11 +198,13 @@ class SidePaneController {
     showDecisionUI(decisionData) {
         const resultContainer = document.getElementById('result-container')
         
-        // Clear previous content
-        resultContainer.innerHTML = ''
+        // Remove any existing decision UI before adding new one
+        const existingDecisionUI = resultContainer.querySelector('.current-decision-ui')
+        if (existingDecisionUI) {
+            existingDecisionUI.remove()
+        }
         
-        // Create decision UI based on the reason
-        let decisionHTML = '<div class="decision-container">'
+        let decisionHTML = '<div class="decision-container current-decision-ui">'
         decisionHTML += `<h4>⏸️ 需要人工决策</h4>`
         decisionHTML += `<p><strong>原因:</strong> ${decisionData.reason || decisionData.message || '需要用户确认'}</p>`
         
@@ -233,29 +239,24 @@ class SidePaneController {
         }
         
         decisionHTML += '</div>'
-        resultContainer.innerHTML = decisionHTML
         
-        // Add event listeners
+        // Append the new decision UI to the result container without clearing existing content
+        resultContainer.insertAdjacentHTML('beforeend', decisionHTML)
         this.setupDecisionEventListeners(decisionData)
     }
 
     setupDecisionEventListeners(decisionData) {
-        // Handle decision buttons
-        document.querySelectorAll('.decision-btn').forEach(btn => {
+        const buttons = document.querySelectorAll('.decision-btn');
+        for (const btn of buttons) {
             btn.addEventListener('click', (e) => {
-                const action = e.target.getAttribute('data-action')
-                
+                const action = e.target.dataset.action
                 if (action === 'feedback') {
-                    // Show feedback input
                     document.querySelector('.feedback-input').style.display = 'block'
                     return
                 }
-                
                 this.sendDecision(decisionData, action)
             })
-        })
-        
-        // Handle feedback submission
+        }
         const submitFeedbackBtn = document.getElementById('submit-feedback')
         if (submitFeedbackBtn) {
             submitFeedbackBtn.addEventListener('click', () => {
@@ -269,7 +270,7 @@ class SidePaneController {
 
     async sendDecision(decisionData, decision, feedback = '') {
         const resultContainer = document.getElementById('result-container')
-        resultContainer.innerHTML = '<p>正在处理您的决策...</p>'
+        resultContainer.innerHTML += '<p>正在处理您的决策...</p>'
         
         try {
             const config = await chrome.storage.sync.get([
