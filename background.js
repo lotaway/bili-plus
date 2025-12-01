@@ -649,7 +649,8 @@ class Utils {
             if (done) break
 
             buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
+            const SPLIT = "\n"
+            const lines = buffer.split(SPLIT)
             buffer = lines.pop()
 
             for (const line of lines) {
@@ -660,7 +661,7 @@ class Utils {
                         onProgress?.("", agentMetadata)
                         const content = data.choices[0]?.delta?.content
                         if (content) {
-                            fullResponse += content
+                            fullResponse += content + SPLIT
                             onProgress?.(content, null)
                         }
                     } catch (e) {
