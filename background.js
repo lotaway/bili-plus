@@ -210,6 +210,16 @@ class DownloadManager {
                 }
                 return true
 
+            case "stopAssistant":
+                {
+                    const stopped = await this.#aiAgentRunner.stopAgent()
+                    sendResponse({ 
+                        stopped: stopped,
+                        message: stopped ? "AI智能体已停止" : "没有正在运行的AI智能体"
+                    })
+                }
+                return true
+
             default:
                 break
         }
@@ -453,6 +463,7 @@ class SubtitleFetcher {
 
 class AIAgentRunner {
     isBusy = false
+    #abortController = null
 
     static defaultModelName() {
         return "gpt-3.5-turbo"
@@ -475,6 +486,8 @@ class AIAgentRunner {
         }
 
         this.isBusy = true
+        this.#abortController = new AbortController()
+        
         try {
             const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
                 method: "POST",
@@ -486,6 +499,7 @@ class AIAgentRunner {
                     messages: [payload.message],
                     model: config.aiModel || AIAgentRunner.defaultModelName(),
                 }),
+                signal: this.#abortController.signal
             })
 
             if (!agentResponse.ok) {
@@ -512,9 +526,25 @@ class AIAgentRunner {
             return {
                 data: fullResponse
             }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log('AI Agent 已停止')
+                return { error: "AI Agent 已停止" }
+            }
+            throw error
         } finally {
             this.isBusy = false
+            this.#abortController = null
         }
+    }
+
+    async stopAgent() {
+        if (this.isBusy && this.#abortController) {
+            this.#abortController.abort()
+            console.log('正在停止 AI Agent...')
+            return true
+        }
+        return false
     }
 }
 

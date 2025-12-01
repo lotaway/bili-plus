@@ -2,6 +2,7 @@
 class SidePaneController {
 
     #ventTypes = new Map()
+    #isAssistantRunning = false
 
     constructor() {
         this.init()
@@ -35,7 +36,8 @@ class SidePaneController {
                     await this.extract("md")
                 })
             document.getElementById('summary').addEventListener('click', () => this.summarize())
-            document.getElementById("assistant").addEventListener("click", () => this.assistant())
+            document.getElementById("assistant-start").addEventListener("click", () => this.assistant())
+            document.getElementById("assistant-stop").addEventListener("click", () => this.stopAssistant())
         })
     }
 
@@ -68,13 +70,69 @@ class SidePaneController {
     }
 
     async assistant() {
+        const inputElement = document.getElementById("assistant-input")
+        const userMessage = inputElement.value.trim()
+        
+        if (!userMessage) {
+            this.setMessage("请输入您的问题或指令")
+            return
+        }
+
+        if (this.#isAssistantRunning) {
+            this.setMessage("AI智能体正在运行中，请先停止当前任务")
+            return
+        }
+
         this.setMessage("正在启动AI智能体...")
-        await this.sendMessage({
-            type: "startAssistant",
-            payload: {
-                message: "帮我做一个视频观看规划"
-            }
-        })
+        this.#isAssistantRunning = true
+        this.updateAssistantButtons()
+
+        try {
+            await this.sendMessage({
+                type: "startAssistant",
+                payload: {
+                    message: userMessage
+                }
+            })
+        } catch (error) {
+            console.error("启动AI智能体失败:", error)
+            this.setMessage("启动AI智能体失败，请重试")
+            this.#isAssistantRunning = false
+            this.updateAssistantButtons()
+        }
+    }
+
+    async stopAssistant() {
+        if (!this.#isAssistantRunning) {
+            return
+        }
+
+        this.setMessage("正在停止AI智能体...")
+        
+        try {
+            await this.sendMessage({
+                type: "stopAssistant"
+            })
+        } catch (error) {
+            console.error("停止AI智能体失败:", error)
+        } finally {
+            this.#isAssistantRunning = false
+            this.updateAssistantButtons()
+            this.setMessage("AI智能体已停止")
+        }
+    }
+
+    updateAssistantButtons() {
+        const startBtn = document.getElementById("assistant-start")
+        const stopBtn = document.getElementById("assistant-stop")
+        
+        if (this.#isAssistantRunning) {
+            startBtn.style.display = "none"
+            stopBtn.style.display = "inline-block"
+        } else {
+            startBtn.style.display = "inline-block"
+            stopBtn.style.display = "none"
+        }
     }
 
     setMessage(msg) {
