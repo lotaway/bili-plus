@@ -84,6 +84,57 @@
         .feedback-input button:hover {
             background: #0056b3;
         }
+        .assistant-section {
+            margin: 15px 0;
+        }
+
+        .assistant-input {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .assistant-input textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            resize: vertical;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .assistant-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .assistant-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #assistant-start {
+            background: #007bff;
+            color: white;
+        }
+
+        #assistant-start:hover {
+            background: #0056b3;
+        }
+
+        #assistant-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        #assistant-stop:hover {
+            background: #c82333;
+        }
     </style>
 </head>
 <body class="sidepane">
@@ -93,8 +144,18 @@
             <button id="extract">提取当前视频字幕（含时间戳）</button>
             <button id="extract-only-text">提取当前视频字幕（纯文字）</button>
             <button id="summary">视频知识总结</button>
-            <button id="assistant">助手启动</button>
         </div>
+        
+        <div class="assistant-section">
+            <div class="assistant-input">
+                <textarea id="assistant-input" placeholder="请输入您的问题或指令..." rows="3"></textarea>
+                <div class="assistant-buttons">
+                    <button id="assistant-start">助手启动</button>
+                    <button id="assistant-stop" style="display: none;">停止</button>
+                </div>
+            </div>
+        </div>
+        
         <div id="result-container" class="result-container"></div>
     </div>
     <script src="sidepane.js"></script>
