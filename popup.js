@@ -82,6 +82,18 @@ class PopupController {
         }
     }
 
+    setMessage(message, type = 'success') {
+        const msgElement = document.getElementById('msg')
+        if (!msgElement) 
+            return
+        msgElement.textContent = message
+        msgElement.className = `message ${type}`
+        setTimeout(() => {
+            msgElement.textContent = ''
+            msgElement.className = 'message'
+        }, 3000)
+    }
+
 }
 
 new PopupController()
