@@ -47,6 +47,7 @@
       "resources": [
         "utils/*",
         "sidepane.html",
+        "sidepane.css",
         "sidepane.js"
       ],
       "matches": [
