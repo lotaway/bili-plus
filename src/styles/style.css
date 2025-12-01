@@ -1,10 +1,10 @@
 body {
   padding: 10px;
   font-family: system-ui;
+}
 
-  &.popup {
-    width: 320px;
-  }
+.popup {
+  width: 320px;
 }
 
 .config-section {

@@ -1,0 +1,60 @@
+{
+    "manifest_version": 3,
+    "name": "Bilibili 字幕提取器",
+    "version": "1.0.1",
+    "description": "自动提取当前B站视频字幕并导出为SRT文件",
+    "permissions": [
+        "cookies",
+        "activeTab",
+        "downloads",
+        "scripting",
+        "storage",
+        "sidePanel"
+    ],
+    "host_permissions": [
+        "https://www.bilibili.com/*",
+        "https://api.bilibili.com/*",
+        "https://aisubtitle.hdslb.com/*"
+    ],
+    "background": {
+        "service_worker": "assets/background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://www.bilibili.com/video/*",
+                "*://www.bilibili.com/list/watchlater?*"
+            ],
+            "js": [
+                "assets/content.js"
+            ]
+        }
+    ],
+    "action": {
+        "default_popup": "src/popup/index.html",
+        "default_icon": {
+            "16": "icon.png"
+        }
+    },
+    "icons": {
+        "16": "icon.png",
+        "48": "icon.png",
+        "128": "icon.png"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "assets/video_page_inject.js",
+                "src/sidepanel/index.html",
+                "src/popup/index.html"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ],
+    "side_panel": {
+        "default_path": "src/sidepanel/index.html"
+    }
+}

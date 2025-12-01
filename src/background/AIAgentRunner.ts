@@ -1,0 +1,96 @@
+import { StreamUtils } from '../utils/streamUtils';
+
+export class AIAgentRunner {
+  isBusy = false;
+  #abortController: AbortController | null = null;
+
+  static defaultModelName() {
+    return 'gpt-3.5-turbo';
+  }
+
+  async runAgent(
+    payload: { message: string },
+    onProgress?: (content: string, metadata: any) => void
+  ) {
+    if (this.isBusy) {
+      return { error: '当前正在处理中，请稍后再试' };
+    }
+
+    const config = await chrome.storage.sync.get([
+      'aiProvider',
+      'aiEndpoint',
+      'aiKey',
+      'aiModel',
+    ]);
+
+    if (!config.aiEndpoint) {
+      return { error: '请先配置AI服务' };
+    }
+
+    this.isBusy = true;
+    this.#abortController = new AbortController();
+
+    try {
+      const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.aiKey ?? ''}`,
+        },
+        body: JSON.stringify({
+          messages: [payload.message],
+          model: config.aiModel || AIAgentRunner.defaultModelName(),
+        }),
+        signal: this.#abortController.signal,
+      });
+
+      if (!agentResponse.ok) {
+        throw new Error(`Agent请求失败: ${await agentResponse.text()}`, {
+          cause: agentResponse,
+        });
+      }
+      // onProgress?.('正在尝试读取流。。。', null);
+      if (!agentResponse.body) throw new Error('No response body');
+      
+      const reader = agentResponse.body.getReader();
+      const fullResponse = await new StreamUtils().readStream(
+        reader,
+        (content, metadata) => {
+          // Handle human-in-loop cases
+          if (metadata?.event_type === 'needs_decision') {
+            // Send decision request to frontend
+            onProgress?.('', {
+              type: 'decision_required',
+              ...metadata,
+            });
+          } else {
+            // Normal progress update
+            onProgress?.(content, metadata);
+          }
+        }
+      );
+
+      return {
+        data: fullResponse,
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('AI Agent 已停止');
+        return { error: 'AI Agent 已停止' };
+      }
+      throw error;
+    } finally {
+      this.isBusy = false;
+      this.#abortController = null;
+    }
+  }
+
+  async stopAgent() {
+    if (this.isBusy && this.#abortController) {
+      this.#abortController.abort();
+      console.log('正在停止 AI Agent...');
+      return true;
+    }
+    return false;
+  }
+}
