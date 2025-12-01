@@ -161,7 +161,7 @@ class SidePaneController {
             return
         }
         if (data.done && data.content) {
-            this.showStreamResult(data.data)
+            this.showMarkdownAsHtml(data.data)
             return
         }
         if (data.content) {
@@ -187,7 +187,7 @@ class SidePaneController {
             return
         }
         if (data.done && data.content) {
-            this.showStreamResult(data.data)
+            document.getElementById('result-container').innerHTML = data.data
             return
         }
         if (data.content) {
@@ -310,7 +310,7 @@ class SidePaneController {
         }
     }
 
-    showStreamResult(data) {
+    showMarkdownAsHtml(data) {
         const resultContainer = document.getElementById('result-container')
         // 简单markdown渲染
         resultContainer.innerHTML = data

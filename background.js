@@ -17,7 +17,7 @@ class DownloadManager {
                 chrome.storage.sync.getBytesInUse(null, resolve)
             })
             console.log('Sync storage usage:', syncBytes, 'bytes')
-            
+
             if (syncBytes > 90000) {
                 await this.cleanupSyncStorage()
             }
@@ -38,7 +38,7 @@ class DownloadManager {
                     }
                 }
             }
-            
+
             if (keysToRemove.length > 0) {
                 await chrome.storage.sync.remove(keysToRemove)
                 console.log(`清理了 ${keysToRemove.length} 个过期的sync存储项`)
@@ -356,10 +356,10 @@ class SubtitleFetcher {
     async cleanupOldStorage() {
         try {
             const allData = await chrome.storage.local.get(null)
-            const videoKeys = Object.keys(allData).filter(key => 
+            const videoKeys = Object.keys(allData).filter(key =>
                 key.startsWith('BV') || /^\d+$/.test(key)
             )
-            
+
             if (videoKeys.length > this.#MAX_STORED_VIDEOS) {
                 const keysToRemove = videoKeys.slice(0, videoKeys.length - this.#MAX_STORED_VIDEOS)
                 await chrome.storage.local.remove(keysToRemove)
@@ -608,8 +608,8 @@ ${text}`
 }
 
 class Utils {
-    async readStream(reader, onProgress = (content, metadata) => { 
-        console.debug('Content:', content, 'Metadata:', metadata) 
+    async readStream(reader, onProgress = (content, metadata) => {
+        console.debug('Content:', content, 'Metadata:', metadata)
     }) {
         const decoder = new TextDecoder()
         let buffer = ""
@@ -626,16 +626,8 @@ class Utils {
                 if (line.startsWith('data:') && !line.includes('[DONE]')) {
                     try {
                         const data = JSON.parse(line.substring(5))
-                        
-                        // Handle agent metadata
                         const agentMetadata = data.agent_metadata
-                        if (agentMetadata) {
-                            // Send agent metadata to progress callback
-                            onProgress?.("", agentMetadata)
-                            continue
-                        }
-                        
-                        // Handle regular content
+                        onProgress?.("", agentMetadata)
                         const content = data.choices[0]?.delta?.content
                         if (content) {
                             fullResponse += content

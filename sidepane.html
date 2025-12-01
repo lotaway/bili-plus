@@ -13,8 +13,18 @@
             <button id="extract">提取当前视频字幕（含时间戳）</button>
             <button id="extract-only-text">提取当前视频字幕（纯文字）</button>
             <button id="summary">视频知识总结</button>
-            <button id="assistant">助手启动</button>
         </div>
+        
+        <div class="assistant-section">
+            <div class="assistant-input">
+                <textarea id="assistant-input" placeholder="请输入您的问题或指令..." rows="3"></textarea>
+                <div class="assistant-buttons">
+                    <button id="assistant-start">助手启动</button>
+                    <button id="assistant-stop" style="display: none;">停止</button>
+                </div>
+            </div>
+        </div>
+        
         <div id="result-container" class="result-container"></div>
     </div>
     <script src="sidepane.js"></script>
