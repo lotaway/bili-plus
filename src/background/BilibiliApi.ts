@@ -1,17 +1,20 @@
+import { VideoDetailResponse } from '../types/video';
+
 export class BilibiliApi {
-  #host = '';
+  private readonly host: string = '';
+  
   constructor(host = 'https://api.bilibili.com') {
-    this.#host = host;
+    this.host = host;
   }
 
   async getCookies(): Promise<chrome.cookies.Cookie[]> {
     return await chrome.cookies.getAll({
-      domain: this.#host.replace('https://api', ''),
-    });
+      domain: this.host.replace('https://api', ''),
+    })
   }
 
   buildCookieHeader(cookies: chrome.cookies.Cookie[]): string {
-    return cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    return cookies.map((c) => `${c.name}=${c.value}`).join('; ')
   }
 
   buildHeader(cookies: string): HeadersInit {
@@ -28,7 +31,7 @@ export class BilibiliApi {
 
   async getVideoInfo(bvid: string, headers?: HeadersInit): Promise<any> {
     headers = await this.fillHeader(headers);
-    const url = `${this.#host}/x/web-interface/view?bvid=${bvid}`;
+    const url = `${this.host}/x/web-interface/view?bvid=${bvid}`;
     return await fetch(url, { headers }).then((r) => r.json());
   }
 
@@ -36,9 +39,9 @@ export class BilibiliApi {
     aid: string | number,
     cid: string | number,
     headers?: HeadersInit
-  ): Promise<any> {
+  ): Promise<VideoDetailResponse> {
     headers = await this.fillHeader(headers);
-    const url = `${this.#host}/x/player/wbi/v2?aid=${aid}&cid=${cid}`;
+    const url = `${this.host}/x/player/wbi/v2?aid=${aid}&cid=${cid}`;
     return await fetch(url, { headers }).then((r) => r.json());
   }
 

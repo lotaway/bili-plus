@@ -63,7 +63,7 @@ export interface SubtitleItem {
 
 export interface Subtitle {
   allow_submit: boolean;
-  list: SubtitleItem[];
+  subtitles: SubtitleItem[];
 }
 
 export interface EmbedPlayer {
@@ -80,6 +80,14 @@ export interface EmbedPlayer {
   t: number;
   fromDid: string | null;
   featureList: Record<string, unknown>;
+}
+
+// Bilibili API response wrapper
+export interface ApiResponse<T> {
+  code: number;
+  message: string;
+  ttl: number;
+  data: T;
 }
 
 export interface VideoData {
@@ -188,3 +196,6 @@ export interface VideoData {
   is_story_play?: number;
   is_view_self?: boolean;
 }
+
+// Response type for getVideoDetailInfo method
+export type VideoDetailResponse = ApiResponse<VideoData>;
