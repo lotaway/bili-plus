@@ -2,17 +2,31 @@ import { SubtitleFetcher } from './SubtitleFetcher'
 import { StreamUtils } from '../utils/streamUtils'
 
 interface Config {
-    aiProvider: string
-    aiEndpoint: string
-    aiKey: string
-    aiModel: string
+  aiProvider: string
+  aiEndpoint: string
+  aiKey: string
+  aiModel: string
+}
+
+interface VersionInfo {
+  model_name: string
+  version: string
+  object: string
+  owned_by: string
+  api_version: string
 }
 
 export class AISubtitleHandler {
   isBusy = false
   private apiCheckTimeout: number | null = null
   private config: Config | null = null
-  private version = "v1"
+  private versionInfo: VersionInfo = {
+    model_name: "unknown",
+    version: "1.0.0",
+    object: "model",
+    owned_by: "lotaway",
+    api_version: "v1"
+  }
 
   static defaultModelName() {
     return 'gpt-3.5-turbo'
@@ -50,6 +64,10 @@ export class AISubtitleHandler {
       if (!this.config.aiEndpoint) {
         return { error: '请先配置AI服务' }
       }
+
+      // Fetch version information when config is available
+      await this.fetchVersionInfo()
+
       const response = await fetch(`${this.config.aiEndpoint}/api/show`, {
         method: 'POST',
         headers: {
@@ -81,6 +99,33 @@ export class AISubtitleHandler {
       })
     } finally {
       this.scheduleApiCheck()
+    }
+  }
+
+  private async fetchVersionInfo() {
+    if (!this.config?.aiEndpoint) {
+      return
+    }
+
+    try {
+      const signal = AbortSignal.timeout(5000)
+      const response = await fetch(`${this.config.aiEndpoint}/api/version`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const versionData = await response.json() as VersionInfo
+      this.versionInfo = versionData
+      console.log('版本信息获取成功:', versionData)
+    } catch (error) {
+      console.error('获取版本信息失败:', error)
     }
   }
 
@@ -131,7 +176,7 @@ ${text}`;
     if (!this.config) {
       return { error: '请先配置AI服务' };
     }
-    const response = await fetch(`${this.config.aiEndpoint}/${this.version}/chat/completions`, {
+    const response = await fetch(`${this.config.aiEndpoint}/${this.versionInfo.api_version ?? "v1"}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
