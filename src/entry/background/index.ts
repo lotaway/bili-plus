@@ -85,6 +85,15 @@ class DownloadManager {
     }, 10000);
   }
 
+  // 停止状态检查定时器
+  stopPollingStatusCheck(): void {
+    if (this.#pollingCheckTimer !== null) {
+      clearInterval(this.#pollingCheckTimer);
+      this.#pollingCheckTimer = null;
+      console.log('停止状态检查定时器');
+    }
+  }
+
   // 检查页面状态并控制API状态检查
   async checkAndControlApiStatusCheck(): Promise<void> {
     const popupOpen = this.isPopupOpen();
