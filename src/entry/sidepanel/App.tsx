@@ -7,15 +7,64 @@ interface DecisionData {
   [key: string]: any;
 }
 
+interface OutputContent {
+  markdown: string;
+  thinking: string;
+}
+
 const App: React.FC = () => {
   const [assistantInput, setAssistantInput] = useState('');
   const [isAssistantRunning, setIsAssistantRunning] = useState(false);
-  const [messages, setMessages] = useState<string>(''); // Using string for HTML content to match original behavior
+  const [outputContent, setOutputContent] = useState<OutputContent>({ markdown: '', thinking: '' });
   const [decisionData, setDecisionData] = useState<DecisionData | null>(null);
   const [feedbackInput, setFeedbackInput] = useState('');
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
+  const [messages, setMessages] = useState('');
+  const [showDownloadButton, setShowDownloadButton] = useState(false);
 
   const resultContainerRef = useRef<HTMLDivElement>(null);
+  const thinkingContainerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<number>();
+
+  // 自动滚动到底部
+  useEffect(() => {
+    const scrollToBottom = () => {
+      if (resultContainerRef.current && !hasUserScrolled) {
+        resultContainerRef.current.scrollTop = resultContainerRef.current.scrollHeight;
+      }
+      if (thinkingContainerRef.current) {
+        thinkingContainerRef.current.scrollTop = thinkingContainerRef.current.scrollHeight;
+      }
+    };
+
+    scrollToBottom();
+  }, [outputContent.markdown, outputContent.thinking, messages, hasUserScrolled]);
+
+  // 监听用户手动滚动
+  useEffect(() => {
+    const container = resultContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      scrollTimeoutRef.current = setTimeout(() => {
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 10;
+        setHasUserScrolled(!isAtBottom);
+      }, 100);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleMessage = (message: any) => {
@@ -39,18 +88,28 @@ const App: React.FC = () => {
   };
 
   const setMessage = (msg: string) => {
-    // In React, we might want to just append to messages or replace.
-    // The original code used textContent = msg for simple messages, 
-    // and innerHTML += for stream content.
-    // I'll use a simple state for the "status" message area if I separate them,
-    // but the original used one container for everything.
-    // For compatibility, I'll just clear and set content.
     setMessages(msg);
-    setDecisionData(null); // Clear decision UI on new message
+    setOutputContent({ markdown: '', thinking: '' });
+    setShowDownloadButton(false);
+    setDecisionData(null);
+    setHasUserScrolled(false);
   };
 
   const appendMessage = (content: string) => {
     setMessages((prev) => prev + content);
+    setHasUserScrolled(false);
+  };
+
+  const setMarkdownContent = (content: string) => {
+    setOutputContent(prev => ({ ...prev, markdown: content }));
+    setMessages('');
+    setShowDownloadButton(true);
+    setHasUserScrolled(false);
+  };
+
+  const appendThinkingContent = (content: string) => {
+    setOutputContent(prev => ({ ...prev, thinking: prev.thinking + content }));
+    setHasUserScrolled(false);
   };
 
   const handleExtract = async (mode: 'srt' | 'md') => {
@@ -153,6 +212,17 @@ const App: React.FC = () => {
     };
   };
 
+  const handleDownloadMarkdown = () => {
+    if (!outputContent.markdown) return;
+    
+    const textData = text2url(outputContent.markdown, 'md');
+    const filename = `ai-summary-${Date.now()}.md`;
+    
+    downloadFile(textData.url, filename).then(() => {
+      textData.destory();
+    });
+  };
+
   const downloadFile = async (url: string, filename: string) => {
     return await chrome.downloads.download({
       url,
@@ -168,7 +238,7 @@ const App: React.FC = () => {
       return;
     }
     if (data.done && data.content) {
-      setMessages(renderMarkdown(data.data));
+      setMarkdownContent(renderMarkdown(data.data));
       return;
     }
     if (data.content) {
@@ -190,11 +260,21 @@ const App: React.FC = () => {
       setMessage(data.error);
       return;
     }
+
+    // 处理thinking内容
+    if (data.thinking) {
+      appendThinkingContent(data.thinking);
+    }
+
     if (data.done && data.content) {
-      setMessages(data.data); // Assuming data.data is HTML or final text
+      if (data.data) {
+        setMarkdownContent(data.data);
+      } else {
+        setMarkdownContent(data.content);
+      }
       return;
     }
-    if (data.content) {
+    if (data.content && !data.thinking) {
       appendMessage(data.content);
     }
   };
@@ -271,6 +351,44 @@ const App: React.FC = () => {
         </button>
       </div>
 
+      {/* 输出内容区域 - 移到输入框上方 */}
+      <div className="output-section">
+        {/* Thinking内容显示区域 */}
+        {outputContent.thinking && (
+          <div className="thinking-container">
+            <h4>🤔 思考过程</h4>
+            <div
+              ref={thinkingContainerRef}
+              className="thinking-content"
+              dangerouslySetInnerHTML={{ __html: outputContent.thinking }}
+            />
+          </div>
+        )}
+
+        {/* 主输出内容区域 */}
+        <div className="result-section">
+          <div className="result-header">
+            <h4>📝 输出结果</h4>
+            {showDownloadButton && outputContent.markdown && (
+              <button 
+                className="download-btn"
+                onClick={handleDownloadMarkdown}
+                title="下载Markdown文件"
+              >
+                📥 下载
+              </button>
+            )}
+          </div>
+          <div
+            id="result-container"
+            className="result-container"
+            ref={resultContainerRef}
+            dangerouslySetInnerHTML={{ __html: outputContent.markdown || messages }}
+          />
+        </div>
+      </div>
+
+      {/* 助手输入区域 - 固定在底部 */}
       <div className="assistant-section">
         <div className="assistant-input">
           <textarea
@@ -293,13 +411,6 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <div
-        id="result-container"
-        className="result-container"
-        ref={resultContainerRef}
-        dangerouslySetInnerHTML={{ __html: messages }}
-      />
 
       {decisionData && (
         <div className="decision-container current-decision-ui">
