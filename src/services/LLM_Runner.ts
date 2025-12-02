@@ -128,36 +128,31 @@ export class LLM_Runner {
     if (!this.config?.aiEndpoint) {
       return
     }
+    const signal = AbortSignal.timeout(5000)
+    const response = await fetch(`${this.config.aiEndpoint}/api/version`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal,
+    })
 
-    try {
-      const signal = AbortSignal.timeout(5000)
-      const response = await fetch(`${this.config.aiEndpoint}/api/version`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const versionData = await response.json() as VersionInfo
-      this._versionInfo = versionData
-      this._versionInfoFetched = true
-      console.log('版本信息获取成功:', versionData)
-    } catch (error) {
-      console.error('获取版本信息失败:', error)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
+
+    const versionData = await response.json() as VersionInfo
+    this._versionInfo = versionData
+    this._versionInfoFetched = true
+    console.log('版本信息获取成功:', versionData)
   }
 
   async callLLM(
     messages: { role: string; content: string }[],
-    options: { 
-      temperature?: number; 
+    options: {
+      temperature?: number;
       stream?: boolean;
-      onProgress?: (chunk: string) => void 
+      onProgress?: (chunk: string) => void
     } = {}
   ) {
     if (this.isBusy) {
