@@ -73,32 +73,40 @@ const App: React.FC = () => {
       } else if (message.type === 'assistant:keepAlive') {
         handleAssistantKeepAliveMessage(message.data);
       }
-    };
+    }
 
-    chrome.runtime.onMessage.addListener(handleMessage);
+    chrome.runtime.onMessage.addListener(handleMessage)
     return () => {
-      chrome.runtime.onMessage.removeListener(handleMessage);
-    };
-  }, []);
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [])
 
   const sendMessage = (payload: any): Promise<any> => {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage(payload, resolve);
-    });
-  };
+      chrome.runtime.sendMessage(payload, resolve)
+    })
+  }
 
   const setMessage = (msg: string) => {
-    setMessages(msg);
-    setOutputContent({ markdown: '', thinking: '' });
-    setShowDownloadButton(false);
-    setDecisionData(null);
-    setHasUserScrolled(false);
-  };
+    setMessages(msg)
+    if (msg == '')
+      clearOoutput()
+    setShowDownloadButton(false)
+    setDecisionData(null)
+    setHasUserScrolled(false)
+  }
 
-  const appendMessage = (content: string) => {
-    setMessages((prev) => prev + content);
+  const clearOoutput = () => {
+    setOutputContent({ markdown: '', thinking: '' })
+  }
+
+  const appendMarkdownContent = (content: string) => {
+    setOutputContent((prev) => {
+      prev.markdown += content
+      return prev
+    })
     setHasUserScrolled(false);
-  };
+  }
 
   const setMarkdownContent = (content: string) => {
     setOutputContent(prev => ({ ...prev, markdown: content }));
@@ -214,10 +222,10 @@ const App: React.FC = () => {
 
   const handleDownloadMarkdown = () => {
     if (!outputContent.markdown) return;
-    
+
     const textData = text2url(outputContent.markdown, 'md');
     const filename = `ai-summary-${Date.now()}.md`;
-    
+
     downloadFile(textData.url, filename).then(() => {
       textData.destory();
     });
@@ -242,7 +250,7 @@ const App: React.FC = () => {
       return;
     }
     if (data.content) {
-      appendMessage(data.content);
+      appendMarkdownContent(data.content);
     }
   };
 
@@ -275,15 +283,15 @@ const App: React.FC = () => {
       return;
     }
     if (data.content && !data.thinking) {
-      appendMessage(data.content);
+      appendMarkdownContent(data.content);
     }
   };
 
   const sendDecision = async (decision: string, feedback: string = '') => {
     if (!decisionData) return;
-    
+
     // Optimistic update or loading state could be added here
-    appendMessage('<p>正在处理您的决策...</p>');
+    appendMarkdownContent('<p>正在处理您的决策...</p>');
     setDecisionData(null); // Hide decision UI
     setShowFeedbackInput(false);
     setFeedbackInput('');
@@ -350,10 +358,7 @@ const App: React.FC = () => {
           视频知识总结
         </button>
       </div>
-
-      {/* 输出内容区域 - 移到输入框上方 */}
       <div className="output-section">
-        {/* Thinking内容显示区域 */}
         {outputContent.thinking && (
           <div className="thinking-container">
             <h4>🤔 思考过程</h4>
@@ -364,50 +369,47 @@ const App: React.FC = () => {
             />
           </div>
         )}
-
-        {/* 主输出内容区域 */}
         <div className="result-section">
           <div className="result-header">
             <h4>📝 输出结果</h4>
-            {showDownloadButton && outputContent.markdown && (
-              <button 
-                className="download-btn"
-                onClick={handleDownloadMarkdown}
-                title="下载Markdown文件"
-              >
-                📥 下载
-              </button>
-            )}
           </div>
           <div
-            id="result-container"
             className="result-container"
             ref={resultContainerRef}
-            dangerouslySetInnerHTML={{ __html: outputContent.markdown || messages }}
+            dangerouslySetInnerHTML={{ __html: outputContent.markdown }}
           />
+          <div
+            className="result-container"
+          >{messages}</div>
+          {showDownloadButton && outputContent.markdown && (
+            <button
+              className="download-btn"
+              onClick={handleDownloadMarkdown}
+              title="下载Markdown文件"
+            >
+              📥 下载
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* 助手输入区域 - 固定在底部 */}
-      <div className="assistant-section">
-        <div className="assistant-input">
-          <textarea
-            id="assistant-input"
-            placeholder="请输入您的问题或指令..."
-            rows={3}
-            value={assistantInput}
-            onChange={(e) => setAssistantInput(e.target.value)}
-          />
-          <div className="assistant-buttons">
-            {!isAssistantRunning ? (
-              <button id="assistant-start" onClick={handleAssistantStart}>
-                助手启动
-              </button>
-            ) : (
-              <button id="assistant-stop" onClick={handleAssistantStop}>
-                停止
-              </button>
-            )}
+        <div className="assistant-section">
+          <div className="assistant-input">
+            <textarea
+              placeholder="请输入您的问题或指令..."
+              rows={6}
+              value={assistantInput}
+              onChange={(e) => setAssistantInput(e.target.value)}
+            />
+            <div className="assistant-buttons">
+              {!isAssistantRunning ? (
+                <button id="assistant-start" onClick={handleAssistantStart}>
+                  助手启动
+                </button>
+              ) : (
+                <button id="assistant-stop" onClick={handleAssistantStop}>
+                  停止
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -499,7 +501,7 @@ const App: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default App;
+export default App
