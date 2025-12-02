@@ -46,10 +46,14 @@ export class AISubtitleHandler {
     }
   }
 
+  isApiStatusCheckRunning(): boolean {
+    return this.apiCheckTimeout !== null
+  }
+
   private scheduleApiCheck() {
     this.apiCheckTimeout = setTimeout(() => {
       this.checkApiStatus()
-    }, 5000)
+    }, 10 * 1000)
   }
 
   private async checkApiStatus() {

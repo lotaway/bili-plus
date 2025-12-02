@@ -6,11 +6,12 @@ class DownloadManager {
   #subtitleFetcher = new SubtitleFetcher();
   #aiSubtitleHandler = new AISubtitleHandler();
   #aiAgentRunner = new AIAgentRunner();
+  #pollingCheckTimer: number | null = null;
 
   constructor() {
     this.setupEventListeners();
     this.initializeStorageCleanup();
-    this.#aiSubtitleHandler.initializeApiStatusCheck();
+    this.startPollingStatusCheck();
   }
 
   async initializeStorageCleanup() {
@@ -51,10 +52,74 @@ class DownloadManager {
     }
   }
 
+  // 检测popup是否打开
+  isPopupOpen(): boolean {
+    try {
+      const views = chrome.extension.getViews({ type: 'popup' });
+      return views.length > 0;
+    } catch (error) {
+      console.error('检测popup状态失败:', error);
+      return false;
+    }
+  }
+
+  // 检测sidepanel是否打开
+  async isSidepanelOpen(): Promise<boolean> {
+    try {
+      if (chrome.sidePanel) {
+        const panel = await chrome.sidePanel.getOptions({});
+        return panel.enabled || false;
+      }
+      return false;
+    } catch (error) {
+      console.error('检测sidepanel状态失败:', error);
+      return false;
+    }
+  }
+
+  // 启动状态检查定时器
+  startPollingStatusCheck(): void {
+    // 每10秒检查一次页面状态并控制API检查
+    this.#pollingCheckTimer = setInterval(async () => {
+      await this.checkAndControlApiStatusCheck();
+    }, 10000);
+  }
+
+  // 检查页面状态并控制API状态检查
+  async checkAndControlApiStatusCheck(): Promise<void> {
+    const popupOpen = this.isPopupOpen();
+    const sidepanelOpen = await this.isSidepanelOpen();
+    const shouldCheckApi = popupOpen || sidepanelOpen;
+
+    if (shouldCheckApi) {
+      // 如果页面打开且API检查未启动，则启动
+      if (!this.#aiSubtitleHandler.isApiStatusCheckRunning()) {
+        this.#aiSubtitleHandler.initializeApiStatusCheck();
+        console.log('启动API状态检查（popup或sidepanel已打开）');
+      }
+    } else {
+      // 如果页面关闭且API检查正在运行，则停止
+      if (this.#aiSubtitleHandler.isApiStatusCheckRunning()) {
+        this.#aiSubtitleHandler.stopApiStatusCheck();
+        console.log('停止API状态检查（popup和sidepanel都已关闭）');
+      }
+    }
+  }
+
   setupEventListeners() {
     chrome.downloads.onChanged.addListener(this.onDownloadChanged.bind(this));
     chrome.downloads.onCreated.addListener(this.onDownloadCreated.bind(this));
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
+    
+    // 监听扩展视图变化（popup打开/关闭）
+    chrome.runtime.onConnect.addListener((port) => {
+      if (port.name === 'popup') {
+        port.onDisconnect.addListener(async () => {
+          // popup关闭时立即检查状态
+          await this.checkAndControlApiStatusCheck();
+        });
+      }
+    });
   }
 
   onDownloadChanged(args: chrome.downloads.DownloadDelta) {
