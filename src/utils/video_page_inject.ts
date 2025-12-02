@@ -1,3 +1,5 @@
+import { VideoData } from '../types/video';
+
 let isWindowActivate = true;
 
 export {};
@@ -21,7 +23,7 @@ function main() {
 
 function syncVideoInfo(needCheck = true) {
   if (needCheck && !isWindowActivate) return;
-  const match = (window as any).__INITIAL_STATE__?.videoData;
+  const match: VideoData = (window as any).__INITIAL_STATE__?.videoData;
   if (!match) {
     console.error('No video data found in window.__INITIAL_STATE__');
     return;

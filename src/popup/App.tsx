@@ -8,10 +8,40 @@ const App: React.FC = () => {
     aiModel: 'gpt-3.5-turbo',
   });
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [apiStatus, setApiStatus] = useState<{
+    ok: boolean;
+    lastChecked: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     loadConfig();
+    loadApiStatus();
+
+    // 监听API状态变化
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area === 'local' && changes.apiStatus) {
+        setApiStatus(changes.apiStatus.newValue);
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
   }, []);
+
+  const loadApiStatus = async () => {
+    try {
+      const result = await chrome.storage.local.get('apiStatus');
+      if (result.apiStatus) {
+        setApiStatus(result.apiStatus);
+      }
+    } catch (error) {
+      console.error('加载API状态失败:', error);
+    }
+  };
 
   const loadConfig = async () => {
     const stored = await chrome.storage.sync.get([
@@ -53,11 +83,11 @@ const App: React.FC = () => {
   };
 
   const handleCleanupStorage = () => {
-      // Logic for cleanup wasn't implemented in the original popup.js provided, 
-      // but the button existed in HTML. 
-      // If there was logic, it should be here. 
-      // For now, I'll leave it as a placeholder or implement if I find it elsewhere.
-      console.log("Cleanup storage clicked");
+    // Logic for cleanup wasn't implemented in the original popup.js provided, 
+    // but the button existed in HTML. 
+    // If there was logic, it should be here. 
+    // For now, I'll leave it as a placeholder or implement if I find it elsewhere.
+    console.log("Cleanup storage clicked");
   }
 
   return (
@@ -108,6 +138,25 @@ const App: React.FC = () => {
         <button id="saveConfig" onClick={handleSaveConfig}>
           保存配置
         </button>
+        
+        {apiStatus && (
+          <div className="api-status-section">
+            <h4>API 状态</h4>
+            <div className={`api-status ${apiStatus.ok ? 'available' : 'unavailable'}`}>
+              <span className="status-indicator"></span>
+              <span className="status-text">
+                {apiStatus.ok ? 'AI模型Provider可用' : 'AI模型Provider不可用'}
+              </span>
+              {apiStatus.message && (
+                <span className="status-message"> - {apiStatus.message}</span>
+              )}
+              {apiStatus.lastChecked && (
+                <span className="last-checked"> (最后检查: {apiStatus.lastChecked})</span>
+              )}
+            </div>
+          </div>
+        )}
+        
         <button id="openSidePanel" onClick={handleOpenSidePanel}>
           生成字幕/总结
         </button>

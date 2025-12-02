@@ -1,24 +1,11 @@
 import { BilibiliApi } from './BilibiliApi';
+import { VideoData, Page } from '../types/video';
 
 interface VideoInfo {
   isInit: boolean;
   aid: number | null;
   cid: number | null;
   bvid: string | null;
-}
-
-interface Page {
-  cid: number;
-  part: string;
-}
-
-interface InitData {
-  aid?: number;
-  cid?: number;
-  bvid?: string;
-  p?: number;
-  pages?: Page[];
-  title?: string;
 }
 
 export class SubtitleFetcher {
@@ -83,7 +70,7 @@ export class SubtitleFetcher {
     }
   }
 
-  async init(data: InitData) {
+  async init(data: VideoData) {
     this.#videoInfo.aid = data.aid ?? null;
     this.#videoInfo.cid =
       (data.p && data.pages ? data.pages[data.p - 1]?.cid : data.cid) ?? null;

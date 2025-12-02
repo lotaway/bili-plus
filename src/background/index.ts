@@ -10,6 +10,7 @@ class DownloadManager {
   constructor() {
     this.setupEventListeners();
     this.initializeStorageCleanup();
+    this.#aiSubtitleHandler.initializeApiStatusCheck();
   }
 
   async initializeStorageCleanup() {
