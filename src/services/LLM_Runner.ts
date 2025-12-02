@@ -26,6 +26,7 @@ export class LLM_Runner {
     owned_by: "lotaway",
     api_version: "v1"
   }
+  private _versionInfoFetched = false
 
   static defaultModelName() {
     return 'gpt-3.5-turbo'
@@ -39,12 +40,12 @@ export class LLM_Runner {
     return this._versionInfo as Readonly<VersionInfo>
   }
 
-  get version() {
-    return this.versionInfo.version
+  get apiVersion() {
+    return this.versionInfo.api_version
   }
 
   get apiPrefixWithVersion() {
-    return `${this.config.aiEndpoint}/${this.version ?? "v1"}`
+    return `${this.config.aiEndpoint}/${this.apiVersion ?? "v1"}`
   }
 
   initializeApiStatusCheck() {
@@ -68,7 +69,7 @@ export class LLM_Runner {
   private scheduleApiCheck() {
     this.apiCheckTimeout = setTimeout(() => {
       this.checkApiStatus()
-    }, 10 * 1000)
+    }, 60 * 1000)
   }
 
   private async checkApiStatus() {
@@ -84,8 +85,10 @@ export class LLM_Runner {
         return { error: '请先配置AI服务' }
       }
 
-      // Fetch version information when config is available
-      await this.fetchVersionInfo()
+      // Fetch version information only once when config is available
+      if (!this._versionInfoFetched) {
+        await this.fetchVersionInfo()
+      }
 
       const response = await fetch(`${this.config.aiEndpoint}/api/show`, {
         method: 'POST',
@@ -142,6 +145,7 @@ export class LLM_Runner {
 
       const versionData = await response.json() as VersionInfo
       this._versionInfo = versionData
+      this._versionInfoFetched = true
       console.log('版本信息获取成功:', versionData)
     } catch (error) {
       console.error('获取版本信息失败:', error)

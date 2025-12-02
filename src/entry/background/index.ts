@@ -55,7 +55,7 @@ class DownloadManager {
   // 检测popup是否打开
   isPopupOpen(): boolean {
     try {
-      const views = chrome.extension.getViews({ type: 'popup' });
+      const views = chrome.extension.getViews?.({ type: 'popup' }) ?? ((chrome.extension as any).ViewType.POPUP === 'popup' ? new Array(1) : []);
       return views.length > 0;
     } catch (error) {
       console.error('检测popup状态失败:', error);
@@ -102,14 +102,14 @@ class DownloadManager {
 
     if (shouldCheckApi) {
       // 如果页面打开且API检查未启动，则启动
-      if (!this.aiSubtitleHandler.isApiStatusCheckRunning()) {
-        this.aiSubtitleHandler.initializeApiStatusCheck();
+      if (!this.llmRunner.isApiStatusCheckRunning()) {
+        this.llmRunner.initializeApiStatusCheck();
         console.log('启动API状态检查（popup或sidepanel已打开）');
       }
     } else {
       // 如果页面关闭且API检查正在运行，则停止
-      if (this.aiSubtitleHandler.isApiStatusCheckRunning()) {
-        this.aiSubtitleHandler.stopApiStatusCheck();
+      if (this.llmRunner.isApiStatusCheckRunning()) {
+        this.llmRunner.stopApiStatusCheck();
         console.log('停止API状态检查（popup和sidepanel都已关闭）');
       }
     }
