@@ -1,6 +1,6 @@
-import { SubtitleFetcher } from './SubtitleFetcher';
-import { AISubtitleHandler } from './AISubtitleHandler';
-import { AIAgentRunner } from './AIAgentRunner';
+import { SubtitleFetcher } from '../../services/SubtitleFetcher';
+import { AISubtitleHandler } from '../../services/AISubtitleHandler';
+import { AIAgentRunner } from '../../services/AIAgentRunner';
 
 class DownloadManager {
   #subtitleFetcher = new SubtitleFetcher();

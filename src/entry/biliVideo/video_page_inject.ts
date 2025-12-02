@@ -1,4 +1,4 @@
-import { VideoData } from '../types/video';
+import { VideoData } from '../../types/video';
 
 let isWindowActivate = true;
 

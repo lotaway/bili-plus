@@ -32,7 +32,7 @@
         }
     ],
     "action": {
-        "default_popup": "src/popup/index.html",
+        "default_popup": "src/entry/popup/index.html",
         "default_icon": {
             "16": "icon.png"
         }
@@ -46,8 +46,8 @@
         {
             "resources": [
                 "assets/video_page_inject.js",
-                "src/sidepanel/index.html",
-                "src/popup/index.html"
+                "src/entry/sidepanel/index.html",
+                "src/entry/popup/index.html"
             ],
             "matches": [
                 "<all_urls>"
@@ -55,6 +55,6 @@
         }
     ],
     "side_panel": {
-        "default_path": "src/sidepanel/index.html"
+        "default_path": "src/entry/sidepanel/index.html"
     }
 }
