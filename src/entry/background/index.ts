@@ -1,16 +1,16 @@
 import { SubtitleFetcher } from '../../services/SubtitleFetcher';
-import { AISubtitleHandler } from '../../services/AISubtitleHandler';
+import { AISubtitleHandler, LLM_Runner } from '../../services/LLM_Runner';
 import { AIAgentRunner } from '../../services/AIAgentRunner';
 
 class DownloadManager {
-  #subtitleFetcher = new SubtitleFetcher();
-  #aiSubtitleHandler = new AISubtitleHandler();
-  #aiAgentRunner = new AIAgentRunner();
+  readonly #subtitleFetcher = new SubtitleFetcher();
+  private readonly llmRunner = new LLM_Runner();
+  private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
+  private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
   #pollingCheckTimer: number | null = null;
 
   constructor() {
     this.setupEventListeners();
-    this.initializeStorageCleanup();
     this.startPollingStatusCheck();
   }
 
@@ -102,14 +102,14 @@ class DownloadManager {
 
     if (shouldCheckApi) {
       // 如果页面打开且API检查未启动，则启动
-      if (!this.#aiSubtitleHandler.isApiStatusCheckRunning()) {
-        this.#aiSubtitleHandler.initializeApiStatusCheck();
+      if (!this.aiSubtitleHandler.isApiStatusCheckRunning()) {
+        this.aiSubtitleHandler.initializeApiStatusCheck();
         console.log('启动API状态检查（popup或sidepanel已打开）');
       }
     } else {
       // 如果页面关闭且API检查正在运行，则停止
-      if (this.#aiSubtitleHandler.isApiStatusCheckRunning()) {
-        this.#aiSubtitleHandler.stopApiStatusCheck();
+      if (this.aiSubtitleHandler.isApiStatusCheckRunning()) {
+        this.aiSubtitleHandler.stopApiStatusCheck();
         console.log('停止API状态检查（popup和sidepanel都已关闭）');
       }
     }
@@ -190,7 +190,7 @@ class DownloadManager {
         const bvid = this.#subtitleFetcher.bvid;
         const cid = this.#subtitleFetcher.cid;
         const EVENT_TYPE = 'summarize:keepAlive';
-        this.#aiSubtitleHandler
+        this.aiSubtitleHandler
           .summarizeSubtitlesHandler(this.#subtitleFetcher, (chunk) => {
             if (sender.id) {
                 chrome.runtime.sendMessage(sender.id, {
@@ -247,7 +247,7 @@ class DownloadManager {
         break;
       case 'startAssistant': {
         const EVENT_TYPE = 'assistant:keepAlive';
-        this.#aiAgentRunner
+        this.aiAgentRunner
           .runAgent(message.payload, (content, metadata) => {
             if (sender.id) {
                 chrome.runtime.sendMessage(sender.id, {
@@ -291,7 +291,7 @@ class DownloadManager {
       }
 
       case 'stopAssistant': {
-        this.#aiAgentRunner.stopAgent().then((stopped) => {
+        this.aiAgentRunner.stopAgent().then((stopped) => {
             sendResponse({
                 stopped: stopped,
                 message: stopped ? 'AI智能体已停止' : '没有正在运行的AI智能体',
@@ -306,4 +306,4 @@ class DownloadManager {
   }
 }
 
-new DownloadManager();
+new DownloadManager().initializeStorageCleanup();

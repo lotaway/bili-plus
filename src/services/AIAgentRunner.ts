@@ -1,8 +1,14 @@
 import { StreamUtils } from '../utils/streamUtils';
+import { LLM_Runner } from './LLM_Runner';
 
 export class AIAgentRunner {
   isBusy = false;
   #abortController: AbortController | null = null;
+  private llmRunner: LLM_Runner;
+
+  constructor(llmRunner: LLM_Runner) {
+    this.llmRunner = llmRunner;
+  }
 
   static defaultModelName() {
     return 'gpt-3.5-turbo';
@@ -16,14 +22,7 @@ export class AIAgentRunner {
       return { error: '当前正在处理中，请稍后再试' };
     }
 
-    const config = await chrome.storage.sync.get([
-      'aiProvider',
-      'aiEndpoint',
-      'aiKey',
-      'aiModel',
-    ]);
-
-    if (!config.aiEndpoint) {
+    if (!this.llmRunner.config?.aiEndpoint) {
       return { error: '请先配置AI服务' };
     }
 
@@ -31,15 +30,15 @@ export class AIAgentRunner {
     this.#abortController = new AbortController();
 
     try {
-      const agentResponse = await fetch(`${config.aiEndpoint}/agents/run`, {
+      const agentResponse = await fetch(`${this.llmRunner.apiPrefixWithVersion}/agents/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.aiKey ?? ''}`,
+          Authorization: `Bearer ${this.llmRunner.config.aiKey ?? ''}`,
         },
         body: JSON.stringify({
           messages: [payload.message],
-          model: config.aiModel || AIAgentRunner.defaultModelName(),
+          model: this.llmRunner.config.aiModel || AIAgentRunner.defaultModelName(),
         }),
         signal: this.#abortController.signal,
       });

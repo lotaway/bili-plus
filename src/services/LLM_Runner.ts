@@ -1,4 +1,3 @@
-import { SubtitleFetcher } from './SubtitleFetcher'
 import { StreamUtils } from '../utils/streamUtils'
 
 interface Config {
@@ -16,11 +15,11 @@ interface VersionInfo {
   api_version: string
 }
 
-export class AISubtitleHandler {
+export class LLM_Runner {
   isBusy = false
   private apiCheckTimeout: number | null = null
-  private config: Config | null = null
-  private versionInfo: VersionInfo = {
+  private _config: Config | null = null
+  private _versionInfo: VersionInfo = {
     model_name: "unknown",
     version: "1.0.0",
     object: "model",
@@ -30,6 +29,22 @@ export class AISubtitleHandler {
 
   static defaultModelName() {
     return 'gpt-3.5-turbo'
+  }
+
+  get config() {
+    return Object.freeze(this._config) as Readonly<Config>
+  }
+
+  get versionInfo() {
+    return this._versionInfo as Readonly<VersionInfo>
+  }
+
+  get version() {
+    return this.versionInfo.version
+  }
+
+  get apiPrefixWithVersion() {
+    return `${this.config.aiEndpoint}/${this.version ?? "v1"}`
   }
 
   initializeApiStatusCheck() {
@@ -59,13 +74,13 @@ export class AISubtitleHandler {
   private async checkApiStatus() {
     try {
       const signal = AbortSignal.timeout(5000)
-      this.config = await chrome.storage.sync.get([
+      this._config = await chrome.storage.sync.get([
         'aiProvider',
         'aiEndpoint',
         'aiKey',
         'aiModel',
       ]) as Config
-      if (!this.config.aiEndpoint) {
+      if (!this._config.aiEndpoint) {
         return { error: '请先配置AI服务' }
       }
 
@@ -126,11 +141,74 @@ export class AISubtitleHandler {
       }
 
       const versionData = await response.json() as VersionInfo
-      this.versionInfo = versionData
+      this._versionInfo = versionData
       console.log('版本信息获取成功:', versionData)
     } catch (error) {
       console.error('获取版本信息失败:', error)
     }
+  }
+
+  async callLLM(
+    messages: { role: string; content: string }[],
+    options: { 
+      temperature?: number; 
+      stream?: boolean;
+      onProgress?: (chunk: string) => void 
+    } = {}
+  ) {
+    if (this.isBusy) {
+      return { error: '当前正在处理中，请稍后再试' };
+    }
+
+    if (!this.config) {
+      return { error: '请先配置AI服务' };
+    }
+
+    this.isBusy = true;
+    try {
+      const signal = AbortSignal.timeout(5 * 60 * 1000);
+      const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
+        },
+        body: JSON.stringify({
+          model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
+          messages,
+          temperature: options.temperature ?? 0.7,
+          stream: options.stream ?? true,
+        }),
+        signal,
+      });
+
+      if (!response.body) throw new Error('No response body');
+      const reader = response.body.getReader();
+
+      const fullResponse = await new StreamUtils().readStream(
+        reader,
+        (content, _metadata) => {
+          if (content && options.onProgress) {
+            options.onProgress(content);
+          }
+        }
+      );
+
+      return { data: fullResponse };
+    } finally {
+      this.isBusy = false;
+    }
+  }
+}
+
+import { SubtitleFetcher } from './SubtitleFetcher'
+
+export class AISubtitleHandler {
+  private llmRunner: LLM_Runner
+  isBusy = false
+
+  constructor(llmRunner: LLM_Runner) {
+    this.llmRunner = llmRunner
   }
 
   get prompt() {
@@ -176,42 +254,27 @@ export class AISubtitleHandler {
 视频标题：${title}
 字幕内容：
 ${text}`;
-    const signal = AbortSignal.timeout(5 * 60 * 1000);
-    if (!this.config) {
-      return { error: '请先配置AI服务' };
-    }
-    const response = await fetch(`${this.config.aiEndpoint}/${this.versionInfo.api_version ?? "v1"}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.aiKey ?? ''}`,
-      },
-      body: JSON.stringify({
-        model: this.config.aiModel ?? AISubtitleHandler.defaultModelName(),
-        messages: [
-          {
-            role: 'user',
-            content: completePrompt,
-          },
-        ],
+
+    const result = await this.llmRunner.callLLM(
+      [
+        {
+          role: 'user',
+          content: completePrompt,
+        },
+      ],
+      {
         temperature: 0.7,
         stream: true,
-      }),
-      signal,
-    });
-
-    if (!response.body) throw new Error('No response body');
-    const reader = response.body.getReader();
-
-    const fullResponse = await new StreamUtils().readStream(
-      reader,
-      (content, _metadata) => {
-        if (content && onProgress) {
-          onProgress(content);
-        }
+        onProgress
       }
     );
-    const matchs = fullResponse.match(/```markdown([\s\S]+?)```/);
+
+    if (result.error) {
+      return result.error;
+    }
+
+    const fullResponse = result.data;
+    const matchs = fullResponse?.match(/```markdown([\s\S]+?)```/);
     return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`;
   }
 }
