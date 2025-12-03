@@ -3,9 +3,9 @@
   "version": "1.0.1",
   "description": "Bilibili 字幕提取器",
   "scripts": {
-    "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "watch": "gulp"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -17,6 +17,8 @@
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
+    "gulp": "^5.0.1",
+    "gulp-cli": "^3.1.0",
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
   }
