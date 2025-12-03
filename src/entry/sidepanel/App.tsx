@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { MessageType } from '../../enums/MessageType';
+import { DownloadType } from '../../enums/DownloadType';
 
 interface DecisionData {
   reason: string;
@@ -68,9 +70,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleMessage = (message: any) => {
-      if (message.type === 'summarize:keepAlive') {
+      if (message.type === MessageType.SUMMARIZE_KEEPALIVE) {
         handleSummarizeKeepAliveMessage(message.data);
-      } else if (message.type === 'assistant:keepAlive') {
+      } else if (message.type === MessageType.ASSISTANT_KEEPALIVE) {
         handleAssistantKeepAliveMessage(message.data);
       }
     }
@@ -102,8 +104,10 @@ const App: React.FC = () => {
 
   const appendMarkdownContent = (content: string) => {
     setOutputContent((prev) => {
-      prev.markdown += content
-      return prev
+      return {
+        ...prev,
+        markdown: prev.markdown + content,
+      }
     })
     setHasUserScrolled(false);
   }
@@ -120,10 +124,10 @@ const App: React.FC = () => {
     setHasUserScrolled(false);
   };
 
-  const handleExtract = async (mode: 'srt' | 'md') => {
+  const handleExtract = async (mode: DownloadType) => {
     setMessage('正在提取字幕...');
     const res = await sendMessage({
-      type: 'fetchSubtitles',
+      type: MessageType.REQUEST_FETCH_SUBTITLE,
       payload: { mode },
     });
 
@@ -133,8 +137,8 @@ const App: React.FC = () => {
     }
 
     let downloadId = -1;
-    if (mode === 'md' || mode === 'srt') {
-      const ext = mode === 'md' ? 'md' : 'srt';
+    if (mode === DownloadType.MARKDOWN || mode === DownloadType.SRT) {
+      const ext = mode === DownloadType.MARKDOWN ? DownloadType.MARKDOWN : DownloadType.SRT;
       const textData = text2url(res.data, mode);
       try {
         downloadId = await downloadFile(
@@ -150,7 +154,7 @@ const App: React.FC = () => {
 
   const handleSummarize = async () => {
     setMessage('正在使用AI处理字幕...');
-    const res = await sendMessage({ type: 'summarize' });
+    const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE });
     if (res?.error) {
       setMessage(res.error);
       return;
@@ -203,12 +207,12 @@ const App: React.FC = () => {
     }
   };
 
-  const text2url = (text: string, fileType: string) => {
-    const fileType2MediaType: Record<string, string> = {
-      txt: 'text/plain',
-      md: 'text/markdown',
-      xmd: 'text/x-markdown',
-      srt: 'application/x-subrip',
+  const text2url = (text: string, fileType: DownloadType) => {
+    const fileType2MediaType: Record<DownloadType, string> = {
+      [DownloadType.TEXT]: 'text/plain',
+      [DownloadType.MARKDOWN]: 'text/markdown',
+      [DownloadType.XMARKDOWN]: 'text/x-markdown',
+      [DownloadType.SRT]: 'application/x-subrip',
     };
     const blob = new Blob([text], {
       type: fileType2MediaType[fileType] || 'text/plain',
@@ -223,7 +227,7 @@ const App: React.FC = () => {
   const handleDownloadMarkdown = () => {
     if (!outputContent.markdown) return;
 
-    const textData = text2url(outputContent.markdown, 'md');
+    const textData = text2url(outputContent.markdown, DownloadType.MARKDOWN);
     const filename = `ai-summary-${Date.now()}.md`;
 
     downloadFile(textData.url, filename).then(() => {
@@ -242,17 +246,17 @@ const App: React.FC = () => {
 
   const handleSummarizeKeepAliveMessage = (data: any) => {
     if (data.error) {
-      setMessage(data.error);
-      return;
+      setMessage(data.error)
+      return
     }
     if (data.done && data.content) {
-      setMarkdownContent(renderMarkdown(data.data));
-      return;
+      setMarkdownContent(renderMarkdown(data.data))
+      return
     }
     if (data.content) {
-      appendMarkdownContent(data.content);
+      appendMarkdownContent(data.content)
     }
-  };
+  }
 
   const handleAssistantKeepAliveMessage = (data: any) => {
     if (data.metadata?.type === 'decision_required') {
@@ -348,10 +352,10 @@ const App: React.FC = () => {
     <div className="sidepane-container">
       <h3>字幕生成</h3>
       <div className="action-section">
-        <button id="extract" onClick={() => handleExtract('srt')}>
+        <button id="extract" onClick={() => handleExtract(DownloadType.SRT)}>
           提取当前视频字幕（含时间戳）
         </button>
-        <button id="extract-only-text" onClick={() => handleExtract('md')}>
+        <button id="extract-only-text" onClick={() => handleExtract(DownloadType.MARKDOWN)}>
           提取当前视频字幕（纯文字）
         </button>
         <button id="summary" onClick={handleSummarize}>

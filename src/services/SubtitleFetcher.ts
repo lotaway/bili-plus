@@ -1,5 +1,6 @@
 import { BilibiliApi } from './BilibiliApi';
 import { VideoData, Page } from '../types/video';
+import { DownloadType } from '../enums/DownloadType';
 
 interface VideoInfo {
   isInit: boolean;
@@ -103,16 +104,16 @@ export class SubtitleFetcher {
     return await this.#api.getSubtitleJson(pref.subtitle_url, headers);
   }
 
-  async fetchSubtitlesHandler(payload: { mode?: string }) {
-    payload.mode = payload.mode ?? 'srt';
+  async fetchSubtitlesHandler(payload: { mode?: DownloadType }) {
+    payload.mode = payload.mode ?? DownloadType.SRT;
     const { mode } = payload;
     const subJson = await this.getSubtitlesText();
     if (subJson.error) return subJson;
     
     switch (mode) {
-      case 'md':
+      case DownloadType.MARKDOWN:
         return this.bilisub2text(subJson);
-      case 'srt':
+      case DownloadType.SRT:
       default:
         return this.bilisub2srt(subJson);
     }

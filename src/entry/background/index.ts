@@ -1,6 +1,7 @@
 import { SubtitleFetcher } from '../../services/SubtitleFetcher';
 import { AISubtitleHandler, LLM_Runner } from '../../services/LLM_Runner';
 import { AIAgentRunner } from '../../services/AIAgentRunner';
+import { MessageType } from '../../enums/MessageType';
 
 class DownloadManager {
   readonly #subtitleFetcher = new SubtitleFetcher();
@@ -90,7 +91,7 @@ class DownloadManager {
     if (this.#pollingCheckTimer !== null) {
       clearInterval(this.#pollingCheckTimer);
       this.#pollingCheckTimer = null;
-      console.log('停止状态检查定时器');
+      console.debug('停止状态检查定时器');
     }
   }
 
@@ -104,13 +105,13 @@ class DownloadManager {
       // 如果页面打开且API检查未启动，则启动
       if (!this.llmRunner.isApiStatusCheckRunning()) {
         this.llmRunner.initializeApiStatusCheck();
-        console.log('启动API状态检查（popup或sidepanel已打开）');
+        console.debug('启动API状态检查（popup或sidepanel已打开）');
       }
     } else {
       // 如果页面关闭且API检查正在运行，则停止
       if (this.llmRunner.isApiStatusCheckRunning()) {
         this.llmRunner.stopApiStatusCheck();
-        console.log('停止API状态检查（popup和sidepanel都已关闭）');
+        console.debug('停止API状态检查（popup和sidepanel都已关闭）');
       }
     }
   }
@@ -157,7 +158,7 @@ class DownloadManager {
 
   handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     switch (message.type) {
-      case 'fetchSubtitles': {
+      case MessageType.REQUEST_FETCH_SUBTITLE: {
         const preResult = this.checkVideoInfo();
         if (preResult?.error) {
           sendResponse(preResult);
@@ -181,7 +182,7 @@ class DownloadManager {
           });
         return true;
       }
-      case 'summarize': {
+      case MessageType.REQUEST_SUMMARIZE: {
         const preResult = this.checkVideoInfo();
         if (preResult?.error) {
           sendResponse(preResult);
@@ -189,7 +190,7 @@ class DownloadManager {
         }
         const bvid = this.#subtitleFetcher.bvid;
         const cid = this.#subtitleFetcher.cid;
-        const EVENT_TYPE = 'summarize:keepAlive';
+        const EVENT_TYPE = MessageType.SUMMARIZE_KEEPALIVE;
         this.aiSubtitleHandler
           .summarizeSubtitlesHandler(this.#subtitleFetcher, (chunk) => {
             if (sender.id) {
@@ -246,7 +247,7 @@ class DownloadManager {
         }
         break;
       case 'startAssistant': {
-        const EVENT_TYPE = 'assistant:keepAlive';
+        const EVENT_TYPE = MessageType.ASSISTANT_KEEPALIVE;
         this.aiAgentRunner
           .runAgent(message.payload, (content, metadata) => {
             if (sender.id) {
