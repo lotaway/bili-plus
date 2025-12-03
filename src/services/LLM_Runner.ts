@@ -105,7 +105,7 @@ export class LLM_Runner {
       await chrome.storage.local.set({
         apiStatus: {
           ok: isApiOk,
-          lastChecked: new Date().toISOString(),
+          lastChecked: new Date().toLocaleString(),
           message: isApiOk ? 'API服务正常' : 'API服务异常'
         }
       })
@@ -115,7 +115,7 @@ export class LLM_Runner {
       await chrome.storage.local.set({
         apiStatus: {
           ok: false,
-          lastChecked: new Date().toISOString(),
+          lastChecked: new Date().toLocaleString(),
           message: `API检查失败: ${error instanceof Error ? error.message : '未知错误'}`
         }
       })

@@ -141,9 +141,9 @@ class DownloadManager {
 
   checkVideoInfo() {
     if (!this.#subtitleFetcher.cid || !this.#subtitleFetcher.aid) {
-      let msg = '视频信息获取失败，请刷新页面重试';
+      let msg = 'Can not get video info, maybe not the target page';
       if (!this.#subtitleFetcher.isInit) {
-        msg = 'content.js maybe not trigger';
+        msg = 'content.js maybe not trigger, please try refresh the page';
       }
       return {
         isOk: false,

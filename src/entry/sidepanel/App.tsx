@@ -373,14 +373,14 @@ const App: React.FC = () => {
           <div className="result-header">
             <h4>📝 输出结果</h4>
           </div>
-          <div
+          {outputContent.markdown && <div
             className="result-container"
             ref={resultContainerRef}
             dangerouslySetInnerHTML={{ __html: outputContent.markdown }}
-          />
-          <div
+          />}
+          {messages && <div
             className="result-container"
-          >{messages}</div>
+          >{messages}</div>}
           {showDownloadButton && outputContent.markdown && (
             <button
               className="download-btn"
