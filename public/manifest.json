@@ -1,8 +1,9 @@
 {
-    "manifest_version": 3,
+    "manifest_version": 4,
+    "key": "CHROMEEXTENSIONKEYBILIBILIPLUS01",
     "name": "Bilibili 字幕提取器",
     "version": "1.0.1",
-    "description": "自动提取当前B站视频字幕并导出为SRT文件",
+    "description": "增强B站功能如提取字幕总结等",
     "permissions": [
         "cookies",
         "activeTab",
