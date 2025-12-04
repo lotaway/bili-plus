@@ -27,7 +27,7 @@ function watchFiles() {
   watch('src/**/*', { ignoreInitial: false }, series(build));
   
   // 监听public目录下的所有文件变化（包括manifest.json）
-  watch('public/**/*', { ignoreInitial: false }, series(build));
+  watch('public/**/*', { ignoreInitial: true }, series(build));
 }
 
 // 一次性构建任务
