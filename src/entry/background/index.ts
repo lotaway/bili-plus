@@ -2,6 +2,7 @@ import { SubtitleFetcher } from '../../services/SubtitleFetcher';
 import { AISubtitleHandler, LLM_Runner } from '../../services/LLM_Runner';
 import { AIAgentRunner } from '../../services/AIAgentRunner';
 import { MessageType } from '../../enums/MessageType';
+import { SummarizeErrorResponse, SummarizeSuccessResponse } from '../../types/summarize';
 
 class DownloadManager {
   readonly #subtitleFetcher = new SubtitleFetcher();
@@ -188,8 +189,8 @@ class DownloadManager {
           sendResponse(preResult);
           return true;
         }
-        const bvid = this.#subtitleFetcher.bvid;
-        const cid = this.#subtitleFetcher.cid;
+        const bvid = this.#subtitleFetcher.bvid
+        const cid = this.#subtitleFetcher.cid
         const EVENT_TYPE = MessageType.SUMMARIZE_KEEPALIVE;
         this.aiSubtitleHandler
           .summarizeSubtitlesHandler(this.#subtitleFetcher, (chunk) => {
@@ -201,20 +202,23 @@ class DownloadManager {
                     bvid,
                     cid,
                     done: false,
-                },
+                } as SummarizeSuccessResponse,
                 });
             }
           })
           .then((summaryResult) => {
+            if (summaryResult.error) {
+              throw new Error(summaryResult.error)
+            }
             if (sender.id) {
                 chrome.runtime.sendMessage(sender.id, {
                 type: EVENT_TYPE,
                 data: {
-                    ...summaryResult,
+                    content: summaryResult.data,
                     bvid,
                     cid,
                     done: true,
-                },
+                } as SummarizeSuccessResponse,
                 });
             }
             sendResponse({ done: true });
@@ -231,7 +235,7 @@ class DownloadManager {
                         : JSON.stringify(error),
                     bvid,
                     cid,
-                },
+                } as SummarizeErrorResponse,
                 });
             }
             sendResponse({ done: true });

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { MessageType } from '../../enums/MessageType';
 import { DownloadType } from '../../enums/DownloadType';
+import { SummarizeResponse, SummarizeSuccessResponse } from '../../types/summarize';
 
 interface DecisionData {
   reason: string;
@@ -243,14 +244,14 @@ const App: React.FC = () => {
       saveAs: false,
     });
   };
- 
-  const handleSummarizeKeepAliveMessage = (data: any) => {
-    if (data.error) {
+
+  const handleSummarizeKeepAliveMessage = (data: SummarizeResponse) => {
+    if ("error" in data) {
       setMessage(data.error)
       return
     }
-    if (data.done && data.content) {
-      setMarkdownContent(renderMarkdown(data.data))
+    if (data.done) {
+      setMarkdownContent(renderMarkdown(data.content))
       return
     }
     if (data.content) {

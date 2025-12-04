@@ -28,11 +28,11 @@ export class SubtitleFetcher {
   }
 
   get cid() {
-    return this.#videoInfo.cid;
+    return this.#videoInfo.cid as number;
   }
 
   get bvid() {
-    return this.#videoInfo.bvid ?? Number.parseInt(String(Math.random() * 10000));
+    return Number.parseInt(this.#videoInfo.bvid ?? String(Math.random() * 10000));
   }
 
   async getTitle(): Promise<string> {
