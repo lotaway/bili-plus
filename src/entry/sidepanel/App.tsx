@@ -253,14 +253,8 @@ const App: React.FC = () => {
     }
 
     if (data.done) {
-      if (parsingState.inThinking && parsingState.thinkingBuffer) {
-        appendThinkingContent(parsingState.thinkingBuffer)
-      }
-      if (parsingState.inMarkdown && parsingState.markdownBuffer) {
-        setMarkdownContent(renderMarkdown(parsingState.markdownBuffer))
-      } else if (data.content) {
-        setMarkdownContent(renderMarkdown(data.content))
-      }
+      console.info("Stream ended")
+      setMarkdownContent(renderMarkdown(data.content))
       setParsingState({
         currentBuffer: '',
         inThinking: false,
@@ -438,7 +432,7 @@ const App: React.FC = () => {
               onClick={handleDownloadMarkdown}
               title="下载Markdown文件"
             >
-              📥 下载
+              下载
             </button>
           )}
         </div>
