@@ -39,7 +39,6 @@ function syncVideoInfo(needCheck = true) {
   })
 }
 
-// 注入生成按钮
 function injectGenerateButton() {
   if (document.getElementById('bili-plus-generate-btn')) return
 
@@ -67,10 +66,8 @@ function injectGenerateButton() {
   document.body.appendChild(btn)
 }
 
-// 初始化时注入按钮
 function initButtonInjection() {
   injectGenerateButton()
-  // 监听DOM变化确保按钮存在
   const observer = new MutationObserver(() => {
     injectGenerateButton()
   })

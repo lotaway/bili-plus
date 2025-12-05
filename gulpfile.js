@@ -23,14 +23,13 @@ function watchFiles() {
   console.log('📁 监听目录: src/, public/');
   console.log('🔄 文件变化时将自动构建扩展');
   
-  // 监听src目录下的所有文件变化
-  watch('src/**/*', { ignoreInitial: false }, series(build));
+  const watchSrcChanges = () => watch('src/**/*', { ignoreInitial: false }, series(build));
+  const watchPublicChanges = () => watch('public/**/*', { ignoreInitial: true }, series(build));
   
-  // 监听public目录下的所有文件变化（包括manifest.json）
-  watch('public/**/*', { ignoreInitial: true }, series(build));
+  watchSrcChanges();
+  watchPublicChanges();
 }
 
-// 一次性构建任务
 function buildOnce(cb) {
   console.log('🔨 执行一次性构建...');
   exec('yarn build', (error, stdout, stderr) => {

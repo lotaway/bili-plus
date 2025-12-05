@@ -59,7 +59,6 @@ class DownloadManager {
     }
   }
 
-  // 检测popup是否打开
   isPopupOpen(): boolean {
     try {
       const views = chrome.extension.getViews?.({ type: 'popup' }) ?? ((chrome.extension as any).ViewType.POPUP === 'popup' ? new Array(1) : [])
@@ -70,7 +69,6 @@ class DownloadManager {
     }
   }
 
-  // 检测sidepanel是否打开
   async isSidepanelOpen(): Promise<boolean> {
     try {
       if (chrome.sidePanel) {
@@ -84,15 +82,12 @@ class DownloadManager {
     }
   }
 
-  // 启动状态检查定时器
   startPollingStatusCheck(): void {
-    // 每10秒检查一次页面状态并控制API检查
     this.#pollingCheckTimer = setInterval(async () => {
       await this.checkAndControlApiStatusCheck()
-    }, 10000)
+    }, 10 * 1000)
   }
 
-  // 停止状态检查定时器
   stopPollingStatusCheck(): void {
     if (this.#pollingCheckTimer !== null) {
       clearInterval(this.#pollingCheckTimer)
@@ -101,20 +96,17 @@ class DownloadManager {
     }
   }
 
-  // 检查页面状态并控制API状态检查
   async checkAndControlApiStatusCheck(): Promise<void> {
     const popupOpen = this.isPopupOpen()
     const sidepanelOpen = await this.isSidepanelOpen()
     const shouldCheckApi = popupOpen || sidepanelOpen
 
     if (shouldCheckApi) {
-      // 如果页面打开且API检查未启动，则启动
       if (!this.llmRunner.isApiStatusCheckRunning()) {
         this.llmRunner.initializeApiStatusCheck()
         console.debug('启动API状态检查（popup或sidepanel已打开）')
       }
     } else {
-      // 如果页面关闭且API检查正在运行，则停止
       if (this.llmRunner.isApiStatusCheckRunning()) {
         this.llmRunner.stopApiStatusCheck()
         console.debug('停止API状态检查（popup和sidepanel都已关闭）')
@@ -126,12 +118,9 @@ class DownloadManager {
     chrome.downloads.onChanged.addListener(this.onDownloadChanged.bind(this))
     chrome.downloads.onCreated.addListener(this.onDownloadCreated.bind(this))
     chrome.runtime.onMessage.addListener(this.handleMessage.bind(this))
-
-    // 监听扩展视图变化（popup打开/关闭）
     chrome.runtime.onConnect.addListener((port) => {
       if (port.name === 'popup') {
         port.onDisconnect.addListener(async () => {
-          // popup关闭时立即检查状态
           await this.checkAndControlApiStatusCheck()
         })
       }

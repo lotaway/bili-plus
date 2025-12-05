@@ -99,15 +99,14 @@ const App: React.FC = () => {
 
   const setMessage = (msg: string) => {
     setMessages(msg)
-    if (msg == '')
-      clearOoutput()
-    setShowDownloadButton(false)
-    setDecisionData(null)
     setHasUserScrolled(false)
   }
 
   const clearOoutput = () => {
+    setMessages("")
     setOutputContent({ markdown: '', thinking: '' })
+    setShowDownloadButton(false)
+    setDecisionData(null)
   }
 
   const appendMarkdownContent = (content: string) => {
@@ -133,6 +132,7 @@ const App: React.FC = () => {
   }
 
   const handleExtract = async (mode: DownloadType) => {
+    // clearOoutput()
     setMessage('正在提取字幕...')
     const res = await sendMessage({
       type: MessageType.REQUEST_FETCH_SUBTITLE,
@@ -161,6 +161,7 @@ const App: React.FC = () => {
   }
 
   const handleRequestSummarize = async () => {
+    clearOoutput()
     setMessage('正在使用AI处理字幕...')
     const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE })
     if (res?.error) {
@@ -346,7 +347,7 @@ const App: React.FC = () => {
     if (!decisionData)
       return
     appendMarkdownContent('<p>正在处理您的决策...</p>')
-    setDecisionData(null) // Hide decision UI
+    setDecisionData(null)
     setShowFeedbackInput(false)
     setFeedbackInput('')
     try {
@@ -379,7 +380,6 @@ const App: React.FC = () => {
   }
 
   const renderMarkdown = (text: string) => {
-    // Simple replacement as in original code
     return text
       .replace(/^# (.*$)/gm, '<h1>$1</h1>')
       .replace(/^## (.*$)/gm, '<h2>$1</h2>')

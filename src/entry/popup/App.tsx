@@ -17,8 +17,6 @@ const App: React.FC = () => {
   useEffect(() => {
     loadConfig()
     loadApiStatus()
-
-    // 监听API状态变化
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area === 'local' && changes.apiStatus) {
         setApiStatus(changes.apiStatus.newValue)
@@ -86,10 +84,6 @@ const App: React.FC = () => {
   }
 
   const handleCleanupStorage = () => {
-    // Logic for cleanup wasn't implemented in the original popup.js provided, 
-    // but the button existed in HTML. 
-    // If there was logic, it should be here. 
-    // For now, I'll leave it as a placeholder or implement if I find it elsewhere.
     console.log("Cleanup storage clicked")
   }
 

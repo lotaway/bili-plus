@@ -32,7 +32,6 @@ export class StreamUtils {
           }
         }
       }
-      // fullResponse += SPLIT
     }
     return fullResponse
   }

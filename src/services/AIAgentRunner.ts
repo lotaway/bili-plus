@@ -48,22 +48,18 @@ export class AIAgentRunner {
           cause: agentResponse,
         })
       }
-      // onProgress?.('正在尝试读取流。。。', null);
       if (!agentResponse.body) throw new Error('No response body')
 
       const reader = agentResponse.body.getReader()
       const fullResponse = await new StreamUtils().readStream(
         reader,
         (content, metadata) => {
-          // Handle human-in-loop cases
           if (metadata?.event_type === 'needs_decision') {
-            // Send decision request to frontend
             onProgress?.('', {
               type: 'decision_required',
               ...metadata,
             })
           } else {
-            // Normal progress update
             onProgress?.(content, metadata)
           }
         }
