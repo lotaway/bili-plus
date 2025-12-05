@@ -208,6 +208,51 @@ export class LLM_Runner {
       this.isBusy = false
     }
   }
+
+  async saveDocument(
+    title: string,
+    source: string,
+    content: string,
+    contentType: string = 'md'
+  ) {
+    if (this.isBusy) {
+      return { error: '当前正在处理中，请稍后再试' }
+    }
+    const result = await this.syncConfig()
+    if (result.error) {
+      return { error: result.error.message }
+    }
+    this.isBusy = true
+    try {
+      const signal = AbortSignal.timeout(30 * 1000)
+      const response = await fetch(`${this.config.aiEndpoint}/api/documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
+        },
+        body: JSON.stringify({
+          title,
+          source,
+          content,
+          contentType,
+        }),
+        signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return { data }
+    } catch (error) {
+      console.error('文档存储失败:', error)
+      return { error: error instanceof Error ? error.message : '未知错误' }
+    } finally {
+      this.isBusy = false
+    }
+  }
 }
 
 import { SubtitleFetcher } from './SubtitleFetcher'
@@ -231,7 +276,7 @@ export class AISubtitleHandler {
   async summarizeSubtitlesHandler(
     fetcher: SubtitleFetcher,
     onProgress?: (chunk: string) => void
-  ) {
+  ): Promise<{ title: string, data: string } | { error: string }> {
     if (this.isBusy) {
       return { error: '当前正在处理中，请稍后再试' }
     }
@@ -247,7 +292,7 @@ export class AISubtitleHandler {
         subtitles,
         onProgress
       )
-      return { data: summary }
+      return { title, data: summary }
     } finally {
       this.isBusy = false
     }
@@ -280,6 +325,6 @@ ${text}`
     if (result.error) {
       return result.error
     }
-    return result.data
+    return result.data ?? ""
   }
 }

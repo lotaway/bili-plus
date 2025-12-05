@@ -201,9 +201,21 @@ class DownloadManager {
             }
           })
           .then((summaryResult) => {
-            if (summaryResult.error) {
+            if ('error' in summaryResult) {
               throw new Error(summaryResult.error)
             }
+            this.llmRunner.saveDocument(
+              summaryResult.title,
+              `${bvid},${cid}`, // @TODO use bilibili video detail page url with params p=?
+              summaryResult.data,
+              'md'
+            )
+              .then(() =>
+                console.log('总结内容已保存到数据库'))
+              .catch(saveError => {
+                console.error('保存总结内容失败:', saveError)
+              })
+
             if (sender.id) {
               chrome.runtime.sendMessage(sender.id, {
                 type: EVENT_TYPE,
