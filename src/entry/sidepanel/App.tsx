@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { MessageType } from '../../enums/MessageType'
 import { DownloadType } from '../../enums/DownloadType'
 import { SummarizeResponse } from '../../types/summarize'
@@ -102,7 +103,7 @@ const App: React.FC = () => {
     setHasUserScrolled(false)
   }
 
-  const clearOoutput = () => {
+  const clearOutput = () => {
     setMessages("")
     setOutputContent({ markdown: '', thinking: '' })
     setShowDownloadButton(false)
@@ -161,7 +162,7 @@ const App: React.FC = () => {
   }
 
   const handleRequestSummarize = async () => {
-    clearOoutput()
+    clearOutput()
     setMessage('正在使用AI处理字幕...')
     const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE })
     if (res?.error) {
@@ -255,7 +256,8 @@ const App: React.FC = () => {
 
     if (data.done) {
       console.info("Stream ended")
-      setMarkdownContent(renderMarkdown(data.content))
+      const matchs = new RegExp(/```markdown([\s\S]+?)```/).exec(data.content)
+      setMarkdownContent(matchs ? matchs[1] : data.content)
       setParsingState({
         currentBuffer: '',
         inThinking: false,
@@ -299,7 +301,7 @@ const App: React.FC = () => {
           const markdownEnd = newState.currentBuffer.indexOf('```')
           if (markdownEnd !== -1) {
             newState.markdownBuffer += newState.currentBuffer.substring(0, markdownEnd)
-            appendMarkdownContent(renderMarkdown(newState.markdownBuffer))
+            appendMarkdownContent(newState.markdownBuffer)
             newState.markdownBuffer = ''
             newState.inMarkdown = false
             newState.currentBuffer = newState.currentBuffer.substring(markdownEnd + 3)
@@ -379,16 +381,6 @@ const App: React.FC = () => {
     }
   }
 
-  const renderMarkdown = (text: string) => {
-    return text
-      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br>')
-  }
-
   return (
     <div className="sidepane-container">
       <h3>字幕生成</h3>
@@ -421,8 +413,9 @@ const App: React.FC = () => {
           {outputContent.markdown && <div
             className="result-container"
             ref={resultContainerRef}
-            dangerouslySetInnerHTML={{ __html: outputContent.markdown }}
-          />}
+          >
+            <ReactMarkdown>{outputContent.markdown}</ReactMarkdown>
+          </div>}
           {messages && <div
             className="result-container"
           >{messages}</div>}

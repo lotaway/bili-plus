@@ -277,13 +277,9 @@ ${text}`
         onProgress
       }
     )
-
     if (result.error) {
       return result.error
     }
-
-    const fullResponse = result.data
-    const matchs = fullResponse?.match(/```markdown([\s\S]+?)```/)
-    return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`
+    return result.data
   }
 }
