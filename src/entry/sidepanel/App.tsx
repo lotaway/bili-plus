@@ -161,13 +161,13 @@ const App: React.FC = () => {
   }
 
   const handleRequestSummarize = async () => {
-    setMessage('正在请求...')
+    setMessage('正在使用AI处理字幕...')
     const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE })
     if (res?.error) {
       setMessage(res.error)
       return
     }
-    setMessage('正在使用AI处理字幕...')
+    setMessage('已经完成字幕的AI处理')
   }
 
   const handleAssistantStart = async () => {
