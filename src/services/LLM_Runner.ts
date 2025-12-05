@@ -48,6 +48,25 @@ export class LLM_Runner {
     return `${this.config.aiEndpoint}/${this.apiVersion ?? "v1"}`
   }
 
+  async init() {
+    return await this.syncConfig()
+  }
+
+  async syncConfig() {
+    this._config = await chrome.storage.sync.get([
+      'aiProvider',
+      'aiEndpoint',
+      'aiKey',
+      'aiModel',
+    ]) as Config
+    if (!this._config) {
+      return { error: new Error('请先配置AI服务') }
+    }
+    return {
+      isOk: true,
+    }
+  }
+
   initializeApiStatusCheck() {
     if (this.apiCheckTimeout) {
       clearTimeout(this.apiCheckTimeout)
@@ -75,21 +94,13 @@ export class LLM_Runner {
   private async checkApiStatus() {
     try {
       const signal = AbortSignal.timeout(5000)
-      this._config = await chrome.storage.sync.get([
-        'aiProvider',
-        'aiEndpoint',
-        'aiKey',
-        'aiModel',
-      ]) as Config
-      if (!this._config.aiEndpoint) {
-        return { error: '请先配置AI服务' }
+      const result = await this.syncConfig()
+      if (result.error) {
+        return { error: result.error.message }
       }
-
-      // Fetch version information only once when config is available
       if (!this._versionInfoFetched) {
         await this.fetchVersionInfo()
       }
-
       const response = await fetch(`${this.config.aiEndpoint}/api/show`, {
         method: 'POST',
         headers: {
@@ -150,22 +161,21 @@ export class LLM_Runner {
   async callLLM(
     messages: { role: string; content: string }[],
     options: {
-      temperature?: number;
-      stream?: boolean;
+      temperature?: number
+      stream?: boolean
       onProgress?: (chunk: string) => void
     } = {}
   ) {
     if (this.isBusy) {
-      return { error: '当前正在处理中，请稍后再试' };
+      return { error: '当前正在处理中，请稍后再试' }
     }
-
-    if (!this.config) {
-      return { error: '请先配置AI服务' };
+    const result = await this.syncConfig()
+    if (result.error) {
+      return { error: result.error.message }
     }
-
-    this.isBusy = true;
+    this.isBusy = true
     try {
-      const signal = AbortSignal.timeout(5 * 60 * 1000);
+      const signal = AbortSignal.timeout(5 * 60 * 1000)
       const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -179,23 +189,23 @@ export class LLM_Runner {
           stream: options.stream ?? true,
         }),
         signal,
-      });
+      })
 
-      if (!response.body) throw new Error('No response body');
-      const reader = response.body.getReader();
+      if (!response.body) throw new Error('No response body')
+      const reader = response.body.getReader()
 
       const fullResponse = await new StreamUtils().readStream(
         reader,
         (content, _metadata) => {
           if (content && options.onProgress) {
-            options.onProgress(content);
+            options.onProgress(content)
           }
         }
-      );
+      )
 
-      return { data: fullResponse };
+      return { data: fullResponse }
     } finally {
-      this.isBusy = false;
+      this.isBusy = false
     }
   }
 }
@@ -223,23 +233,23 @@ export class AISubtitleHandler {
     onProgress?: (chunk: string) => void
   ) {
     if (this.isBusy) {
-      return { error: '当前正在处理中，请稍后再试' };
+      return { error: '当前正在处理中，请稍后再试' }
     }
-    const subJson = await fetcher.getSubtitlesText();
-    if (subJson.error) return subJson;
+    const subJson = await fetcher.getSubtitlesText()
+    if (subJson.error) return subJson
 
-    const subtitles = fetcher.bilisub2text(subJson);
-    const title = await fetcher.getTitle().catch(() => '');
-    this.isBusy = true;
+    const subtitles = fetcher.bilisub2text(subJson)
+    const title = await fetcher.getTitle().catch(() => '')
+    this.isBusy = true
     try {
       const summary = await this.processWithAI(
         title,
         subtitles,
         onProgress
-      );
-      return { data: summary };
+      )
+      return { data: summary }
     } finally {
-      this.isBusy = false;
+      this.isBusy = false
     }
   }
 
@@ -252,7 +262,7 @@ export class AISubtitleHandler {
 
 视频标题：${title}
 字幕内容：
-${text}`;
+${text}`
 
     const result = await this.llmRunner.callLLM(
       [
@@ -266,14 +276,14 @@ ${text}`;
         stream: true,
         onProgress
       }
-    );
+    )
 
     if (result.error) {
-      return result.error;
+      return result.error
     }
 
-    const fullResponse = result.data;
-    const matchs = fullResponse?.match(/```markdown([\s\S]+?)```/);
-    return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`;
+    const fullResponse = result.data
+    const matchs = fullResponse?.match(/```markdown([\s\S]+?)```/)
+    return `# ${title}\n\n${matchs ? matchs[1] : fullResponse}`
   }
 }

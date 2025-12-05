@@ -1,80 +1,87 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { MessageType } from '../../enums/MessageType';
-import { DownloadType } from '../../enums/DownloadType';
-import { SummarizeResponse, SummarizeSuccessResponse } from '../../types/summarize';
+import React, { useEffect, useState, useRef } from 'react'
+import { MessageType } from '../../enums/MessageType'
+import { DownloadType } from '../../enums/DownloadType'
+import { SummarizeResponse } from '../../types/summarize'
+import { LLM_Runner } from '../../services/LLM_Runner'
 
 interface DecisionData {
-  reason: string;
-  message?: string;
-  max_iterations?: number;
-  [key: string]: any;
+  reason: string
+  message?: string
+  max_iterations?: number
+  [key: string]: any
 }
 
 interface OutputContent {
-  markdown: string;
-  thinking: string;
+  markdown: string
+  thinking: string
 }
 
 const App: React.FC = () => {
-  const [assistantInput, setAssistantInput] = useState('');
-  const [isAssistantRunning, setIsAssistantRunning] = useState(false);
-  const [outputContent, setOutputContent] = useState<OutputContent>({ markdown: '', thinking: '' });
-  const [decisionData, setDecisionData] = useState<DecisionData | null>(null);
-  const [feedbackInput, setFeedbackInput] = useState('');
-  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
-  const [hasUserScrolled, setHasUserScrolled] = useState(false);
-  const [messages, setMessages] = useState('');
-  const [showDownloadButton, setShowDownloadButton] = useState(false);
+  const [assistantInput, setAssistantInput] = useState('')
+  const [isAssistantRunning, setIsAssistantRunning] = useState(false)
+  const [outputContent, setOutputContent] = useState<OutputContent>({ markdown: '', thinking: '' })
+  const [decisionData, setDecisionData] = useState<DecisionData | null>(null)
+  const [feedbackInput, setFeedbackInput] = useState('')
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false)
+  const [hasUserScrolled, setHasUserScrolled] = useState(false)
+  const [messages, setMessages] = useState('')
+  const [showDownloadButton, setShowDownloadButton] = useState(false)
 
-  const resultContainerRef = useRef<HTMLDivElement>(null);
-  const thinkingContainerRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<number>();
+  const [parsingState, setParsingState] = useState({
+    currentBuffer: '',
+    inThinking: false,
+    inMarkdown: false,
+    thinkingBuffer: '',
+    markdownBuffer: ''
+  })
 
-  // 自动滚动到底部
+  const resultContainerRef = useRef<HTMLDivElement>(null)
+  const thinkingContainerRef = useRef<HTMLDivElement>(null)
+  const scrollTimeoutRef = useRef<number>()
+
   useEffect(() => {
     const scrollToBottom = () => {
       if (resultContainerRef.current && !hasUserScrolled) {
-        resultContainerRef.current.scrollTop = resultContainerRef.current.scrollHeight;
+        resultContainerRef.current.scrollTop = resultContainerRef.current.scrollHeight
       }
       if (thinkingContainerRef.current) {
-        thinkingContainerRef.current.scrollTop = thinkingContainerRef.current.scrollHeight;
+        thinkingContainerRef.current.scrollTop = thinkingContainerRef.current.scrollHeight
       }
-    };
+    }
 
-    scrollToBottom();
-  }, [outputContent.markdown, outputContent.thinking, messages, hasUserScrolled]);
+    scrollToBottom()
+  }, [outputContent.markdown, outputContent.thinking, messages, hasUserScrolled])
 
-  // 监听用户手动滚动
   useEffect(() => {
-    const container = resultContainerRef.current;
-    if (!container) return;
+    const container = resultContainerRef.current
+    if (!container) return
 
     const handleScroll = () => {
       if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
+        clearTimeout(scrollTimeoutRef.current)
       }
 
       scrollTimeoutRef.current = setTimeout(() => {
-        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 10;
-        setHasUserScrolled(!isAtBottom);
-      }, 100);
-    };
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 10
+        setHasUserScrolled(!isAtBottom)
+      }, 100)
+    }
 
-    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll)
     return () => {
-      container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener('scroll', handleScroll)
       if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
+        clearTimeout(scrollTimeoutRef.current)
       }
-    };
-  }, []);
+    }
+  }, [])
 
   useEffect(() => {
     const handleMessage = (message: any) => {
-      if (message.type === MessageType.SUMMARIZE_KEEPALIVE) {
-        handleSummarizeKeepAliveMessage(message.data);
-      } else if (message.type === MessageType.ASSISTANT_KEEPALIVE) {
-        handleAssistantKeepAliveMessage(message.data);
+      if (message.type === MessageType.SUMMARIZE_RESPONSE_STREAM) {
+        handleSummarizeResponseStream(message.data)
+      } else if (message.type === MessageType.ASSISTANT_RESPONSE_STREAM) {
+        handleAssistantResponseStream(message.data)
       }
     }
 
@@ -110,103 +117,97 @@ const App: React.FC = () => {
         markdown: prev.markdown + content,
       }
     })
-    setHasUserScrolled(false);
+    setHasUserScrolled(false)
   }
 
   const setMarkdownContent = (content: string) => {
-    setOutputContent(prev => ({ ...prev, markdown: content }));
-    setMessages('');
-    setShowDownloadButton(true);
-    setHasUserScrolled(false);
-  };
+    setOutputContent(prev => ({ ...prev, markdown: content }))
+    setMessages('')
+    setShowDownloadButton(true)
+    setHasUserScrolled(false)
+  }
 
   const appendThinkingContent = (content: string) => {
-    setOutputContent(prev => ({ ...prev, thinking: prev.thinking + content }));
-    setHasUserScrolled(false);
-  };
+    setOutputContent(prev => ({ ...prev, thinking: prev.thinking + content }))
+    setHasUserScrolled(false)
+  }
 
   const handleExtract = async (mode: DownloadType) => {
-    setMessage('正在提取字幕...');
+    setMessage('正在提取字幕...')
     const res = await sendMessage({
       type: MessageType.REQUEST_FETCH_SUBTITLE,
       payload: { mode },
-    });
+    })
 
     if (res?.error) {
-      setMessage(res.error);
-      return;
+      setMessage(res.error)
+      return
     }
 
-    let downloadId = -1;
+    let downloadId = -1
     if (mode === DownloadType.MARKDOWN || mode === DownloadType.SRT) {
-      const ext = mode === DownloadType.MARKDOWN ? DownloadType.MARKDOWN : DownloadType.SRT;
-      const textData = text2url(res.data, mode);
+      const ext = mode === DownloadType.MARKDOWN ? DownloadType.MARKDOWN : DownloadType.SRT
+      const textData = text2url(res.data, mode)
       try {
         downloadId = await downloadFile(
           textData.url,
           `${res.bvid}-${res.cid}.${ext}`
-        );
+        )
       } finally {
-        textData.destory();
+        textData.destory()
       }
     }
-    setMessage(`字幕提取完成:${downloadId}`);
-  };
+    setMessage(`字幕提取完成:${downloadId}`)
+  }
 
-  const handleSummarize = async () => {
-    setMessage('正在使用AI处理字幕...');
-    const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE });
+  const handleRequestSummarize = async () => {
+    setMessage('正在请求...')
+    const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE })
     if (res?.error) {
-      setMessage(res.error);
-      return;
+      setMessage(res.error)
+      return
     }
-    // Note: The original code had logic for requireDownload=false but called it with no args (false).
-    // So it just returns after sending message? 
-    // Wait, the original code: 
-    // async summarize(requireDownload = false) { ... if (!requireDownload) return ... }
-    // And the event listener: () => this.summarize()
-    // So it defaults to false, and just sends the message. 
-    // The actual result comes back via 'summarize:keepAlive'.
-  };
+    setMessage('正在使用AI处理字幕...')
+  }
 
   const handleAssistantStart = async () => {
     if (!assistantInput.trim()) {
-      setMessage('请输入您的问题或指令');
-      return;
+      setMessage('请输入您的问题或指令')
+      return
     }
     if (isAssistantRunning) {
-      setMessage('AI智能体正在运行中，请先停止当前任务');
-      return;
+      setMessage('AI智能体正在运行中，请先停止当前任务')
+      return
     }
 
-    setMessage('正在启动AI智能体...');
-    setIsAssistantRunning(true);
+    setMessage('正在启动AI智能体...')
+    setIsAssistantRunning(true)
 
     try {
       await sendMessage({
         type: 'startAssistant',
         payload: { message: assistantInput.trim() },
-      });
+      })
     } catch (error) {
-      console.error('启动AI智能体失败:', error);
-      setMessage('启动AI智能体失败，请重试');
-      setIsAssistantRunning(false);
+      console.error('启动AI智能体失败:', error)
+      setMessage('启动AI智能体失败，请重试')
+      setIsAssistantRunning(false)
     }
-  };
+  }
 
   const handleAssistantStop = async () => {
-    if (!isAssistantRunning) return;
+    if (!isAssistantRunning) return
 
-    setMessage('正在停止AI智能体...');
+    setMessage('正在停止AI智能体...')
     try {
-      await sendMessage({ type: 'stopAssistant' });
+      await sendMessage({ type: 'stopAssistant' })
     } catch (error) {
-      console.error('停止AI智能体失败:', error);
+      console.error('停止AI智能体失败:', error)
     } finally {
-      setIsAssistantRunning(false);
-      setMessage('AI智能体已停止');
+      setIsAssistantRunning(false)
+      setMessage('AI智能体已停止')
     }
-  };
+  }
 
   const text2url = (text: string, fileType: DownloadType) => {
     const fileType2MediaType: Record<DownloadType, string> = {
@@ -214,27 +215,27 @@ const App: React.FC = () => {
       [DownloadType.MARKDOWN]: 'text/markdown',
       [DownloadType.XMARKDOWN]: 'text/x-markdown',
       [DownloadType.SRT]: 'application/x-subrip',
-    };
+    }
     const blob = new Blob([text], {
       type: fileType2MediaType[fileType] || 'text/plain',
-    });
-    const url = URL.createObjectURL(blob);
+    })
+    const url = URL.createObjectURL(blob)
     return {
       url,
       destory: () => URL.revokeObjectURL(url),
-    };
-  };
+    }
+  }
 
   const handleDownloadMarkdown = () => {
-    if (!outputContent.markdown) return;
+    if (!outputContent.markdown) return
 
-    const textData = text2url(outputContent.markdown, DownloadType.MARKDOWN);
-    const filename = `ai-summary-${Date.now()}.md`;
+    const textData = text2url(outputContent.markdown, DownloadType.MARKDOWN)
+    const filename = `ai-summary-${Date.now()}.md`
 
     downloadFile(textData.url, filename).then(() => {
-      textData.destory();
-    });
-  };
+      textData.destory()
+    })
+  }
 
   const downloadFile = async (url: string, filename: string) => {
     return await chrome.downloads.download({
@@ -242,101 +243,146 @@ const App: React.FC = () => {
       filename,
       conflictAction: 'uniquify',
       saveAs: false,
-    });
-  };
+    })
+  }
 
-  const handleSummarizeKeepAliveMessage = (data: SummarizeResponse) => {
+  const handleSummarizeResponseStream = (data: SummarizeResponse) => {
     if ("error" in data) {
       setMessage(data.error)
       return
     }
+
     if (data.done) {
-      setMarkdownContent(renderMarkdown(data.content))
+      if (parsingState.inThinking && parsingState.thinkingBuffer) {
+        appendThinkingContent(parsingState.thinkingBuffer)
+      }
+      if (parsingState.inMarkdown && parsingState.markdownBuffer) {
+        setMarkdownContent(renderMarkdown(parsingState.markdownBuffer))
+      } else if (data.content) {
+        setMarkdownContent(renderMarkdown(data.content))
+      }
+      setParsingState({
+        currentBuffer: '',
+        inThinking: false,
+        inMarkdown: false,
+        thinkingBuffer: '',
+        markdownBuffer: ''
+      })
       return
     }
     if (data.content) {
-      appendMarkdownContent(data.content)
+      let content = data.content
+      let newState = { ...parsingState }
+      newState.currentBuffer += content
+      while (newState.currentBuffer.length > 0) {
+        if (!newState.inThinking && !newState.inMarkdown) {
+          const thinkingStart = newState.currentBuffer.indexOf('<thinking>')
+          const markdownStart = newState.currentBuffer.indexOf('```markdown')
+          if (thinkingStart !== -1 && (markdownStart === -1 || thinkingStart < markdownStart)) {
+            newState.inThinking = true
+            newState.currentBuffer = newState.currentBuffer.substring(thinkingStart + 10)
+          } else if (markdownStart !== -1) {
+            newState.inMarkdown = true
+            newState.currentBuffer = newState.currentBuffer.substring(markdownStart + 11)
+          } else {
+            appendMarkdownContent(newState.currentBuffer)
+            newState.currentBuffer = ''
+          }
+        } else if (newState.inThinking) {
+          const thinkingEnd = newState.currentBuffer.indexOf('</thinking>')
+          if (thinkingEnd !== -1) {
+            newState.thinkingBuffer += newState.currentBuffer.substring(0, thinkingEnd)
+            appendThinkingContent(newState.thinkingBuffer)
+            newState.thinkingBuffer = ''
+            newState.inThinking = false
+            newState.currentBuffer = newState.currentBuffer.substring(thinkingEnd + 11)
+          } else {
+            newState.thinkingBuffer += newState.currentBuffer
+            newState.currentBuffer = ''
+          }
+        } else if (newState.inMarkdown) {
+          const markdownEnd = newState.currentBuffer.indexOf('```')
+          if (markdownEnd !== -1) {
+            newState.markdownBuffer += newState.currentBuffer.substring(0, markdownEnd)
+            appendMarkdownContent(renderMarkdown(newState.markdownBuffer))
+            newState.markdownBuffer = ''
+            newState.inMarkdown = false
+            newState.currentBuffer = newState.currentBuffer.substring(markdownEnd + 3)
+          } else {
+            newState.markdownBuffer += newState.currentBuffer
+            newState.currentBuffer = ''
+          }
+        }
+      }
+      setParsingState(newState)
     }
   }
 
-  const handleAssistantKeepAliveMessage = (data: any) => {
+  const handleAssistantResponseStream = (data: any) => {
     if (data.metadata?.type === 'decision_required') {
       setDecisionData({
         ...data,
         ...data.metadata,
         reason: data.metadata?.reason || data.reason,
-      });
-      return;
+      })
+      return
     }
-
     if (data.error) {
-      setMessage(data.error);
-      return;
+      setMessage(data.error)
+      return
     }
-
-    // 处理thinking内容
     if (data.thinking) {
-      appendThinkingContent(data.thinking);
+      appendThinkingContent(data.thinking)
     }
 
     if (data.done && data.content) {
       if (data.data) {
-        setMarkdownContent(data.data);
+        setMarkdownContent(data.data)
       } else {
-        setMarkdownContent(data.content);
+        setMarkdownContent(data.content)
       }
-      return;
+      return
     }
     if (data.content && !data.thinking) {
-      appendMarkdownContent(data.content);
+      appendMarkdownContent(data.content)
     }
-  };
+  }
 
   const sendDecision = async (decision: string, feedback: string = '') => {
-    if (!decisionData) return;
-
-    // Optimistic update or loading state could be added here
-    appendMarkdownContent('<p>正在处理您的决策...</p>');
-    setDecisionData(null); // Hide decision UI
-    setShowFeedbackInput(false);
-    setFeedbackInput('');
-
+    if (!decisionData)
+      return
+    appendMarkdownContent('<p>正在处理您的决策...</p>')
+    setDecisionData(null) // Hide decision UI
+    setShowFeedbackInput(false)
+    setFeedbackInput('')
     try {
-      const config = await chrome.storage.sync.get([
-        'aiProvider',
-        'aiEndpoint',
-        'aiKey',
-      ]);
-
-      if (!config.aiEndpoint) {
-        throw new Error('请先配置AI服务');
+      const llmRunner = new LLM_Runner()
+      const result = await llmRunner.init()
+      if (result.error) {
+        throw result.error
       }
-
       const decisionPayload = {
         approved: decision === 'approved',
         feedback: feedback,
         ...decisionData,
-      };
-
-      const response = await fetch(`${config.aiEndpoint}/agents/decision`, {
+      }
+      const response = await fetch(`${llmRunner.config.aiEndpoint}/agents/decision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.aiKey ?? ''}`,
+          Authorization: `Bearer ${llmRunner.config.aiKey ?? ''}`,
         },
         body: JSON.stringify(decisionPayload),
-      });
-
+      })
       if (!response.ok) {
-        throw new Error(`决策提交失败: ${await response.text()}`);
+        throw new Error(`决策提交失败: ${await response.text()}`)
       }
-
-      setMessages((prev) => prev + '<p>决策已提交，继续处理中...</p>');
+      setMessages((prev) => prev + '<p>决策已提交，继续处理中...</p>')
     } catch (error: any) {
-      console.error('Decision submission error:', error);
-      setMessages((prev) => prev + `<p style="color: red;">决策提交失败: ${error.message}</p>`);
+      console.error('Decision submission error:', error)
+      setMessages((prev) => prev + `<p style="color: red;">决策提交失败: ${error.message}</p>`)
     }
-  };
+  }
 
   const renderMarkdown = (text: string) => {
     // Simple replacement as in original code
@@ -346,8 +392,8 @@ const App: React.FC = () => {
       .replace(/^### (.*$)/gm, '<h3>$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br>');
-  };
+      .replace(/\n/g, '<br>')
+  }
 
   return (
     <div className="sidepane-container">
@@ -359,7 +405,7 @@ const App: React.FC = () => {
         <button id="extract-only-text" onClick={() => handleExtract(DownloadType.MARKDOWN)}>
           提取当前视频字幕（纯文字）
         </button>
-        <button id="summary" onClick={handleSummarize}>
+        <button id="summary" onClick={handleRequestSummarize}>
           视频知识总结
         </button>
       </div>

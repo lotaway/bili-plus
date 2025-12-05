@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 
 const App: React.FC = () => {
   const [config, setConfig] = useState({
@@ -6,42 +6,42 @@ const App: React.FC = () => {
     aiEndpoint: '',
     aiKey: '',
     aiModel: 'gpt-3.5-turbo',
-  });
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  })
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [apiStatus, setApiStatus] = useState<{
-    ok: boolean;
-    lastChecked: string;
-    message: string;
-  } | null>(null);
+    ok: boolean
+    lastChecked: string
+    message: string
+  } | null>(null)
 
   useEffect(() => {
-    loadConfig();
-    loadApiStatus();
+    loadConfig()
+    loadApiStatus()
 
     // 监听API状态变化
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area === 'local' && changes.apiStatus) {
-        setApiStatus(changes.apiStatus.newValue);
+        setApiStatus(changes.apiStatus.newValue)
       }
-    };
+    }
 
-    chrome.storage.onChanged.addListener(handleStorageChange);
+    chrome.storage.onChanged.addListener(handleStorageChange)
 
     return () => {
-      chrome.storage.onChanged.removeListener(handleStorageChange);
-    };
-  }, []);
+      chrome.storage.onChanged.removeListener(handleStorageChange)
+    }
+  }, [])
 
   const loadApiStatus = async () => {
     try {
-      const result = await chrome.storage.local.get('apiStatus');
+      const result = await chrome.storage.local.get('apiStatus')
       if (result.apiStatus) {
-        setApiStatus(result.apiStatus);
+        setApiStatus(result.apiStatus)
       }
     } catch (error) {
-      console.error('加载API状态失败:', error);
+      console.error('加载API状态失败:', error)
     }
-  };
+  }
 
   const loadConfig = async () => {
     const stored = await chrome.storage.sync.get([
@@ -49,45 +49,48 @@ const App: React.FC = () => {
       'aiEndpoint',
       'aiKey',
       'aiModel',
-    ]);
+    ])
     setConfig({
       aiProvider: stored.aiProvider || '',
       aiEndpoint: stored.aiEndpoint || '',
       aiKey: stored.aiKey || '',
       aiModel: stored.aiModel || 'gpt-3.5-turbo',
-    });
-  };
+    })
+  }
 
   const handleSaveConfig = async () => {
-    await chrome.storage.sync.set(config);
-    showMessage('配置已保存', 'success');
-  };
+    await chrome.storage.sync.set(config).catch((error) => {
+      console.error(error)
+      showMessage(error.message)
+    })
+    showMessage('配置已保存', 'success')
+  }
 
   const handleOpenSidePanel = async () => {
     try {
-      const window = await chrome.windows.getCurrent();
+      const window = await chrome.windows.getCurrent()
       if (window.id) {
-        await chrome.sidePanel.open({ windowId: window.id });
+        await chrome.sidePanel.open({ windowId: window.id })
       }
     } catch (error) {
-      console.error('Failed to open side panel:', error);
-      showMessage('无法打开侧边栏', 'error');
+      console.error('Failed to open side panel:', error)
+      showMessage('无法打开侧边栏', 'error')
     }
-  };
+  }
 
   const showMessage = (text: string, type: 'success' | 'error' = 'success') => {
-    setMessage({ text, type });
+    setMessage({ text, type })
     setTimeout(() => {
-      setMessage(null);
-    }, 3000);
-  };
+      setMessage(null)
+    }, 3000)
+  }
 
   const handleCleanupStorage = () => {
     // Logic for cleanup wasn't implemented in the original popup.js provided, 
     // but the button existed in HTML. 
     // If there was logic, it should be here. 
     // For now, I'll leave it as a placeholder or implement if I find it elsewhere.
-    console.log("Cleanup storage clicked");
+    console.log("Cleanup storage clicked")
   }
 
   return (
@@ -138,7 +141,7 @@ const App: React.FC = () => {
         <button id="saveConfig" onClick={handleSaveConfig}>
           保存配置
         </button>
-        
+
         {apiStatus && (
           <div className="api-status-section">
             <h4>API 状态</h4>
@@ -156,9 +159,9 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-        
+
         <button id="openSidePanel" onClick={handleOpenSidePanel}>
-          生成字幕/总结
+          显示操作面板
         </button>
       </div>
 
@@ -178,7 +181,7 @@ const App: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default App;
+export default App

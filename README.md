@@ -26,3 +26,11 @@
 -   自动读取登录 Cookie（无需手动输入）
 -   自动识别可用字幕语言
 -   一键导出 `.srt` 文件
+
+## 目录结构
+
+* src/entry/background - 插件后台脚本，用于实现统一的任务处理
+* src/entry/content - 插件内容脚本，主要用于嫁接页面与插件的通讯
+* src/entry/biliVideo - 页面注入脚本，主要用于获取页面信息和提供侵入式交互
+* src/entry/popup - 插件弹出页面脚本，主要用于完成配置、设置
+* src/entry/sidepanel - 插件侧边栏脚本，用户进行输入输出的主要界面
