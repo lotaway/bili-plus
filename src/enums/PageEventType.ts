@@ -1,0 +1,4 @@
+export enum PageEventType {
+    VIDEO_INFO_INIT,
+    REQUEST_OPEN_SIDE_PANEL,
+}

@@ -1,3 +1,7 @@
+import { PageEventType } from '../../enums/PageEventType'
+import { MessageType } from '../../enums/MessageType'
+import { PageType } from '../../enums/PageType'
+
 export { }
 
 function main() {
@@ -11,21 +15,21 @@ function addListener() {
   window.addEventListener('message', async (event) => {
     if (
       event.source !== window ||
-      event.data?.source !== 'VIDEO_PAGE_INJECT'
+      event.data?.source !== PageType.VIDEO_PAGE_INJECT
     ) {
       return
     }
 
     switch (event.data.type) {
-      case 'videoInfoInit':
+      case PageEventType.VIDEO_INFO_INIT:
         await chrome.runtime.sendMessage({
-          type: 'VideoInfoUpdate',
+          type: MessageType.VIDEO_INFO_UPDATE,
           payload: event.data.payload,
         })
         break
-      case 'openSidePanel':
+      case PageEventType.REQUEST_OPEN_SIDE_PANEL:
         chrome.runtime.sendMessage({
-          type: 'openSidePanel',
+          type: MessageType.OPEN_SIDE_PANEL,
         })
         break
       default:

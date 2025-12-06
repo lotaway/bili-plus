@@ -248,15 +248,15 @@ class DownloadManager {
           })
         return true
       }
-      case 'VideoInfoUpdate':
+      case MessageType.VIDEO_INFO_UPDATE:
         this.#subtitleFetcher.init(message.payload)
         break
-      case 'openSidePanel':
+      case MessageType.OPEN_SIDE_PANEL:
         if (sender.tab?.windowId) {
           chrome.sidePanel.open({ windowId: sender.tab.windowId })
         }
         break
-      case 'startAssistant': {
+      case MessageType.REQUEST_START_ASSISTANT: {
         const EVENT_TYPE = MessageType.ASSISTANT_RESPONSE_STREAM
         this.aiAgentRunner
           .runAgent(message.payload, (content, metadata) => {
@@ -301,7 +301,7 @@ class DownloadManager {
         return true
       }
 
-      case 'stopAssistant': {
+      case MessageType.REQUEST_STOP_ASSISTANT: {
         this.aiAgentRunner.stopAgent().then((stopped) => {
           sendResponse({
             stopped: stopped,

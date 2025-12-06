@@ -225,7 +225,7 @@ export class LLM_Runner {
     this.isBusy = true
     try {
       const signal = AbortSignal.timeout(30 * 1000)
-      const response = await fetch(`${this.config.aiEndpoint}/api/documents`, {
+      const response = await fetch(`${this.config.aiEndpoint}/rag/document/import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

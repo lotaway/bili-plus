@@ -1,4 +1,6 @@
+import { PageType } from '../../enums/PageType'
 import { VideoData } from '../../types/video'
+import { PageEventType } from '../../enums/PageEventType'
 
 let isWindowActivate = true
 
@@ -33,8 +35,8 @@ function syncVideoInfo(needCheck = true) {
   )
   match.p = p
   window.postMessage({
-    source: 'VIDEO_PAGE_INJECT',
-    type: 'videoInfoInit',
+    source: PageType.VIDEO_PAGE_INJECT,
+    type: PageEventType.VIDEO_INFO_INIT,
     payload: match,
   })
 }
@@ -58,8 +60,8 @@ function injectGenerateButton() {
 
   btn.addEventListener('click', () => {
     window.postMessage({
-      source: 'VIDEO_PAGE_INJECT',
-      type: 'openSidePanel',
+      source: PageType.VIDEO_PAGE_INJECT,
+      type: PageEventType.REQUEST_OPEN_SIDE_PANEL,
     })
   })
 
