@@ -1,6 +1,7 @@
 import { PageEventType } from '../../enums/PageEventType'
 import { MessageType } from '../../enums/MessageType'
 import { PageType } from '../../enums/PageType'
+import { VideoData } from '../../types/video'
 
 export { }
 
@@ -24,7 +25,7 @@ function addListener() {
       case PageEventType.VIDEO_INFO_INIT:
         await chrome.runtime.sendMessage({
           type: MessageType.VIDEO_INFO_UPDATE,
-          payload: event.data.payload,
+          payload: event.data.payload as VideoData,
         })
         break
       case PageEventType.REQUEST_OPEN_SIDE_PANEL:

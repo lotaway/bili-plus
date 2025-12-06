@@ -7,6 +7,7 @@ interface VideoInfo {
   aid: number | null
   cid: number | null
   bvid: string | null
+  p: number | null
 }
 
 export class SubtitleFetcher {
@@ -15,9 +16,10 @@ export class SubtitleFetcher {
     aid: null,
     cid: null,
     bvid: null,
+    p: null,
   }
-  #api = new BilibiliApi();
-  #MAX_STORED_VIDEOS = 50;
+  private readonly api = new BilibiliApi()
+  MAX_STORED_VIDEOS = 50
 
   get isInit() {
     return this.videoInfo.isInit
@@ -33,6 +35,14 @@ export class SubtitleFetcher {
 
   get bvid() {
     return Number.parseInt(this.videoInfo.bvid ?? String(Math.random() * 10000))
+  }
+
+  get p() {
+    return this.videoInfo.p ?? 1
+  }
+
+  getVideoDetailPageUrl() {
+    return this.api.getVideoDetailPageUrl(this.bvid, this.p)
   }
 
   async getTitle(): Promise<string> {
@@ -58,10 +68,10 @@ export class SubtitleFetcher {
         (key) => key.startsWith('BV') || /^\d+$/.test(key)
       )
 
-      if (videoKeys.length > this.#MAX_STORED_VIDEOS) {
+      if (videoKeys.length > this.MAX_STORED_VIDEOS) {
         const keysToRemove = videoKeys.slice(
           0,
-          videoKeys.length - this.#MAX_STORED_VIDEOS
+          videoKeys.length - this.MAX_STORED_VIDEOS
         )
         await chrome.storage.local.remove(keysToRemove)
         console.log(`清理了 ${keysToRemove.length} 个过期的视频存储`)
@@ -76,6 +86,7 @@ export class SubtitleFetcher {
     this.videoInfo.cid =
       (data.p && data.pages ? data.pages[data.p - 1]?.cid : data.cid) ?? null
     this.videoInfo.bvid = data.bvid ?? null
+    this.videoInfo.p = data.p ?? null
     this.videoInfo.isInit = !!(this.videoInfo.cid && this.videoInfo.aid)
     if (this.videoInfo.bvid) {
       await this.cleanupOldStorage()
@@ -92,8 +103,8 @@ export class SubtitleFetcher {
     if (!this.videoInfo.aid || !this.videoInfo.cid) {
       return { error: 'Video info not initialized' }
     }
-    headers = await this.#api.fillHeader(headers)
-    const subtitles = await this.#api.getVideoSubtitle(
+    headers = await this.api.fillHeader(headers)
+    const subtitles = await this.api.getVideoSubtitle(
       this.videoInfo.aid,
       this.videoInfo.cid
     )
@@ -101,7 +112,7 @@ export class SubtitleFetcher {
       ['zh-CN', 'zh', 'ai-zh'].includes(s.lan)
     )
     if (!pref) return { error: '无可用字幕' }
-    return await this.#api.getSubtitleJson(pref.subtitle_url, headers)
+    return await this.api.getSubtitleJson(pref.subtitle_url, headers)
   }
 
   async fetchSubtitlesHandler(payload: { mode?: DownloadType }) {

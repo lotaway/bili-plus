@@ -3,9 +3,10 @@ import { AISubtitleHandler, LLM_Runner } from '../../services/LLM_Runner'
 import { AIAgentRunner } from '../../services/AIAgentRunner'
 import { MessageType } from '../../enums/MessageType'
 import { SummarizeErrorResponse, SummarizeSuccessResponse } from '../../types/summarize'
+import { VideoData } from '../../types/video'
 
 class DownloadManager {
-  readonly #subtitleFetcher = new SubtitleFetcher();
+  private readonly subtitleFetcher = new SubtitleFetcher();
   private readonly llmRunner = new LLM_Runner();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
   private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
@@ -23,7 +24,7 @@ class DownloadManager {
 
   async initializeStorageCleanup() {
     try {
-      await this.#subtitleFetcher.cleanupOldStorage()
+      await this.subtitleFetcher.cleanupOldStorage()
       const syncBytes = await new Promise<number>((resolve) => {
         chrome.storage.sync.getBytesInUse(null, resolve)
       })
@@ -136,9 +137,9 @@ class DownloadManager {
   }
 
   checkVideoInfo() {
-    if (!this.#subtitleFetcher.cid || !this.#subtitleFetcher.aid) {
+    if (!this.subtitleFetcher.cid || !this.subtitleFetcher.aid) {
       let msg = 'Can not get video info, maybe not the target page'
-      if (!this.#subtitleFetcher.isInit) {
+      if (!this.subtitleFetcher.isInit) {
         msg = 'content.js maybe not trigger, please try refresh the page'
       }
       return {
@@ -159,13 +160,13 @@ class DownloadManager {
           sendResponse(preResult)
           return true
         }
-        this.#subtitleFetcher
+        this.subtitleFetcher
           .fetchSubtitlesHandler(message.payload)
           .then((subtitleResult) => {
             sendResponse({
               data: subtitleResult,
-              bvid: this.#subtitleFetcher.bvid,
-              cid: this.#subtitleFetcher.cid,
+              bvid: this.subtitleFetcher.bvid,
+              cid: this.subtitleFetcher.cid,
             })
           })
           .catch((error) => {
@@ -183,11 +184,11 @@ class DownloadManager {
           sendResponse(preResult)
           return true
         }
-        const bvid = this.#subtitleFetcher.bvid
-        const cid = this.#subtitleFetcher.cid
+        const bvid = this.subtitleFetcher.bvid
+        const cid = this.subtitleFetcher.cid
         const EVENT_TYPE = MessageType.SUMMARIZE_RESPONSE_STREAM
         this.aiSubtitleHandler
-          .summarizeSubtitlesHandler(this.#subtitleFetcher, (chunk) => {
+          .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
             if (sender.id) {
               chrome.runtime.sendMessage(sender.id, {
                 type: EVENT_TYPE,
@@ -206,7 +207,7 @@ class DownloadManager {
             }
             this.llmRunner.saveDocument(
               summaryResult.title,
-              `${bvid},${cid}`, // @TODO use bilibili video detail page url with params p=?
+              this.subtitleFetcher.getVideoDetailPageUrl().toString(),
               summaryResult.data,
               'md'
             )
@@ -249,7 +250,7 @@ class DownloadManager {
         return true
       }
       case MessageType.VIDEO_INFO_UPDATE:
-        this.#subtitleFetcher.init(message.payload)
+        this.subtitleFetcher.init(message.payload as VideoData)
         break
       case MessageType.OPEN_SIDE_PANEL:
         if (sender.tab?.windowId) {
