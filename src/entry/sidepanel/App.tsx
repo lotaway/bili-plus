@@ -273,8 +273,8 @@ const App: React.FC = () => {
       newState.currentBuffer += content
       while (newState.currentBuffer.length > 0) {
         if (!newState.inThinking && !newState.inMarkdown) {
-          const thinkingStart = newState.currentBuffer.indexOf('<thinking>')
-          const markdownStart = newState.currentBuffer.indexOf('```markdown')
+          const thinkingStart = newState.currentBuffer.indexOf('<think>')
+          const markdownStart = newState.currentBuffer.indexOf('```markdown') 
           if (thinkingStart !== -1 && (markdownStart === -1 || thinkingStart < markdownStart)) {
             newState.inThinking = true
             newState.currentBuffer = newState.currentBuffer.substring(thinkingStart + 10)
@@ -286,7 +286,7 @@ const App: React.FC = () => {
             newState.currentBuffer = ''
           }
         } else if (newState.inThinking) {
-          const thinkingEnd = newState.currentBuffer.indexOf('</thinking>')
+          const thinkingEnd = newState.currentBuffer.indexOf('</think>')
           if (thinkingEnd !== -1) {
             newState.thinkingBuffer += newState.currentBuffer.substring(0, thinkingEnd)
             appendThinkingContent(newState.thinkingBuffer)
