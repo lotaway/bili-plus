@@ -211,6 +211,8 @@ export class LLM_Runner {
 
   async saveDocument(
     title: string,
+    bvid: number,
+    cid: number,
     source: string,
     content: string,
     contentType: string = 'md'
@@ -225,7 +227,7 @@ export class LLM_Runner {
     this.isBusy = true
     try {
       const signal = AbortSignal.timeout(30 * 1000)
-      const response = await fetch(`${this.config.aiEndpoint}/rag/document/import`, {
+      const response = await fetch(`${this.apiPrefixWithVersion}/rag/document/import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -236,6 +238,8 @@ export class LLM_Runner {
           source,
           content,
           contentType,
+          bvid,
+          cid,
         }),
         signal,
       })
