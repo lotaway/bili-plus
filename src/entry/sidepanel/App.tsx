@@ -282,7 +282,18 @@ const App: React.FC = () => {
       while (parsingStateRef.current.currentBuffer.length > 0) {
         if (!parsingStateRef.current.inThinking && !parsingStateRef.current.inMarkdown) {
           const START_TAG = '<think>'
+          const END_TAG = '</think>'
           const thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_TAG)
+          const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(END_TAG)
+
+          if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
+            const contentBefore = parsingStateRef.current.currentBuffer.substring(0, thinkingEndIndex)
+            setOutputContent(prev => ({ ...prev, markdown: '', thinking: prev.thinking + prev.markdown + contentBefore }))
+            setHasUserScrolled(false)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + END_TAG.length)
+            continue
+          }
+
           const START_MARKDOWN_TAG = '```markdown'
           const markdownStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_MARKDOWN_TAG)
           if (thinkingStartIndex !== -1 && (markdownStartIndex === -1 || thinkingStartIndex < markdownStartIndex)) {

@@ -3,7 +3,7 @@
   "version": "1.0.1",
   "description": "Bilibili 字幕提取器",
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && vite build -c vite.content.config.ts && vite build -c vite.inject.config.ts",
     "preview": "vite preview",
     "watch": "gulp"
   },

@@ -13,6 +13,9 @@ function main() {
 }
 
 function addListener() {
+  chrome.runtime.sendMessage({
+    type: MessageType.REGISTER_CONTENT_JS,
+  }).catch(err => console.error(err))
   window.addEventListener('message', async (event) => {
     if (
       event.source !== window ||
@@ -40,7 +43,13 @@ function addListener() {
 }
 
 function injectScript() {
+  const ID = "video_page_inject"
+  const origin = document.getElementById(ID)
+  if (origin) {
+    document.removeChild(origin)
+  }
   const script = document.createElement('script')
+  script.id = ID
   const url = chrome.runtime.getURL('assets/video_page_inject.js')
   script.src = url
   document.documentElement.appendChild(script)

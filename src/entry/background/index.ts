@@ -11,6 +11,8 @@ class DownloadManager {
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
   private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
   #pollingCheckTimer: number | null = null;
+  private readonly registedContentJss = new Map<string, boolean>()
+  private readonly registerMaxSize = 10
 
   constructor() {
     this.setupEventListeners()
@@ -140,7 +142,7 @@ class DownloadManager {
     if (!this.subtitleFetcher.cid || !this.subtitleFetcher.aid) {
       let msg = 'Can not get video info, maybe not the target page'
       if (!this.subtitleFetcher.isInit) {
-        msg = 'content.js maybe not trigger, please try refresh the page'
+        msg = 'video_page_inject.js maybe not trigger, please try refresh the page'
       }
       return {
         isOk: false,
@@ -178,7 +180,20 @@ class DownloadManager {
           })
         return true
       }
+      case MessageType.REGISTER_CONTENT_JS:
+        if (this.registedContentJss.size > this.registerMaxSize - 1) {
+          this.registedContentJss.delete(this.registedContentJss.keys().next().value as string)
+        }
+        this.registedContentJss.set(sender.id as string, true)
+        break
       case MessageType.REQUEST_SUMMARIZE: {
+        const isRegisted = this.registedContentJss.get(sender.id as string)
+        if (!isRegisted) {
+          sendResponse({
+            error: 'content.js maybe not registed, please try refresh the page',
+          })
+          return true
+        }
         const preResult = this.checkVideoInfo()
         if (preResult?.error) {
           sendResponse(preResult)

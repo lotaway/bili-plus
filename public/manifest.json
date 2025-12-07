@@ -1,5 +1,5 @@
 {
-    "manifest_version": 4,
+    "manifest_version": 3,
     "key": "CHROMEEXTENSIONKEYBILIBILIPLUS01",
     "name": "Bilibili 字幕提取器",
     "version": "1.0.1",
@@ -47,6 +47,9 @@
         {
             "resources": [
                 "assets/video_page_inject.js",
+                "assets/MessageType.js",
+                "assets/PageType.js",
+                "assets/content.js",
                 "src/entry/sidepanel/index.html",
                 "src/entry/popup/index.html"
             ],

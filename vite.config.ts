@@ -11,8 +11,6 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/entry/popup/index.html'),
         sidepanel: resolve(__dirname, 'src/entry/sidepanel/index.html'),
         background: resolve(__dirname, 'src/entry/background/index.ts'),
-        content: resolve(__dirname, 'src/entry/content/index.ts'),
-        video_page_inject: resolve(__dirname, 'src/entry/biliVideo/video_page_inject.ts'),
       },
       output: {
         entryFileNames: 'assets/[name].js',
