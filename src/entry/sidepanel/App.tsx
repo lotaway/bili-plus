@@ -263,7 +263,7 @@ const App: React.FC = () => {
 
     if (data.done) {
       console.info("Stream ended")
-      const cleanedContent = data.content.replace(/<think>[\s\S]*?<\/think>\s*/, '')
+      const cleanedContent = data.content.replace(/^(<think>)?[\s\S]*?<\/think>\s*/, '')
       const matchs = new RegExp(/```markdown([\s\S]+?)```/).exec(data.content)
       setMarkdownContent(matchs ? matchs[1] : data.content)
       setMarkdownContent(cleanedContent)
@@ -279,18 +279,18 @@ const App: React.FC = () => {
     if (data.content) {
       let content = data.content
       parsingStateRef.current.currentBuffer += content
+      const START_THINK_TAG = '<think>'
+      const END_THINK_TAG = '</think>'
       while (parsingStateRef.current.currentBuffer.length > 0) {
         if (!parsingStateRef.current.inThinking && !parsingStateRef.current.inMarkdown) {
-          const START_TAG = '<think>'
-          const END_TAG = '</think>'
-          const thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_TAG)
-          const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(END_TAG)
+          const thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_THINK_TAG)
+          const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(END_THINK_TAG)
 
           if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
             const contentBefore = parsingStateRef.current.currentBuffer.substring(0, thinkingEndIndex)
             setOutputContent(prev => ({ ...prev, markdown: '', thinking: prev.thinking + prev.markdown + contentBefore }))
             setHasUserScrolled(false)
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + END_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + END_THINK_TAG.length)
             continue
           }
 
@@ -298,7 +298,7 @@ const App: React.FC = () => {
           const markdownStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_MARKDOWN_TAG)
           if (thinkingStartIndex !== -1 && (markdownStartIndex === -1 || thinkingStartIndex < markdownStartIndex)) {
             parsingStateRef.current.inThinking = true
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex + START_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex + START_THINK_TAG.length)
           } else if (markdownStartIndex !== -1) {
             parsingStateRef.current.inMarkdown = true
             parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownStartIndex + START_MARKDOWN_TAG.length)
@@ -308,14 +308,13 @@ const App: React.FC = () => {
           }
         }
         if (parsingStateRef.current.inThinking) {
-          const END_TAG = '</think>'
-          const thinkingEnd = parsingStateRef.current.currentBuffer.indexOf(END_TAG)
+          const thinkingEnd = parsingStateRef.current.currentBuffer.indexOf(END_THINK_TAG)
           if (thinkingEnd !== -1) {
             parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer.substring(0, thinkingEnd)
             appendThinkingContent(parsingStateRef.current.thinkingBuffer)
             parsingStateRef.current.thinkingBuffer = ''
             parsingStateRef.current.inThinking = false
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEnd + END_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEnd + END_THINK_TAG.length)
           } else {
             parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer
             parsingStateRef.current.currentBuffer = ''
