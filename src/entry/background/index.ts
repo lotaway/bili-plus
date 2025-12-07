@@ -131,11 +131,11 @@ class DownloadManager {
   }
 
   onDownloadChanged(args: chrome.downloads.DownloadDelta) {
-    console.debug(`Download changed: ${JSON.stringify(args)}`)
+    // console.debug(`Download changed: ${JSON.stringify(args)}`)
   }
 
   onDownloadCreated(args: chrome.downloads.DownloadItem) {
-    console.debug(`Download created: ${JSON.stringify(args)}`)
+    // console.debug(`Download created: ${JSON.stringify(args)}`)
   }
 
   checkVideoInfo() {
@@ -222,6 +222,8 @@ class DownloadManager {
             }
             this.llmRunner.saveDocument(
               summaryResult.title,
+              bvid,
+              cid,
               this.subtitleFetcher.getVideoDetailPageUrl().toString(),
               summaryResult.data,
               'md'
