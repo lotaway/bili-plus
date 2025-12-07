@@ -5,6 +5,12 @@ import { DownloadType } from '../../enums/DownloadType'
 import { SummarizeResponse } from '../../types/summarize'
 import { LLM_Runner } from '../../services/LLM_Runner'
 
+enum ParsingState {
+  FREE,
+  THINKING,
+  GENERATING,
+}
+
 interface DecisionData {
   reason: string
   message?: string
@@ -30,8 +36,7 @@ const App: React.FC = () => {
 
   const parsingStateRef = useRef({
     currentBuffer: '',
-    inThinking: false,
-    inMarkdown: false,
+    state: ParsingState.FREE,
     thinkingBuffer: '',
     markdownBuffer: ''
   })
@@ -110,8 +115,7 @@ const App: React.FC = () => {
     setDecisionData(null)
     parsingStateRef.current = {
       currentBuffer: '',
-      inThinking: false,
-      inMarkdown: false,
+      state: ParsingState.FREE,
       thinkingBuffer: '',
       markdownBuffer: ''
     }
@@ -263,17 +267,16 @@ const App: React.FC = () => {
 
     if (data.done) {
       console.info("Stream ended")
-      const cleanedContent = data.content.replace(/^(<think>)?[\s\S]*?<\/think>\s*/, '')
+      const cleanedContent = data.content.replace(/^(<think>)?[\s\S]*?<\/think>\s*/, '').replace(/<｜end▁of▁sentence｜>$/, '')
       const matchs = new RegExp(/```markdown([\s\S]+?)```/).exec(data.content)
       setMarkdownContent(matchs ? matchs[1] : data.content)
       setMarkdownContent(cleanedContent)
-      parsingStateRef.current = {
-        currentBuffer: '',
-        inThinking: false,
-        inMarkdown: false,
-        thinkingBuffer: '',
-        markdownBuffer: ''
-      }
+    parsingStateRef.current = {
+      currentBuffer: '',
+      state: ParsingState.FREE,
+      thinkingBuffer: '',
+      markdownBuffer: ''
+    }
       return
     }
     if (data.content) {
@@ -282,12 +285,13 @@ const App: React.FC = () => {
       const START_THINK_TAG = '<think>'
       const END_THINK_TAG = '</think>'
       while (parsingStateRef.current.currentBuffer.length > 0) {
-        if (!parsingStateRef.current.inThinking && !parsingStateRef.current.inMarkdown) {
-          const thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_THINK_TAG)
+        if (parsingStateRef.current.state === ParsingState.FREE) {
+          let thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_THINK_TAG)
           const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(END_THINK_TAG)
 
           if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
-            const contentBefore = parsingStateRef.current.currentBuffer.substring(0, thinkingEndIndex)
+            thinkingStartIndex = 0
+            const contentBefore = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex, thinkingEndIndex)
             setOutputContent(prev => ({ ...prev, markdown: '', thinking: prev.thinking + prev.markdown + contentBefore }))
             setHasUserScrolled(false)
             parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + END_THINK_TAG.length)
@@ -297,37 +301,37 @@ const App: React.FC = () => {
           const START_MARKDOWN_TAG = '```markdown'
           const markdownStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_MARKDOWN_TAG)
           if (thinkingStartIndex !== -1 && (markdownStartIndex === -1 || thinkingStartIndex < markdownStartIndex)) {
-            parsingStateRef.current.inThinking = true
+            parsingStateRef.current.state = ParsingState.THINKING
             parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex + START_THINK_TAG.length)
           } else if (markdownStartIndex !== -1) {
-            parsingStateRef.current.inMarkdown = true
+            parsingStateRef.current.state = ParsingState.GENERATING
             parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownStartIndex + START_MARKDOWN_TAG.length)
           } else {
             appendMarkdownContent(parsingStateRef.current.currentBuffer)
             parsingStateRef.current.currentBuffer = ''
           }
         }
-        if (parsingStateRef.current.inThinking) {
+        if (parsingStateRef.current.state === ParsingState.THINKING) {
           const thinkingEnd = parsingStateRef.current.currentBuffer.indexOf(END_THINK_TAG)
           if (thinkingEnd !== -1) {
             parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer.substring(0, thinkingEnd)
             appendThinkingContent(parsingStateRef.current.thinkingBuffer)
             parsingStateRef.current.thinkingBuffer = ''
-            parsingStateRef.current.inThinking = false
+            parsingStateRef.current.state = ParsingState.FREE
             parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEnd + END_THINK_TAG.length)
           } else {
             parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer
             parsingStateRef.current.currentBuffer = ''
           }
         }
-        if (parsingStateRef.current.inMarkdown) {
+        if (parsingStateRef.current.state === ParsingState.GENERATING) {
           const END_MARKDOWN_TAG = '```'
           const markdownEnd = parsingStateRef.current.currentBuffer.indexOf(END_MARKDOWN_TAG)
           if (markdownEnd !== -1) {
             parsingStateRef.current.markdownBuffer += parsingStateRef.current.currentBuffer.substring(0, markdownEnd)
             appendMarkdownContent(parsingStateRef.current.markdownBuffer)
             parsingStateRef.current.markdownBuffer = ''
-            parsingStateRef.current.inMarkdown = false
+            parsingStateRef.current.state = ParsingState.FREE
             parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownEnd + END_MARKDOWN_TAG.length)
           } else {
             parsingStateRef.current.markdownBuffer += parsingStateRef.current.currentBuffer

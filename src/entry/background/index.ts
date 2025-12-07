@@ -204,17 +204,18 @@ class DownloadManager {
         const EVENT_TYPE = MessageType.SUMMARIZE_RESPONSE_STREAM
         this.aiSubtitleHandler
           .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
-            if (sender.id) {
-              chrome.runtime.sendMessage(sender.id, {
-                type: EVENT_TYPE,
-                data: {
-                  content: chunk,
-                  bvid,
-                  cid,
-                  done: false,
-                } as SummarizeSuccessResponse,
-              })
+            if (!sender.id) {
+              return
             }
+            chrome.runtime.sendMessage(sender.id, {
+              type: EVENT_TYPE,
+              data: {
+                content: chunk,
+                bvid,
+                cid,
+                done: false,
+              } as SummarizeSuccessResponse,
+            })
           })
           .then((summaryResult) => {
             if ('error' in summaryResult) {
