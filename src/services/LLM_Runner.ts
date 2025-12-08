@@ -1,6 +1,7 @@
 import { DocumentType } from '../enums/DownloadType'
 import { StreamUtils } from '../utils/streamUtils'
 import { SubtitleFetcher } from './SubtitleFetcher'
+import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
 
 interface Config {
   aiProvider: string
@@ -213,8 +214,8 @@ export class LLM_Runner {
           }
         }
       )
-
-      return { data: fullResponse }
+      const data = new AIGenerationAnalyzer(fullResponse).analyze()
+      return { data }
     } finally {
       this.isBusy = false
     }
@@ -276,7 +277,7 @@ export class AISubtitleHandler {
   async summarizeSubtitlesHandler(
     fetcher: SubtitleFetcher,
     onProgress?: (chunk: string) => void
-  ): Promise<{ title: string, data: string } | { error: string }> {
+  ): Promise<{ title: string, data: { think: string, content: string } } | { error: string }> {
     if (this.isBusy) {
       return { error: '当前正在处理中，请稍后再试' }
     }
@@ -323,8 +324,8 @@ ${text}`
       }
     )
     if (result.error) {
-      return result.error
+      throw new Error(result.error)
     }
-    return result.data ?? ""
+    return result.data ?? { think: '', content: '' }
   }
 }

@@ -226,7 +226,7 @@ class DownloadManager {
               bvid,
               cid,
               source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-              content: summaryResult.data,
+              content: summaryResult.data.content,
             })
               .then(() =>
                 console.log('总结内容已保存到数据库'))
@@ -238,7 +238,8 @@ class DownloadManager {
               chrome.runtime.sendMessage(sender.id, {
                 type: EVENT_TYPE,
                 data: {
-                  content: summaryResult.data,
+                  think: summaryResult.data.think,
+                  content: summaryResult.data.content,
                   bvid,
                   cid,
                   done: true,

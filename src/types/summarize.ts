@@ -4,6 +4,7 @@ export interface SummarizeCommonResponse {
 }
 
 export interface SummarizeSuccessResponse extends SummarizeCommonResponse {
+    think: string
     content: string
     done: boolean
 }
