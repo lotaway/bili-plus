@@ -256,6 +256,76 @@ export class LLM_Runner {
       this.isBusy = false
     }
   }
+
+  async analyzeScreenshot(
+    screenshotDataUrl: string,
+    onProgress?: (chunk: string) => void
+  ): Promise<{ data: { think: string, content: string } } | { error: string }> {
+    if (this.isBusy) {
+      return { error: '当前正在处理中，请稍后再试' }
+    }
+    const result = await this.syncConfig()
+    if (result.error) {
+      return { error: result.error.message }
+    }
+    this.isBusy = true
+    try {
+      const signal = AbortSignal.timeout(5 * 60 * 1000)
+      const screenshotPrompt = `请分析这张截图的内容，描述截图中的界面元素、文字内容、布局结构等信息。
+      如果截图包含视频播放界面，请描述视频的标题、进度条、控制按钮等元素。
+      如果截图包含网页内容，请描述网页的主要内容和结构。
+      请用清晰的结构化格式输出分析结果。`
+      const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
+        },
+        body: JSON.stringify({
+          model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: screenshotPrompt
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: screenshotDataUrl
+                  }
+                }
+              ]
+            }
+          ],
+          temperature: 0.7,
+          stream: true,
+        }),
+        signal,
+      })
+
+      if (!response.body) throw new Error('No response body')
+      const reader = response.body.getReader()
+
+      const fullResponse = await new StreamUtils().readStream(
+        reader,
+        (content, _metadata) => {
+          if (content && onProgress) {
+            onProgress(content)
+          }
+        }
+      )
+      const data = new AIGenerationAnalyzer(fullResponse).analyze()
+      return { data }
+    } catch (error) {
+      console.error('截图分析失败:', error)
+      return { error: error instanceof Error ? error.message : '未知错误' }
+    } finally {
+      this.isBusy = false
+    }
+  }
 }
 
 export class AISubtitleHandler {

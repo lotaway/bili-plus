@@ -267,6 +267,83 @@ class DownloadManager {
           })
         return true
       }
+
+      case MessageType.REQUEST_SUMMARIZE_SCREENSHOT: {
+        const isRegisted = this.registedContentJss.get(sender.id as string)
+        if (!isRegisted) {
+          sendResponse({
+            error: 'content.js maybe not registed, please try refresh the page',
+          })
+          return true
+        }
+
+        const screenshotDataUrl = message.payload?.screenshot
+        if (!screenshotDataUrl) {
+          sendResponse({
+            error: '截图数据为空，请重试',
+          })
+          return true
+        }
+
+        const EVENT_TYPE = MessageType.SUMMARIZE_SCREENSHOT_RESPONSE_STREAM
+        this.llmRunner.analyzeScreenshot(screenshotDataUrl, (chunk) => {
+          if (!sender.id) {
+            return
+          }
+          chrome.runtime.sendMessage(sender.id, {
+            type: EVENT_TYPE,
+            data: {
+              content: chunk,
+              done: false,
+            } as SummarizeSuccessResponse,
+          })
+        })
+          .then((analysisResult) => {
+            if ('error' in analysisResult) {
+              throw new Error(analysisResult.error)
+            }
+            // this.llmRunner.saveDocument({
+            //   title: '界面截图分析',
+            //   bvid: 'screenshot',
+            //   cid: Date.now(),
+            //   source: 'screenshot_analysis',
+            //   content: analysisResult.data.content,
+            // })
+            //   .then(() =>
+            //     console.log('截图分析内容已保存到数据库'))
+            //   .catch(saveError => {
+            //     console.error('保存截图分析内容失败:', saveError)
+            //   })
+
+            if (sender.id) {
+              chrome.runtime.sendMessage(sender.id, {
+                type: EVENT_TYPE,
+                data: {
+                  think: analysisResult.data.think,
+                  content: analysisResult.data.content,
+                  done: true,
+                } as SummarizeSuccessResponse,
+              })
+            }
+            sendResponse({ done: true })
+          })
+          .catch((error) => {
+            console.error(error)
+            if (sender.id) {
+              chrome.runtime.sendMessage(sender.id, {
+                type: EVENT_TYPE,
+                data: {
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : JSON.stringify(error),
+                } as SummarizeErrorResponse,
+              })
+            }
+            sendResponse({ done: true })
+          })
+        return true
+      }
       case MessageType.VIDEO_INFO_UPDATE:
         this.subtitleFetcher.init(message.payload as VideoData)
         break

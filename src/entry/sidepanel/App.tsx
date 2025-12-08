@@ -6,6 +6,7 @@ import { SummarizeResponse } from '../../types/summarize'
 import { LLM_Runner } from '../../services/LLM_Runner'
 import { ParsingState } from '../../enums/ParseState'
 import { AIGenerationAnalyzer } from '../../services/AIGeneratioinAnalyzer'
+import { ChromeMessage } from '../../types/chrome'
 
 interface DecisionData {
   reason: string
@@ -77,10 +78,12 @@ const App: React.FC = () => {
       }
     }
   }, [])
-
+  
   useEffect(() => {
-    const handleMessage = (message: any) => {
+    const handleMessage = (message: ChromeMessage) => {
       if (message.type === MessageType.SUMMARIZE_RESPONSE_STREAM) {
+        handleSummarizeResponseStream(message.data)
+      } else if (message.type === MessageType.SUMMARIZE_SCREENSHOT_RESPONSE_STREAM) {
         handleSummarizeResponseStream(message.data)
       } else if (message.type === MessageType.ASSISTANT_RESPONSE_STREAM) {
         handleAssistantResponseStream(message.data)
@@ -92,7 +95,6 @@ const App: React.FC = () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
     }
   }, [])
-
   const sendMessage = (payload: any): Promise<any> => {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(payload, resolve)
@@ -177,6 +179,29 @@ const App: React.FC = () => {
       return
     }
     // setMessage('已经完成字幕的AI处理')
+  }
+
+  const handleRequestScreenshotSummarize = async () => {
+    clearOutput()
+    setMessage('正在截取屏幕...')
+    try {
+      const screenshotDataUrl = await chrome.tabs.captureVisibleTab({
+        format: 'png',
+        quality: 80
+      })
+      setMessage('正在使用AI分析界面...')
+      const res = await sendMessage({
+        type: MessageType.REQUEST_SUMMARIZE_SCREENSHOT,
+        payload: { screenshot: screenshotDataUrl }
+      })
+      if (res?.error) {
+        setMessage(res.error)
+        return
+      }
+    } catch (error) {
+      console.error('截图失败:', error)
+      setMessage('截图失败，请重试')
+    }
   }
 
   const handleAssistantStart = async () => {
@@ -407,8 +432,11 @@ const App: React.FC = () => {
         <button id="extract-only-text" onClick={() => handleExtract(DownloadType.MARKDOWN)}>
           提取当前视频字幕（纯文字）
         </button>
-        <button id="summary" onClick={handleRequestSummarize}>
-          视频知识总结
+        <button onClick={handleRequestSummarize}>
+          视频知识总结（按照字幕）
+        </button>
+        <button onClick={handleRequestScreenshotSummarize}>
+          界面总结（截图分析）
         </button>
       </div>
       <div className="output-section">
