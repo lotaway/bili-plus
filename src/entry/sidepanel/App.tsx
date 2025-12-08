@@ -176,7 +176,7 @@ const App: React.FC = () => {
       setMessage(res.error)
       return
     }
-    setMessage('已经完成字幕的AI处理')
+    // setMessage('已经完成字幕的AI处理')
   }
 
   const handleAssistantStart = async () => {
