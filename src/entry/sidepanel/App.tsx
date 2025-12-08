@@ -4,12 +4,8 @@ import { MessageType } from '../../enums/MessageType'
 import { DownloadType } from '../../enums/DownloadType'
 import { SummarizeResponse } from '../../types/summarize'
 import { LLM_Runner } from '../../services/LLM_Runner'
-
-enum ParsingState {
-  FREE,
-  THINKING,
-  GENERATING,
-}
+import { ParsingState } from '../../enums/ParseState'
+import { AIGenerationAnalyzer } from '../../services/AIGeneratioinAnalyzer'
 
 interface DecisionData {
   reason: string
@@ -259,6 +255,7 @@ const App: React.FC = () => {
     })
   }
 
+  const aiGenerationAnalyzer = new AIGenerationAnalyzer()
   const handleSummarizeResponseStream = (data: SummarizeResponse) => {
     if ("error" in data) {
       setMessage(data.error)
@@ -268,68 +265,63 @@ const App: React.FC = () => {
     if (data.done) {
       console.debug("Stream ended")
       setMarkdownContent(data.content)
-    parsingStateRef.current = {
-      currentBuffer: '',
-      state: ParsingState.FREE,
-      thinkingBuffer: '',
-      markdownBuffer: ''
-    }
+      parsingStateRef.current = {
+        currentBuffer: '',
+        state: ParsingState.FREE,
+        thinkingBuffer: '',
+        markdownBuffer: ''
+      }
       return
     }
     if (data.content) {
       let content = data.content
       parsingStateRef.current.currentBuffer += content
-      const START_THINK_TAG = '<think>'
-      const END_THINK_TAG = '</think>'
       while (parsingStateRef.current.currentBuffer.length > 0) {
         if (parsingStateRef.current.state === ParsingState.FREE) {
-          let thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_THINK_TAG)
-          const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(END_THINK_TAG)
+          let thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.START_THINK_TAG)
+          const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.END_THINK_TAG)
 
           if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
             thinkingStartIndex = 0
             const contentBefore = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex, thinkingEndIndex)
             setOutputContent(prev => ({ ...prev, markdown: '', thinking: prev.thinking + prev.markdown + contentBefore }))
             setHasUserScrolled(false)
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + END_THINK_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + aiGenerationAnalyzer.END_THINK_TAG.length)
             continue
           }
-
-          const START_MARKDOWN_TAG = '```markdown'
-          const markdownStartIndex = parsingStateRef.current.currentBuffer.indexOf(START_MARKDOWN_TAG)
+          const markdownStartIndex = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.START_MARKDOWN_TAG)
           if (thinkingStartIndex !== -1 && (markdownStartIndex === -1 || thinkingStartIndex < markdownStartIndex)) {
             parsingStateRef.current.state = ParsingState.THINKING
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex + START_THINK_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex + aiGenerationAnalyzer.START_THINK_TAG.length)
           } else if (markdownStartIndex !== -1) {
             parsingStateRef.current.state = ParsingState.GENERATING
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownStartIndex + START_MARKDOWN_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownStartIndex + aiGenerationAnalyzer.START_MARKDOWN_TAG.length)
           } else {
             appendMarkdownContent(parsingStateRef.current.currentBuffer)
             parsingStateRef.current.currentBuffer = ''
           }
         }
         if (parsingStateRef.current.state === ParsingState.THINKING) {
-          const thinkingEnd = parsingStateRef.current.currentBuffer.indexOf(END_THINK_TAG)
+          const thinkingEnd = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.END_THINK_TAG)
           if (thinkingEnd !== -1) {
             parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer.substring(0, thinkingEnd)
             appendThinkingContent(parsingStateRef.current.thinkingBuffer)
             parsingStateRef.current.thinkingBuffer = ''
             parsingStateRef.current.state = ParsingState.FREE
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEnd + END_THINK_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEnd + aiGenerationAnalyzer.END_THINK_TAG.length)
           } else {
             parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer
             parsingStateRef.current.currentBuffer = ''
           }
         }
         if (parsingStateRef.current.state === ParsingState.GENERATING) {
-          const END_MARKDOWN_TAG = '```'
-          const markdownEnd = parsingStateRef.current.currentBuffer.indexOf(END_MARKDOWN_TAG)
+          const markdownEnd = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.END_MARKDOWN_TAG)
           if (markdownEnd !== -1) {
             parsingStateRef.current.markdownBuffer += parsingStateRef.current.currentBuffer.substring(0, markdownEnd)
             appendMarkdownContent(parsingStateRef.current.markdownBuffer)
             parsingStateRef.current.markdownBuffer = ''
             parsingStateRef.current.state = ParsingState.FREE
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownEnd + END_MARKDOWN_TAG.length)
+            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownEnd + aiGenerationAnalyzer.END_MARKDOWN_TAG.length)
           } else {
             parsingStateRef.current.markdownBuffer += parsingStateRef.current.currentBuffer
             parsingStateRef.current.currentBuffer = ''
