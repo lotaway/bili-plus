@@ -221,14 +221,13 @@ class DownloadManager {
             if ('error' in summaryResult) {
               throw new Error(summaryResult.error)
             }
-            this.llmRunner.saveDocument(
-              summaryResult.title,
+            this.llmRunner.saveDocument({
+              title: summaryResult.title,
               bvid,
               cid,
-              this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-              summaryResult.data,
-              'md'
-            )
+              source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+              content: summaryResult.data,
+            })
               .then(() =>
                 console.log('总结内容已保存到数据库'))
               .catch(saveError => {

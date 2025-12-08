@@ -11,8 +11,8 @@ export class BilibiliApi {
     return "https://www.bilibili.com"
   }
 
-  getVideoDetailPageUrl(bvid: number, p?: number): URL {
-    const url = new URL(`/video/BV${bvid}`, this.websiteHost)
+  getVideoDetailPageUrl(bvid: string, p?: number): URL {
+    const url = new URL(`/video/${bvid}`, this.websiteHost)
     // url.searchParams.set('cid', cid.toString())
     if (!p) {
       return url

@@ -1,5 +1,5 @@
 export interface SummarizeCommonResponse {
-    bvid: number
+    bvid: string
     cid: number
 }
 

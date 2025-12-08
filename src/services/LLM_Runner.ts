@@ -1,4 +1,6 @@
+import { DocumentType } from '../enums/DownloadType'
 import { StreamUtils } from '../utils/streamUtils'
+import { SubtitleFetcher } from './SubtitleFetcher'
 
 interface Config {
   aiProvider: string
@@ -13,6 +15,15 @@ interface VersionInfo {
   object: string
   owned_by: string
   api_version: string
+}
+
+interface ImportDocumentData {
+  title: string
+  bvid: string
+  cid: number
+  source: string
+  content: string
+  contentType?: DocumentType
 }
 
 export class LLM_Runner {
@@ -209,14 +220,8 @@ export class LLM_Runner {
     }
   }
 
-  async saveDocument(
-    title: string,
-    bvid: number,
-    cid: number,
-    source: string,
-    content: string,
-    contentType: string = 'md'
-  ) {
+  async saveDocument(importDocumentData: ImportDocumentData) {
+    importDocumentData.contentType = importDocumentData.contentType ?? DocumentType.MARKDOWN
     if (this.isBusy) {
       return { error: '当前正在处理中，请稍后再试' }
     }
@@ -233,14 +238,7 @@ export class LLM_Runner {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.config.aiKey ?? ''}`,
         },
-        body: JSON.stringify({
-          title,
-          source,
-          content,
-          contentType,
-          bvid,
-          cid,
-        }),
+        body: JSON.stringify(importDocumentData),
         signal,
       })
 
@@ -258,8 +256,6 @@ export class LLM_Runner {
     }
   }
 }
-
-import { SubtitleFetcher } from './SubtitleFetcher'
 
 export class AISubtitleHandler {
   private llmRunner: LLM_Runner

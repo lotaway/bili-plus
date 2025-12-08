@@ -34,7 +34,7 @@ export class SubtitleFetcher {
   }
 
   get bvid() {
-    return Number.parseInt(this.videoInfo.bvid ?? String(Math.random() * 10000))
+    return this.videoInfo.bvid ?? String(Math.random() * 10000)
   }
 
   get p() {
