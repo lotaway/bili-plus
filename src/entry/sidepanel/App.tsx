@@ -81,12 +81,17 @@ const App: React.FC = () => {
   
   useEffect(() => {
     const handleMessage = (message: ChromeMessage) => {
-      if (message.type === MessageType.SUMMARIZE_RESPONSE_STREAM) {
-        handleSummarizeResponseStream(message.data)
-      } else if (message.type === MessageType.SUMMARIZE_SCREENSHOT_RESPONSE_STREAM) {
-        handleSummarizeResponseStream(message.data)
-      } else if (message.type === MessageType.ASSISTANT_RESPONSE_STREAM) {
-        handleAssistantResponseStream(message.data)
+      switch (message.type) {
+        case MessageType.SUMMARIZE_RESPONSE_STREAM:
+        case MessageType.SUMMARIZE_SCREENSHOT_RESPONSE_STREAM:
+          handleSummarizeResponseStream(message.data)
+          break
+        case MessageType.ASSISTANT_RESPONSE_STREAM:
+          handleAssistantResponseStream(message.data)
+          break
+        default:
+          // 其他消息类型暂不处理
+          break
       }
     }
 
