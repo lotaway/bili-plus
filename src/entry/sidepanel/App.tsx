@@ -266,11 +266,8 @@ const App: React.FC = () => {
     }
 
     if (data.done) {
-      console.info("Stream ended")
-      const cleanedContent = data.content.replace(/^(<think>)?[\s\S]*?<\/think>\s*/, '').replace(/<｜end▁of▁sentence｜>$/, '')
-      const matchs = new RegExp(/```markdown([\s\S]+?)```/).exec(data.content)
-      setMarkdownContent(matchs ? matchs[1] : data.content)
-      setMarkdownContent(cleanedContent)
+      console.debug("Stream ended")
+      setMarkdownContent(data.content)
     parsingStateRef.current = {
       currentBuffer: '',
       state: ParsingState.FREE,

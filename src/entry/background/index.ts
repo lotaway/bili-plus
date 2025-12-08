@@ -226,7 +226,7 @@ class DownloadManager {
               bvid,
               cid,
               this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-              summaryResult.data,
+              summaryResult.data.content,
               'md'
             )
               .then(() =>
@@ -239,7 +239,8 @@ class DownloadManager {
               chrome.runtime.sendMessage(sender.id, {
                 type: EVENT_TYPE,
                 data: {
-                  content: summaryResult.data,
+                  think: summaryResult.data.think,
+                  content: summaryResult.data.content,
                   bvid,
                   cid,
                   done: true,
