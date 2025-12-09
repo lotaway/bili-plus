@@ -1,4 +1,5 @@
 import { DocumentType } from '../enums/DownloadType'
+import { LLMContentType } from '../enums/LLMContentType'
 import { StreamUtils } from '../utils/streamUtils'
 import { FileUtils } from '../utils/FileUtils'
 import { SubtitleFetcher } from './SubtitleFetcher'
@@ -316,10 +317,10 @@ export class LLM_Runner {
     this.isBusy = true
     try {
       const signal = AbortSignal.timeout(5 * 60 * 1000)
-      const uploadResult = await this.uploadFile(screenshotDataUrl)
-      if ('error' in uploadResult) {
-        return { error: uploadResult.error }
-      }
+      // const uploadResult = await this.uploadFile(screenshotDataUrl)
+      // if ('error' in uploadResult) {
+      //   return { error: uploadResult.error }
+      // }
       const screenshotPrompt = `请分析这张截图的内容，描述截图中的界面元素、文字内容、布局结构等信息。
       如果截图包含视频播放界面，请描述视频的标题、进度条、控制按钮等元素。
       如果截图包含网页内容，请描述网页的主要内容和结构。
@@ -330,10 +331,19 @@ export class LLM_Runner {
         messages: [
           {
             role: 'user',
-            content: screenshotPrompt
+            content: [
+              {
+                type: LLMContentType.TEXT,
+                text: screenshotPrompt,
+              },
+              {
+                type: LLMContentType.IMAGE_URL,
+                image_url: screenshotDataUrl,
+              }
+            ]
           }
         ],
-        files: [uploadResult.id],
+        // files: [uploadResult.id],
         temperature: 0.7,
         enable_rag: false,
       }
