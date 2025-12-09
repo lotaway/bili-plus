@@ -1,5 +1,6 @@
 import { DocumentType } from '../enums/DownloadType'
 import { StreamUtils } from '../utils/streamUtils'
+import { FileUtils } from '../utils/FileUtils'
 import { SubtitleFetcher } from './SubtitleFetcher'
 import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
 
@@ -194,6 +195,13 @@ export class LLM_Runner {
     }
     this.isBusy = true
     try {
+      const bodyData = {
+        ...this.defaultRequestBody,
+        model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
+        messages,
+        temperature: options.temperature ?? 0.7,
+        stream: options.stream,
+      }
       const signal = AbortSignal.timeout(5 * 60 * 1000)
       const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
         method: 'POST',
@@ -201,13 +209,7 @@ export class LLM_Runner {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.config.aiKey ?? ''}`,
         },
-        body: JSON.stringify({
-          ...this.defaultRequestBody,
-          model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
-          messages,
-          temperature: options.temperature ?? 0.7,
-          stream: options.stream,
-        }),
+        body: JSON.stringify(bodyData),
         signal,
       })
 
@@ -265,7 +267,7 @@ export class LLM_Runner {
     }
   }
 
-  async uploadFile(fileData: string, filename: string = String(Date.now())): Promise<{ id: string, filename: string, message: string } | { error: string }> {
+  async uploadFile(fileData: string, filename?: string): Promise<{ id: string, filename: string, message: string } | { error: string }> {
     try {
       const result = await this.syncConfig()
       if (result.error) {
@@ -274,7 +276,14 @@ export class LLM_Runner {
       const response = await fetch(fileData)
       const blob = await response.blob()
       const formData = new FormData()
-      formData.append('file', blob, filename)
+      let finalFilename = filename
+      if (!finalFilename) {
+        const mimeType = FileUtils.extractMimeTypeFromDataUrl(fileData)
+        const extension = FileUtils.getFileExtensionFromMimeType(mimeType)
+        finalFilename = `${Date.now()}${extension}`
+      }
+
+      formData.append('file', blob, finalFilename)
       const uploadResponse = await fetch(`${this.apiPrefixWithVersion}/upload`, {
         method: 'POST',
         headers: {
@@ -307,37 +316,34 @@ export class LLM_Runner {
     this.isBusy = true
     try {
       const signal = AbortSignal.timeout(5 * 60 * 1000)
-
-      // 先上传文件
       const uploadResult = await this.uploadFile(screenshotDataUrl)
       if ('error' in uploadResult) {
         return { error: uploadResult.error }
       }
-
       const screenshotPrompt = `请分析这张截图的内容，描述截图中的界面元素、文字内容、布局结构等信息。
       如果截图包含视频播放界面，请描述视频的标题、进度条、控制按钮等元素。
       如果截图包含网页内容，请描述网页的主要内容和结构。
       请用清晰的结构化格式输出分析结果。`
-
+      const bodyData = {
+        ...this.defaultRequestBody,
+        model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
+        messages: [
+          {
+            role: 'user',
+            content: screenshotPrompt
+          }
+        ],
+        files: [uploadResult.id],
+        temperature: 0.7,
+        enable_rag: false,
+      }
       const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.config.aiKey ?? ''}`,
         },
-        body: JSON.stringify({
-          ...this.defaultRequestBody,
-          model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
-          messages: [
-            {
-              role: 'user',
-              content: screenshotPrompt
-            }
-          ],
-          files: [uploadResult.id],
-          temperature: 0.7,
-          stream: true,
-        }),
+        body: JSON.stringify(bodyData),
         signal,
       })
 
