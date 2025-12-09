@@ -105,7 +105,7 @@ export class AIGenerationAnalyzer {
         const think = exp.exec(buffer)
         const output = buffer.replace(exp, '')
         const matchs = new RegExp(`${this.START_MARKDOWN_TAG}([\\s\\S]+?)${this.END_MARKDOWN_TAG}`).exec(output)
-        const cleanContent = (matchs?.[1] ?? output).replace(`${this.END_OUTPUT}$`, '')
+        const cleanContent = (matchs?.[1] ?? output).replace(new RegExp(`${this.END_OUTPUT}$`), '')
         return {
             think: think?.[0] ?? '',
             content: cleanContent,
