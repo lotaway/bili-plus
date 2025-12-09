@@ -170,6 +170,13 @@ export class LLM_Runner {
     console.log('版本信息获取成功:', versionData)
   }
 
+  get defaultRequestBody() {
+    return {
+      stream: true,
+      enable_rag: true,
+    }
+  }
+
   async callLLM(
     messages: { role: string; content: string }[],
     options: {
@@ -195,10 +202,11 @@ export class LLM_Runner {
           Authorization: `Bearer ${this.config.aiKey ?? ''}`,
         },
         body: JSON.stringify({
+          ...this.defaultRequestBody,
           model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
           messages,
           temperature: options.temperature ?? 0.7,
-          stream: options.stream ?? true,
+          stream: options.stream,
         }),
         signal,
       })
@@ -257,6 +265,34 @@ export class LLM_Runner {
     }
   }
 
+  async uploadFile(fileData: string, filename: string = String(Date.now())): Promise<{ id: string, filename: string, message: string } | { error: string }> {
+    try {
+      const result = await this.syncConfig()
+      if (result.error) {
+        return { error: result.error.message }
+      }
+      const response = await fetch(fileData)
+      const blob = await response.blob()
+      const formData = new FormData()
+      formData.append('file', blob, filename)
+      const uploadResponse = await fetch(`${this.apiPrefixWithVersion}/upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
+        },
+        body: formData,
+      })
+      if (!uploadResponse.ok) {
+        throw new Error(`文件上传失败: ${uploadResponse.status}`)
+      }
+      const uploadData = await uploadResponse.json()
+      return uploadData
+    } catch (error) {
+      console.error('文件上传失败:', error)
+      return { error: error instanceof Error ? error.message : '未知错误' }
+    }
+  }
+
   async analyzeScreenshot(
     screenshotDataUrl: string,
     onProgress?: (chunk: string) => void
@@ -271,10 +307,18 @@ export class LLM_Runner {
     this.isBusy = true
     try {
       const signal = AbortSignal.timeout(5 * 60 * 1000)
+
+      // 先上传文件
+      const uploadResult = await this.uploadFile(screenshotDataUrl)
+      if ('error' in uploadResult) {
+        return { error: uploadResult.error }
+      }
+
       const screenshotPrompt = `请分析这张截图的内容，描述截图中的界面元素、文字内容、布局结构等信息。
       如果截图包含视频播放界面，请描述视频的标题、进度条、控制按钮等元素。
       如果截图包含网页内容，请描述网页的主要内容和结构。
       请用清晰的结构化格式输出分析结果。`
+
       const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -282,24 +326,15 @@ export class LLM_Runner {
           Authorization: `Bearer ${this.config.aiKey ?? ''}`,
         },
         body: JSON.stringify({
+          ...this.defaultRequestBody,
           model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
           messages: [
             {
               role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: screenshotPrompt
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: screenshotDataUrl
-                  }
-                }
-              ]
+              content: screenshotPrompt
             }
           ],
+          files: [uploadResult.id],
           temperature: 0.7,
           stream: true,
         }),
