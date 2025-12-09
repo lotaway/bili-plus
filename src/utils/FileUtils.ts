@@ -1,3 +1,4 @@
+import { DownloadType } from '../enums/DownloadType'
 
 export class FileUtils {
 
@@ -31,5 +32,22 @@ export class FileUtils {
     const extension = this.getFileExtensionFromMimeType(mimeType)
     const baseName = customName || String(Date.now())
     return `${baseName}${extension}`
+  }
+
+  static text2url(text: string, fileType: DownloadType) {
+    const fileType2MediaType: Record<DownloadType, string> = {
+      [DownloadType.TEXT]: 'text/plain',
+      [DownloadType.MARKDOWN]: 'text/markdown',
+      [DownloadType.XMARKDOWN]: 'text/x-markdown',
+      [DownloadType.SRT]: 'application/x-subrip',
+    }
+    const blob = new Blob([text], {
+      type: fileType2MediaType[fileType] || 'text/plain',
+    })
+    const url = URL.createObjectURL(blob)
+    return {
+      url,
+      destory: () => URL.revokeObjectURL(url),
+    }
   }
 }

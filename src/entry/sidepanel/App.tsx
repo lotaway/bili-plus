@@ -7,6 +7,7 @@ import { LLM_Runner } from '../../services/LLM_Runner'
 import { ParsingState } from '../../enums/ParseState'
 import { AIGenerationAnalyzer } from '../../services/AIGeneratioinAnalyzer'
 import { ChromeMessage } from '../../types/chrome'
+import { FileUtils } from '../../utils/FileUtils'
 
 interface DecisionData {
   reason: string
@@ -162,7 +163,7 @@ const App: React.FC = () => {
     let downloadId = -1
     if (mode === DownloadType.MARKDOWN || mode === DownloadType.SRT) {
       const ext = mode === DownloadType.MARKDOWN ? DownloadType.MARKDOWN : DownloadType.SRT
-      const textData = text2url(res.data, mode)
+      const textData = FileUtils.text2url(res.data, mode)
       try {
         downloadId = await downloadFile(
           textData.url,
@@ -248,27 +249,10 @@ const App: React.FC = () => {
     }
   }
 
-  const text2url = (text: string, fileType: DownloadType) => {
-    const fileType2MediaType: Record<DownloadType, string> = {
-      [DownloadType.TEXT]: 'text/plain',
-      [DownloadType.MARKDOWN]: 'text/markdown',
-      [DownloadType.XMARKDOWN]: 'text/x-markdown',
-      [DownloadType.SRT]: 'application/x-subrip',
-    }
-    const blob = new Blob([text], {
-      type: fileType2MediaType[fileType] || 'text/plain',
-    })
-    const url = URL.createObjectURL(blob)
-    return {
-      url,
-      destory: () => URL.revokeObjectURL(url),
-    }
-  }
-
   const handleDownloadMarkdown = () => {
     if (!outputContent.markdown) return
 
-    const textData = text2url(outputContent.markdown, DownloadType.MARKDOWN)
+    const textData = FileUtils.text2url(outputContent.markdown, DownloadType.MARKDOWN)
     const filename = `ai-summary-${Date.now()}.md`
 
     downloadFile(textData.url, filename).then(() => {
