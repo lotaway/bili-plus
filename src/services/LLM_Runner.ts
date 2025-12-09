@@ -117,9 +117,7 @@ export class LLM_Runner {
       }
       const response = await fetch(`${this.config.aiEndpoint}/api/show`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.defaultHeaders(false),
         signal,
       })
       if (!response.ok) {
@@ -156,9 +154,7 @@ export class LLM_Runner {
     const signal = AbortSignal.timeout(5000)
     const response = await fetch(`${this.config.aiEndpoint}/api/version`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.defaultHeaders(false),
       signal,
     })
 
@@ -177,6 +173,20 @@ export class LLM_Runner {
       stream: true,
       enable_rag: true,
     }
+  }
+
+  defaultHeaders(includeAuth: boolean = true, contentType: string = 'application/json'): Record<string, string> {
+    const headers: Record<string, string> = {}
+
+    if (contentType) {
+      headers['Content-Type'] = contentType
+    }
+
+    if (includeAuth && this.config?.aiKey) {
+      headers['Authorization'] = `Bearer ${this.config.aiKey}`
+    }
+
+    return headers
   }
 
   async callLLM(
@@ -206,10 +216,7 @@ export class LLM_Runner {
       const signal = AbortSignal.timeout(5 * 60 * 1000)
       const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
-        },
+        headers: this.defaultHeaders(),
         body: JSON.stringify(bodyData),
         signal,
       })
@@ -246,10 +253,7 @@ export class LLM_Runner {
       const signal = AbortSignal.timeout(30 * 1000)
       const response = await fetch(`${this.apiPrefixWithVersion}/rag/document/import`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
-        },
+        headers: this.defaultHeaders(),
         body: JSON.stringify(importDocumentData),
         signal,
       })
@@ -287,9 +291,7 @@ export class LLM_Runner {
       formData.append('file', blob, finalFilename)
       const uploadResponse = await fetch(`${this.apiPrefixWithVersion}/upload`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
-        },
+        headers: this.defaultHeaders(true),
         body: formData,
       })
       if (!uploadResponse.ok) {
@@ -349,10 +351,7 @@ export class LLM_Runner {
       }
       const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.aiKey ?? ''}`,
-        },
+        headers: this.defaultHeaders(),
         body: JSON.stringify(bodyData),
         signal,
       })
