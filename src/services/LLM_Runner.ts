@@ -171,7 +171,7 @@ export class LLM_Runner {
   get defaultRequestBody() {
     return {
       stream: true,
-      enable_rag: true,
+      enable_rag: false,
     }
   }
 
