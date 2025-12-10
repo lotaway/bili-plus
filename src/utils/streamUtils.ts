@@ -2,9 +2,10 @@ export class StreamUtils {
   async readStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
     onProgress: (content: string, metadata: any) => void = (c, m) =>
-      console.debug('Content:', c, 'Metadata:', m)
+      console.debug('Content:', c, 'Metadata:', m),
+    encoding: string = 'utf-8'
   ): Promise<string> {
-    const decoder = new TextDecoder()
+    const decoder = new TextDecoder(encoding)
     let buffer = ''
     let fullResponse = ''
     while (true) {
