@@ -11,6 +11,11 @@ interface VideoInfo {
 }
 
 export class SubtitleFetcher {
+
+  constructor(private readonly api: BilibiliApi) {
+
+  }
+
   private videoInfo: VideoInfo = {
     isInit: false,
     aid: null,
@@ -18,7 +23,7 @@ export class SubtitleFetcher {
     bvid: null,
     p: null,
   }
-  private readonly api = new BilibiliApi()
+
   MAX_STORED_VIDEOS = 50
 
   get isInit() {

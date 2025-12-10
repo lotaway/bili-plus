@@ -4,9 +4,10 @@ import { AIAgentRunner } from '../../services/AIAgentRunner'
 import { MessageType } from '../../enums/MessageType'
 import { SummarizeErrorResponse, SummarizeSuccessResponse } from '../../types/summarize'
 import { VideoData } from '../../types/video'
+import { BilibiliApi } from '../../services/BilibiliApi'
 
 class DownloadManager {
-  private readonly subtitleFetcher = new SubtitleFetcher();
+  private readonly subtitleFetcher = new SubtitleFetcher(new BilibiliApi());
   private readonly llmRunner = new LLM_Runner();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
   private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
