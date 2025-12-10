@@ -270,6 +270,26 @@ const App: React.FC = () => {
   }
 
   const aiGenerationAnalyzer = new AIGenerationAnalyzer()
+  
+  useEffect(() => {
+    const handleAnalyzerOutput = (data: { done: boolean, think: string, content: string }) => {
+      if (data.think) {
+        appendThinkingContent(data.think)
+      }
+      if (data.content) {
+        appendMarkdownContent(data.content)
+      }
+      if (data.done) {
+        setShowDownloadButton(true)
+        setHasUserScrolled(false)
+      }
+    }
+    const subscriptionId = aiGenerationAnalyzer.subscribe(handleAnalyzerOutput)
+    return () => {
+        aiGenerationAnalyzer.unsubscribe(subscriptionId)
+    }
+  }, [])
+
   const handleSummarizeResponseStream = (data: SummarizeResponse) => {
     if ("error" in data) {
       setMessage(data.error)
@@ -278,7 +298,10 @@ const App: React.FC = () => {
 
     if (data.done) {
       console.debug("Stream ended")
-      setMarkdownContent(data.content)
+      if (data.content) {
+        aiGenerationAnalyzer.inputStream(data.content)
+      }
+      setMarkdownContent(data.content || '')
       parsingStateRef.current = {
         currentBuffer: '',
         state: ParsingState.FREE,
@@ -288,60 +311,7 @@ const App: React.FC = () => {
       return
     }
     if (data.content) {
-      let content = data.content
-      parsingStateRef.current.currentBuffer += content
-      while (parsingStateRef.current.currentBuffer.length > 0) {
-        if (parsingStateRef.current.state === ParsingState.FREE) {
-          let thinkingStartIndex = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.START_THINK_TAG)
-          const thinkingEndIndex = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.END_THINK_TAG)
-
-          if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
-            thinkingStartIndex = 0
-            const contentBefore = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex, thinkingEndIndex)
-            setOutputContent(prev => ({ ...prev, markdown: '', thinking: prev.thinking + prev.markdown + contentBefore }))
-            setHasUserScrolled(false)
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEndIndex + aiGenerationAnalyzer.END_THINK_TAG.length)
-            continue
-          }
-          const markdownStartIndex = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.START_MARKDOWN_TAG)
-          if (thinkingStartIndex !== -1 && (markdownStartIndex === -1 || thinkingStartIndex < markdownStartIndex)) {
-            parsingStateRef.current.state = ParsingState.THINKING
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingStartIndex + aiGenerationAnalyzer.START_THINK_TAG.length)
-          } else if (markdownStartIndex !== -1) {
-            parsingStateRef.current.state = ParsingState.GENERATING
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownStartIndex + aiGenerationAnalyzer.START_MARKDOWN_TAG.length)
-          } else {
-            appendMarkdownContent(parsingStateRef.current.currentBuffer)
-            parsingStateRef.current.currentBuffer = ''
-          }
-        }
-        if (parsingStateRef.current.state === ParsingState.THINKING) {
-          const thinkingEnd = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.END_THINK_TAG)
-          if (thinkingEnd !== -1) {
-            parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer.substring(0, thinkingEnd)
-            appendThinkingContent(parsingStateRef.current.thinkingBuffer)
-            parsingStateRef.current.thinkingBuffer = ''
-            parsingStateRef.current.state = ParsingState.FREE
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(thinkingEnd + aiGenerationAnalyzer.END_THINK_TAG.length)
-          } else {
-            parsingStateRef.current.thinkingBuffer += parsingStateRef.current.currentBuffer
-            parsingStateRef.current.currentBuffer = ''
-          }
-        }
-        if (parsingStateRef.current.state === ParsingState.GENERATING) {
-          const markdownEnd = parsingStateRef.current.currentBuffer.indexOf(aiGenerationAnalyzer.END_MARKDOWN_TAG)
-          if (markdownEnd !== -1) {
-            parsingStateRef.current.markdownBuffer += parsingStateRef.current.currentBuffer.substring(0, markdownEnd)
-            appendMarkdownContent(parsingStateRef.current.markdownBuffer)
-            parsingStateRef.current.markdownBuffer = ''
-            parsingStateRef.current.state = ParsingState.FREE
-            parsingStateRef.current.currentBuffer = parsingStateRef.current.currentBuffer.substring(markdownEnd + aiGenerationAnalyzer.END_MARKDOWN_TAG.length)
-          } else {
-            parsingStateRef.current.markdownBuffer += parsingStateRef.current.currentBuffer
-            parsingStateRef.current.currentBuffer = ''
-          }
-        }
-      }
+      aiGenerationAnalyzer.inputStream(data.content)
     }
   }
 

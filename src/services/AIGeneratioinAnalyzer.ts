@@ -14,15 +14,19 @@ export class AIGenerationAnalyzer {
     private content: string = ''
     private handeTimer?: number
     private streaming: boolean = false
-    subscribers: Subscriber[] = []
+    private subscribers: Map<string, Subscriber> = new Map()
 
     constructor(private buffer: string = '') {
 
     }
 
+    private generateSubscriptionId(): string {
+        return `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    }
+
     inputStream(chunk: string) {
         this.buffer += chunk
-        if (this.subscribers.length === 0 || this.streaming)
+        if (this.subscribers.size === 0 || this.streaming)
             return
         this.handeTimer && globalThis.cancelAnimationFrame(this.handeTimer)
         this.handeTimer = globalThis.requestAnimationFrame(() => {
@@ -96,8 +100,25 @@ export class AIGenerationAnalyzer {
         }
     }
 
-    subscribe(subscriber: Subscriber) {
-        this.subscribers.push(subscriber)
+    subscribe(subscriber: Subscriber): string {
+        const id = this.generateSubscriptionId()
+        this.subscribers.set(id, subscriber)
+        return id
+    }
+
+    unsubscribe(id: string): boolean {
+        return this.subscribers.delete(id)
+    }
+
+    reset() {
+        this.subscribers.clear()
+        this.subscribers = new Map()
+        this.state = ParsingState.FREE
+        this.buffer = ''
+        this.think = ''
+        this.content = ''
+        this.streaming = false
+        this.handeTimer && globalThis.cancelAnimationFrame(this.handeTimer)
     }
 
     analyze(buffer: string = this.buffer) {
