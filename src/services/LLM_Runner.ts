@@ -179,7 +179,7 @@ export class LLM_Runner {
     const headers: Record<string, string> = {}
 
     if (contentType) {
-      headers['Content-Type'] = contentType
+      headers['Content-Type'] = `${contentType}; charset=utf-8`
     }
 
     if (includeAuth && this.config?.aiKey) {
