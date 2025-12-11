@@ -14,6 +14,8 @@ class DownloadManager {
   #pollingCheckTimer: number | null = null;
   private readonly registedContentJss = new Map<string, boolean>()
   private readonly registerMaxSize = 10
+  private _lastModelListFetchTime: number = 0
+  private readonly MODEL_LIST_CACHE_DURATION = 5 * 60 * 1000
 
   constructor() {
     this.setupEventListeners()
@@ -109,12 +111,43 @@ class DownloadManager {
       if (!this.llmRunner.isApiStatusCheckRunning()) {
         this.llmRunner.initializeApiStatusCheck()
         console.debug('启动API状态检查（popup或sidepanel已打开）')
+
+        // API状态检查启动后，获取模型列表
+        await this.fetchAndCacheModelList()
       }
     } else {
       if (this.llmRunner.isApiStatusCheckRunning()) {
         this.llmRunner.stopApiStatusCheck()
         console.debug('停止API状态检查（popup和sidepanel都已关闭）')
       }
+    }
+  }
+
+  private async fetchAndCacheModelList(): Promise<void> {
+    const now = Date.now()
+    // 检查缓存是否过期
+    if (now - this._lastModelListFetchTime < this.MODEL_LIST_CACHE_DURATION) {
+      return
+    }
+
+    try {
+      await this.llmRunner.init()
+      const models = await this.llmRunner.getAvailableModels()
+
+      if (models.length > 0) {
+        // 缓存模型列表到本地存储
+        await chrome.storage.local.set({
+          modelList: {
+            models,
+            lastUpdated: now,
+            source: 'background_polling'
+          }
+        })
+        this._lastModelListFetchTime = now
+        console.debug('模型列表已缓存:', models.length, '个模型')
+      }
+    } catch (error) {
+      console.error('后台获取模型列表失败:', error)
     }
   }
 

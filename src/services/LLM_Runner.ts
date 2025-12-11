@@ -20,6 +20,14 @@ interface VersionInfo {
   api_version: string
 }
 
+interface ModelInfo {
+  name: string
+  version: string
+  object: string
+  owned_by: string
+  api_version: string
+}
+
 interface ImportDocumentData {
   title: string
   bvid: string
@@ -41,6 +49,8 @@ export class LLM_Runner {
     api_version: "v1"
   }
   private _versionInfoFetched = false
+  private _modelList: ModelInfo[] = []
+  private _modelListFetched = false
 
   static defaultModelName() {
     return 'gpt-3.5-turbo'
@@ -166,6 +176,50 @@ export class LLM_Runner {
     this._versionInfo = versionData
     this._versionInfoFetched = true
     console.log('版本信息获取成功:', versionData)
+  }
+
+  async fetchModelList(): Promise<ModelInfo[]> {
+    if (!this.config?.aiEndpoint) {
+      return []
+    }
+
+    try {
+      const signal = AbortSignal.timeout(5000)
+      const response = await fetch(`${this.config.aiEndpoint}/api/tags`, {
+        method: 'GET',
+        headers: this.defaultHeaders(false),
+        signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const modelList = await response.json() as ModelInfo[]
+      this._modelList = modelList
+      this._modelListFetched = true
+      console.log('模型列表获取成功:', modelList)
+      return modelList
+    } catch (error) {
+      console.error('获取模型列表失败:', error)
+      return []
+    }
+  }
+
+  get modelList(): ModelInfo[] {
+    return [...this._modelList]
+  }
+
+  async getAvailableModels(): Promise<ModelInfo[]> {
+    if (!this._modelListFetched) {
+      await this.fetchModelList()
+    }
+    return this.modelList
+  }
+
+  async validateModel(modelName: string): Promise<boolean> {
+    const models = await this.getAvailableModels()
+    return models.some(model => model.name === modelName)
   }
 
   get defaultRequestBody() {

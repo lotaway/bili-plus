@@ -1,4 +1,13 @@
 import React, { useEffect, useState } from 'react'
+import { LLM_Runner } from '../../services/LLM_Runner'
+
+interface ModelInfo {
+  name: string
+  version: string
+  object: string
+  owned_by: string
+  api_version: string
+}
 
 const App: React.FC = () => {
   const [config, setConfig] = useState({
@@ -13,6 +22,8 @@ const App: React.FC = () => {
     lastChecked: string
     message: string
   } | null>(null)
+  const [modelList, setModelList] = useState<ModelInfo[]>([])
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
 
   useEffect(() => {
     loadConfig()
@@ -29,6 +40,12 @@ const App: React.FC = () => {
       chrome.storage.onChanged.removeListener(handleStorageChange)
     }
   }, [])
+
+  useEffect(() => {
+    if (config.aiEndpoint && config.aiKey) {
+      loadModelList()
+    }
+  }, [config.aiEndpoint, config.aiKey])
 
   const loadApiStatus = async () => {
     try {
@@ -56,7 +73,62 @@ const App: React.FC = () => {
     })
   }
 
+  const loadModelList = async () => {
+    if (!config.aiEndpoint || !config.aiKey) {
+      return
+    }
+
+    setIsLoadingModels(true)
+    try {
+      const cachedModelList = await chrome.storage.local.get('modelList')
+      if (cachedModelList.modelList && cachedModelList.modelList.models) {
+        const cacheAge = Date.now() - cachedModelList.modelList.lastUpdated
+        const CACHE_MAX_AGE = 10 * 60 * 1000
+        if (cacheAge < CACHE_MAX_AGE) {
+          setModelList(cachedModelList.modelList.models)
+          console.log('使用缓存的模型列表:', cachedModelList.modelList.models.length, '个模型')
+          return
+        }
+      }
+
+      const llmRunner = new LLM_Runner()
+      await llmRunner.init()
+      const models = await llmRunner.getAvailableModels()
+      setModelList(models)
+      
+      await chrome.storage.local.set({
+        modelList: {
+          models,
+          lastUpdated: Date.now(),
+          source: 'popup_direct_fetch'
+        }
+      })
+    } catch (error) {
+      console.error('加载模型列表失败:', error)
+      setModelList([])
+    } finally {
+      setIsLoadingModels(false)
+    }
+  }
+
   const handleSaveConfig = async () => {
+    if (config.aiEndpoint && config.aiKey && config.aiModel) {
+      try {
+        const llmRunner = new LLM_Runner()
+        await llmRunner.init()
+        const isValidModel = await llmRunner.validateModel(config.aiModel)
+        
+        if (!isValidModel && modelList.length > 0) {
+          showMessage('选择的模型不在可用列表中，请重新选择', 'error')
+          return
+        }
+      } catch (error) {
+        console.error('模型验证失败:', error)
+        showMessage('模型验证失败，请检查配置', 'error')
+        return
+      }
+    }
+
     await chrome.storage.sync.set(config).catch((error) => {
       console.error(error)
       showMessage(error.message)
@@ -124,13 +196,42 @@ const App: React.FC = () => {
         </div>
         <div className="form-group">
           <label htmlFor="aiModel">模型名称</label>
-          <input
-            type="text"
-            id="aiModel"
-            placeholder="例如: gpt-3.5-turbo"
-            value={config.aiModel}
-            onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
-          />
+          {isLoadingModels ? (
+            <select id="aiModel" disabled>
+              <option>加载模型中...</option>
+            </select>
+          ) : modelList.length > 0 ? (
+            <select
+              id="aiModel"
+              value={config.aiModel}
+              onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
+            >
+              <option value="">请选择模型</option>
+              {modelList.map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.name} ({model.version}) - {model.owned_by}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              id="aiModel"
+              placeholder="例如: gpt-3.5-turbo"
+              value={config.aiModel}
+              onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
+            />
+          )}
+          {modelList.length === 0 && config.aiEndpoint && config.aiKey && (
+            <button 
+              type="button" 
+              className="refresh-models-btn"
+              onClick={loadModelList}
+              disabled={isLoadingModels}
+            >
+              {isLoadingModels ? '加载中...' : '刷新模型列表'}
+            </button>
+          )}
         </div>
         <button id="saveConfig" onClick={handleSaveConfig}>
           保存配置
