@@ -144,7 +144,6 @@ class DownloadManager {
           }
         })
         this._lastModelListFetchTime = now
-        console.debug('模型列表已缓存:', models.length, '个模型')
       }
     } catch (error) {
       console.error('后台获取模型列表失败:', error)

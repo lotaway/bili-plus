@@ -198,7 +198,6 @@ export class LLM_Runner {
       const modelList = await response.json() as ModelInfo[]
       this._modelList = modelList
       this._modelListFetched = true
-      console.log('模型列表获取成功:', modelList)
       return modelList
     } catch (error) {
       console.error('获取模型列表失败:', error)
