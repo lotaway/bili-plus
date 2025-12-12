@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react'
+import styled from 'styled-components'
 
 interface Tab {
   id: string
@@ -11,28 +12,66 @@ interface TabContainerProps {
   defaultTab?: string
 }
 
+const TabContainerWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+`
+
+const TabHeader = styled.div`
+  display: flex;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+`
+
+const TabButton = styled.button<{ active: boolean }>`
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: ${props => props.active ? '#007bff' : '#6c757d'};
+  border-bottom: 2px solid ${props => props.active ? '#007bff' : 'transparent'};
+  transition: all 0.2s;
+
+  &:hover {
+    background: #e9ecef;
+    color: #495057;
+  }
+
+  ${props => props.active && `
+    background: white;
+  `}
+`
+
+const TabContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+`
+
 const TabContainer: React.FC<TabContainerProps> = ({ tabs, defaultTab }) => {
   const [activeTab, setActiveTab] = React.useState(defaultTab || tabs[0]?.id)
 
   const activeTabContent = tabs.find(tab => tab.id === activeTab)?.content
 
   return (
-    <div className="tab-container">
-      <div className="tab-header">
+    <TabContainerWrapper>
+      <TabHeader>
         {tabs.map(tab => (
-          <button
+          <TabButton
             key={tab.id}
-            className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+            active={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
-          </button>
+          </TabButton>
         ))}
-      </div>
-      <div className="tab-content">
+      </TabHeader>
+      <TabContent>
         {activeTabContent}
-      </div>
-    </div>
+      </TabContent>
+    </TabContainerWrapper>
   )
 }
 
