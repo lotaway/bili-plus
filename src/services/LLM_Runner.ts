@@ -112,7 +112,7 @@ export class LLM_Runner {
   private scheduleApiCheck() {
     this.apiCheckTimeout = setTimeout(() => {
       this.checkApiStatus()
-    }, 60 * 1000)
+    }, 60 * 1000) as unknown as number
   }
 
   private async checkApiStatus() {

@@ -11,7 +11,7 @@ class DownloadManager {
   private readonly llmRunner = new LLM_Runner();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
   private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
-  #pollingCheckTimer: number | null = null;
+  private pollingCheckTimer: number | null = null;
   private readonly registedContentJss = new Map<string, boolean>()
   private readonly registerMaxSize = 10
   private _lastModelListFetchTime: number = 0
@@ -89,15 +89,15 @@ class DownloadManager {
   }
 
   startPollingStatusCheck(): void {
-    this.#pollingCheckTimer = setInterval(async () => {
+    this.pollingCheckTimer = setInterval(async () => {
       await this.checkAndControlApiStatusCheck()
-    }, 10 * 1000)
+    }, 10 * 1000) as unknown as number
   }
 
   stopPollingStatusCheck(): void {
-    if (this.#pollingCheckTimer !== null) {
-      clearInterval(this.#pollingCheckTimer)
-      this.#pollingCheckTimer = null
+    if (this.pollingCheckTimer !== null) {
+      clearInterval(this.pollingCheckTimer)
+      this.pollingCheckTimer = null
       console.debug('停止状态检查定时器')
     }
   }
