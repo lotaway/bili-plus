@@ -81,7 +81,7 @@ const App: React.FC = () => {
     setIsLoadingModels(true)
     try {
       const cachedModelList = await chrome.storage.local.get('modelList')
-      if (cachedModelList.modelList && cachedModelList.modelList.models) {
+      if (cachedModelList.modelList && cachedModelList.modelList.models && cachedModelList.modelList.models.length > 0) {
         const cacheAge = Date.now() - cachedModelList.modelList.lastUpdated
         const CACHE_MAX_AGE = 10 * 60 * 1000
         if (cacheAge < CACHE_MAX_AGE) {
@@ -95,7 +95,7 @@ const App: React.FC = () => {
       await llmRunner.init()
       const models = await llmRunner.getAvailableModels()
       setModelList(models)
-      
+
       await chrome.storage.local.set({
         modelList: {
           models,
@@ -117,7 +117,7 @@ const App: React.FC = () => {
         const llmRunner = new LLM_Runner()
         await llmRunner.init()
         const isValidModel = await llmRunner.validateModel(config.aiModel)
-        
+
         if (!isValidModel && modelList.length > 0) {
           showMessage('选择的模型不在可用列表中，请重新选择', 'error')
           return
@@ -223,8 +223,8 @@ const App: React.FC = () => {
             />
           )}
           {modelList.length === 0 && config.aiEndpoint && config.aiKey && (
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="refresh-models-btn"
               onClick={loadModelList}
               disabled={isLoadingModels}
