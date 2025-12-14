@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useMessageHandling } from './hooks/useMessageHandling'
 import { useScrollManagement } from './hooks/useScrollManagement'
@@ -44,7 +44,6 @@ export const VideoSummary = () => {
     isAssistantRunning,
     outputContent,
     decisionData,
-    hasUserScrolled,
     messages,
     showDownloadButton
   } = useSelector((state: RootState) => state.videoSummary)

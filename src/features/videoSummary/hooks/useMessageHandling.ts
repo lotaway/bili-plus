@@ -7,10 +7,6 @@ import {
   setMessage,
   setDecisionData,
   appendThinkingContent,
-  appendMarkdownContent,
-  setMarkdownContent,
-  setShowDownloadButton,
-  setHasUserScrolled
 } from '../../../store/slices/videoSummarySlice'
 
 export const useMessageHandling = () => {
@@ -36,7 +32,7 @@ export const useMessageHandling = () => {
         dispatch(setMessage(data.error))
         return
       }
-      
+
       if (data.done) {
         console.debug("Stream ended")
         return

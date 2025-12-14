@@ -35,10 +35,10 @@ export const useDecisionHandling = () => {
         throw new Error(`决策提交失败: ${await response.text()}`)
       }
 
-      dispatch(setMessage(prev => prev + '<p>决策已提交，继续处理中...</p>'))
+      dispatch(setMessage('决策已提交，继续处理中...'))
     } catch (error: any) {
       console.error('Decision submission error:', error)
-      dispatch(setMessage(prev => prev + `<p style="color: red;">决策提交失败: ${error.message}</p>`))
+      dispatch(setMessage(`决策提交失败: ${error.message}`))
     }
   }
 
