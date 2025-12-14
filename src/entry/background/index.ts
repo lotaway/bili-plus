@@ -1,6 +1,10 @@
 import { SubtitleFetcher } from '../../services/SubtitleFetcher'
 import { AISubtitleHandler, LLM_Runner } from '../../services/LLM_Runner'
 import { AIAgentRunner } from '../../services/AIAgentRunner'
+import { StorageCleanupService } from '../../services/StorageCleanupService'
+import { StatusCheckService } from '../../services/StatusCheckService'
+import { DownloadUtils } from '../../utils/DownloadUtils'
+import { VideoInfoUtils } from '../../utils/VideoInfoUtils'
 import { MessageType } from '../../enums/MessageType'
 import { SummarizeErrorResponse, SummarizeSuccessResponse } from '../../types/summarize'
 import { VideoData } from '../../types/video'
@@ -12,178 +16,21 @@ class DownloadManager {
   private readonly llmRunner = new LLM_Runner();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
   private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
-  private pollingCheckTimer: number | null = null;
+  private readonly storageCleanupService = new StorageCleanupService();
+  private readonly statusCheckService = new StatusCheckService(this.llmRunner);
+  private readonly downloadUtils = new DownloadUtils();
+  private readonly videoInfoUtils = new VideoInfoUtils(this.subtitleFetcher);
   private readonly registedContentJss = new Map<string, boolean>()
   private readonly registerMaxSize = 10
-  private _lastModelListFetchTime: number = 0
-  private readonly MODEL_LIST_CACHE_DURATION = 5 * 60 * 1000
 
   constructor() {
     this.setupEventListeners()
-    this.startPollingStatusCheck()
+    this.statusCheckService.startPollingStatusCheck()
   }
 
   async init() {
     await this.llmRunner.init()
-    await this.initializeStorageCleanup()
-  }
-
-  async initializeStorageCleanup() {
-    try {
-      await this.subtitleFetcher.cleanupOldStorage()
-      const syncBytes = await new Promise<number>((resolve) => {
-        chrome.storage.sync.getBytesInUse(null, resolve)
-      })
-      console.log('Sync storage usage:', syncBytes, 'bytes')
-
-      if (syncBytes > 90000) {
-        await this.cleanupSyncStorage()
-      }
-    } catch (error) {
-      console.error('Storage cleanup initialization failed:', error)
-    }
-  }
-
-  async cleanupSyncStorage() {
-    try {
-      const allData = await chrome.storage.sync.get(null)
-      const keysToRemove: string[] = []
-      for (const [key, value] of Object.entries(allData)) {
-        if (value && typeof value === 'object' && (value as any).timestamp) {
-          const age = Date.now() - (value as any).timestamp
-          if (age > 7 * 24 * 60 * 60 * 1000) {
-            keysToRemove.push(key)
-          }
-        }
-      }
-
-      if (keysToRemove.length > 0) {
-        await chrome.storage.sync.remove(keysToRemove)
-        console.log(`清理了 ${keysToRemove.length} 个过期的sync存储项`)
-      }
-    } catch (error) {
-      console.error('清理sync存储时出错:', error)
-    }
-  }
-
-  isPopupOpen(): boolean {
-    try {
-      const views = chrome.extension.getViews?.({ type: 'popup' }) ?? ((chrome.extension as any).ViewType.POPUP === 'popup' ? new Array(1) : [])
-      return views.length > 0
-    } catch (error) {
-      console.error('检测popup状态失败:', error)
-      return false
-    }
-  }
-
-  async isSidepanelOpen(): Promise<boolean> {
-    try {
-      if (chrome.sidePanel) {
-        const panel = await chrome.sidePanel.getOptions({})
-        return panel.enabled || false
-      }
-      return false
-    } catch (error) {
-      console.error('检测sidepanel状态失败:', error)
-      return false
-    }
-  }
-
-  startPollingStatusCheck(): void {
-    this.pollingCheckTimer = setInterval(async () => {
-      await this.checkAndControlApiStatusCheck()
-    }, 10 * 1000) as unknown as number
-  }
-
-  stopPollingStatusCheck(): void {
-    if (this.pollingCheckTimer !== null) {
-      clearInterval(this.pollingCheckTimer)
-      this.pollingCheckTimer = null
-      console.debug('停止状态检查定时器')
-    }
-  }
-
-  async downloadToBlob(url: string): Promise<Blob> {
-    const res = await fetch(url, {
-      credentials: "include"
-    })
-
-    if (!res.ok) throw new Error("下载失败")
-
-    return await res.blob()
-  }
-
-  saveBlob(blob: Blob, filename: string) {
-    const a = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  downloadWithChromeAPI(url: string, filename: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      chrome.downloads.download({
-        url: url,
-        filename: filename,
-        saveAs: false
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message))
-        } else {
-          resolve()
-        }
-      })
-    })
-  }
-
-  async checkAndControlApiStatusCheck(): Promise<void> {
-    const popupOpen = this.isPopupOpen()
-    const sidepanelOpen = await this.isSidepanelOpen()
-    const shouldCheckApi = popupOpen || sidepanelOpen
-
-    if (shouldCheckApi) {
-      if (!this.llmRunner.isApiStatusCheckRunning()) {
-        this.llmRunner.initializeApiStatusCheck()
-        console.debug('启动API状态检查（popup或sidepanel已打开）')
-
-        // API状态检查启动后，获取模型列表
-        await this.fetchAndCacheModelList()
-      }
-    } else {
-      if (this.llmRunner.isApiStatusCheckRunning()) {
-        this.llmRunner.stopApiStatusCheck()
-        console.debug('停止API状态检查（popup和sidepanel都已关闭）')
-      }
-    }
-  }
-
-  private async fetchAndCacheModelList(): Promise<void> {
-    const now = Date.now()
-    // 检查缓存是否过期
-    if (now - this._lastModelListFetchTime < this.MODEL_LIST_CACHE_DURATION) {
-      return
-    }
-
-    try {
-      await this.llmRunner.init()
-      const models = await this.llmRunner.getAvailableModels()
-
-      if (models.length > 0) {
-        // 缓存模型列表到本地存储
-        await chrome.storage.local.set({
-          modelList: {
-            models,
-            lastUpdated: now,
-            source: 'background_polling'
-          }
-        })
-        this._lastModelListFetchTime = now
-      }
-    } catch (error) {
-      console.error('后台获取模型列表失败:', error)
-    }
+    await this.storageCleanupService.initializeStorageCleanup()
   }
 
   setupEventListeners() {
@@ -193,7 +40,7 @@ class DownloadManager {
     chrome.runtime.onConnect.addListener((port) => {
       if (port.name === 'popup') {
         port.onDisconnect.addListener(async () => {
-          await this.checkAndControlApiStatusCheck()
+          await this.statusCheckService.checkAndControlApiStatusCheck()
         })
       }
     })
@@ -207,24 +54,8 @@ class DownloadManager {
     // console.debug(`Download created: ${JSON.stringify(args)}`)
   }
 
-  checkVideoInfo() {
-    if (!this.subtitleFetcher.cid || !this.subtitleFetcher.aid) {
-      let msg = 'Can not get video info, maybe not the target page'
-      if (!this.subtitleFetcher.isInit) {
-        msg = 'video_page_inject.js maybe not trigger, please try refresh the page'
-      }
-      return {
-        isOk: false,
-        error: msg,
-      }
-    }
-    return {
-      isOk: true,
-    }
-  }
-
   async handleFetchSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
-    const preResult = this.checkVideoInfo()
+    const preResult = this.videoInfoUtils.checkVideoInfo()
     if (preResult?.error) {
       sendResponse(preResult)
       return
@@ -263,7 +94,7 @@ class DownloadManager {
       return
     }
 
-    const preResult = this.checkVideoInfo()
+    const preResult = this.videoInfoUtils.checkVideoInfo()
     if (preResult?.error) {
       sendResponse(preResult)
       return
@@ -451,7 +282,7 @@ class DownloadManager {
   }
 
   async handleVideoInfo(sendResponse: (response?: any) => void) {
-    const videoInfo = this.checkVideoInfo()
+    const videoInfo = this.videoInfoUtils.checkVideoInfo()
     if (videoInfo.isOk) {
       sendResponse({
         bvid: this.subtitleFetcher.bvid,
@@ -476,17 +307,17 @@ class DownloadManager {
 
       if (useChromeAPI) {
         await Promise.all([
-          this.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
-          this.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+          this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
+          this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
         ])
       } else {
         const [videoBlob, audioBlob] = await Promise.all([
-          this.downloadToBlob(videoUrl),
-          this.downloadToBlob(audioUrl)
+          this.downloadUtils.downloadToBlob(videoUrl),
+          this.downloadUtils.downloadToBlob(audioUrl)
         ])
 
-        this.saveBlob(videoBlob, `${title}.video.mp4`)
-        this.saveBlob(audioBlob, `${title}.audio.m4a`)
+        this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+        this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
       }
 
       sendResponse({ success: true, message: '下载完成' })
@@ -498,7 +329,7 @@ class DownloadManager {
   async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     switch (message.type) {
       case MessageType.REQUEST_FETCH_SUBTITLE: {
-        const preResult = this.checkVideoInfo()
+        const preResult = this.videoInfoUtils.checkVideoInfo()
         if (preResult?.error) {
           sendResponse(preResult)
           return true
@@ -535,7 +366,7 @@ class DownloadManager {
           })
           return true
         }
-        const preResult = this.checkVideoInfo()
+        const preResult = this.videoInfoUtils.checkVideoInfo()
         if (preResult?.error) {
           sendResponse(preResult)
           return true
@@ -597,9 +428,7 @@ class DownloadManager {
                 type: EVENT_TYPE,
                 data: {
                   error:
-                    error instanceof Error
-                      ? error.message
-                      : JSON.stringify(error),
+                    error instanceof Error ? error.message : JSON.stringify(error),
                   bvid,
                   cid,
                 } as SummarizeErrorResponse,
@@ -609,7 +438,6 @@ class DownloadManager {
           })
         return true
       }
-
       case MessageType.REQUEST_SUMMARIZE_SCREENSHOT: {
         const isRegisted = this.registedContentJss.get(sender.id as string)
         if (!isRegisted) {
@@ -676,9 +504,7 @@ class DownloadManager {
                 type: EVENT_TYPE,
                 data: {
                   error:
-                    error instanceof Error
-                      ? error.message
-                      : JSON.stringify(error),
+                    error instanceof Error ? error.message : JSON.stringify(error),
                 } as SummarizeErrorResponse,
               })
             }
@@ -728,9 +554,7 @@ class DownloadManager {
                 type: EVENT_TYPE,
                 data: {
                   error:
-                    error instanceof Error
-                      ? error.message
-                      : JSON.stringify(error),
+                    error instanceof Error ? error.message : JSON.stringify(error),
                 },
               })
             }
@@ -738,7 +562,6 @@ class DownloadManager {
           })
         return true
       }
-
       case MessageType.REQUEST_STOP_ASSISTANT: {
         this.aiAgentRunner.stopAgent().then((stopped) => {
           sendResponse({
@@ -748,9 +571,8 @@ class DownloadManager {
         })
         return true
       }
-
       case MessageType.REQUEST_VIDEO_INFO: {
-        const videoInfo = this.checkVideoInfo()
+        const videoInfo = this.videoInfoUtils.checkVideoInfo()
         if (videoInfo.isOk) {
           sendResponse({
             bvid: this.subtitleFetcher.bvid,
@@ -763,7 +585,6 @@ class DownloadManager {
         }
         return true
       }
-
       case MessageType.REQUEST_DOWNLOAD_VIDEO: {
         const { bvid, cid, useChromeAPI } = message.payload
         if (!bvid || !cid) {
@@ -776,17 +597,17 @@ class DownloadManager {
 
           if (useChromeAPI) {
             await Promise.all([
-              this.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
-              this.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+              this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
+              this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
             ])
           } else {
             const [videoBlob, audioBlob] = await Promise.all([
-              this.downloadToBlob(videoUrl),
-              this.downloadToBlob(audioUrl)
+              this.downloadUtils.downloadToBlob(videoUrl),
+              this.downloadUtils.downloadToBlob(audioUrl)
             ])
 
-            this.saveBlob(videoBlob, `${title}.video.mp4`)
-            this.saveBlob(audioBlob, `${title}.audio.m4a`)
+            this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+            this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
           }
 
           sendResponse({ success: true, message: '下载完成' })
@@ -795,7 +616,6 @@ class DownloadManager {
         }
         return true
       }
-
       default:
         break
     }
