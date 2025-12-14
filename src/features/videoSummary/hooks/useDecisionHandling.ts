@@ -1,7 +1,7 @@
 import { LLM_Runner } from '../../../services/LLM_Runner'
 
 interface UseDecisionHandlingProps {
-  appendMarkdownContent: (content: string | ((prev: string) => string)) => void
+  appendMarkdownContent: (content: string) => void
   setMessages: (messages: string | ((prev: string) => string)) => void
 }
 

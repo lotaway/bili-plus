@@ -1,5 +1,11 @@
 import { VideoDetailResponse } from '../types/video'
 
+export type PlayUrlResult = {
+  videoUrl: string
+  audioUrl: string
+  title: string
+}
+
 export class BilibiliApi {
   private readonly host: string = '';
 
@@ -13,7 +19,6 @@ export class BilibiliApi {
 
   getVideoDetailPageUrl(bvid: string, p?: number): URL {
     const url = new URL(`/video/${bvid}`, this.websiteHost)
-    // url.searchParams.set('cid', cid.toString())
     if (!p) {
       return url
     }
@@ -71,5 +76,33 @@ export class BilibiliApi {
     headers = await this.fillHeader(headers)
     const subUrl = url.startsWith('http') ? url : 'https:' + url
     return await fetch(subUrl, { headers }).then((r) => r.json())
+  }
+
+  async fetchPlayUrls(bvid: string, cid: number, quality = 80): Promise<PlayUrlResult> {
+    const params = new URLSearchParams({
+      bvid,
+      cid: cid.toString(),
+      fourk: "1",
+      qn: quality.toString()
+    })
+
+    const url = `https://api.bilibili.com/x/player/wbi/playurl?${params.toString()}`
+
+    const resp = await fetch(url, {
+      credentials: "include"
+    })
+
+    const data = await resp.json()
+
+    if (data.code !== 0) throw new Error(data.message)
+
+    const dash = data.data.dash
+    if (!dash) throw new Error("非 DASH 视频")
+
+    return {
+      videoUrl: dash.video[0].baseUrl,
+      audioUrl: dash.audio[0].baseUrl,
+      title: data.data.accept_description?.[0] ?? bvid
+    }
   }
 }

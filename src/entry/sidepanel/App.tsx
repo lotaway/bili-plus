@@ -2,6 +2,7 @@ import React from 'react'
 import TabContainer from '../../components/TabContainer'
 import Calculator from '../../features/calculator/calculator'
 import { VideoSummary } from '../../features/videoSummary/VideoSummary'
+import VideoDownload from '../../features/videoDownload/VideoDownload'
 
 const App: React.FC = () => {
     const tabs = [
@@ -14,6 +15,11 @@ const App: React.FC = () => {
             id: 'calculator',
             label: '贷款计算器',
             content: <Calculator />
+        },
+        {
+            id: 'download',
+            label: '视频下载',
+            content: <VideoDownload />
         }
     ]
 
