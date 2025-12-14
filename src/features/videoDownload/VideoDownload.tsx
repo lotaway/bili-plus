@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
-import { downloadBiliVideo, parseVideoInfoFromUrl } from './videoDownloadUtils'
+import { MessageType } from '../../enums/MessageType'
 
 const Container = styled.div`
   padding: 20px;
@@ -101,14 +101,22 @@ const VideoDownload: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null)
 
-  const handleParseFromUrl = () => {
-    const videoInfo = parseVideoInfoFromUrl()
-    if (videoInfo) {
-      setBvid(videoInfo.bvid)
-      setCid(videoInfo.cid)
-      setStatus({ type: 'info', message: `已解析: BVID=${videoInfo.bvid}, CID=${videoInfo.cid}` })
-    } else {
-      setStatus({ type: 'error', message: '无法从当前页面URL解析视频信息，请手动输入' })
+  const handleParseFromUrl = async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.REQUEST_VIDEO_INFO
+      })
+      
+      if (response.error) {
+        setStatus({ type: 'error', message: response.error })
+        return
+      }
+      
+      setBvid(response.bvid || '')
+      setCid(response.cid || '')
+      setStatus({ type: 'info', message: `已解析: BVID=${response.bvid}, CID=${response.cid}` })
+    } catch (error) {
+      setStatus({ type: 'error', message: '无法获取视频信息，请确保在B站视频页面打开侧边栏' })
     }
   }
 
@@ -122,7 +130,15 @@ const VideoDownload: React.FC = () => {
     setStatus({ type: 'info', message: '开始下载...' })
 
     try {
-      await downloadBiliVideo(bvid, parseInt(cid), useChromeAPI)
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.REQUEST_DOWNLOAD_VIDEO,
+        payload: { bvid, cid, useChromeAPI }
+      })
+      
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      
       setStatus({ 
         type: 'success', 
         message: `下载完成！文件已保存到默认下载目录。\n注意：需要手动使用ffmpeg合并音视频文件。` 
