@@ -106,17 +106,17 @@ const VideoDownload: React.FC = () => {
       const response = await chrome.runtime.sendMessage({
         type: MessageType.REQUEST_VIDEO_INFO
       })
-      
+
       if (response.error) {
         setStatus({ type: 'error', message: response.error })
         return
       }
-      
+
       setBvid(response.bvid || '')
       setCid(response.cid || '')
       setStatus({ type: 'info', message: `已解析: BVID=${response.bvid}, CID=${response.cid}` })
     } catch (error) {
-      setStatus({ type: 'error', message: '无法获取视频信息，请确保在B站视频页面打开侧边栏' })
+      setStatus({ type: 'error', message: `无法获取视频信息，请确保在B站视频页面打开侧边栏.${error instanceof Error ? error.message : '未知错误'}` })
     }
   }
 
@@ -134,19 +134,19 @@ const VideoDownload: React.FC = () => {
         type: MessageType.REQUEST_DOWNLOAD_VIDEO,
         payload: { bvid, cid, useChromeAPI }
       })
-      
+
       if (response.error) {
         throw new Error(response.error)
       }
-      
-      setStatus({ 
-        type: 'success', 
-        message: `下载完成！文件已保存到默认下载目录。\n注意：需要手动使用ffmpeg合并音视频文件。` 
+
+      setStatus({
+        type: 'success',
+        message: `下载完成！文件已保存到默认下载目录。\n注意：需要手动使用ffmpeg合并音视频文件。`
       })
     } catch (error) {
-      setStatus({ 
-        type: 'error', 
-        message: `下载失败: ${error instanceof Error ? error.message : '未知错误'}` 
+      setStatus({
+        type: 'error',
+        message: `下载失败: ${error instanceof Error ? error.message : '未知错误'}`
       })
     } finally {
       setIsLoading(false)
@@ -156,7 +156,7 @@ const VideoDownload: React.FC = () => {
   return (
     <Container>
       <Title>B站视频下载</Title>
-      
+
       {status && (
         <Status type={status.type}>
           {status.message}
@@ -185,21 +185,21 @@ const VideoDownload: React.FC = () => {
         />
       </InputGroup>
 
-      <SecondaryButton 
+      <SecondaryButton
         onClick={handleParseFromUrl}
         disabled={isLoading}
       >
         从当前页面解析
       </SecondaryButton>
 
-      <Button 
+      <Button
         onClick={() => handleDownload(false)}
         disabled={isLoading}
       >
         {isLoading ? '下载中...' : '下载视频+音频'}
       </Button>
 
-      <SecondaryButton 
+      <SecondaryButton
         onClick={() => handleDownload(true)}
         disabled={isLoading}
       >
