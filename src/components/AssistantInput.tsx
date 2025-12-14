@@ -18,6 +18,34 @@ const StyledAssistantInput = styled.div`
   padding: 15px;
 `
 
+const AssistantTextarea = styled.textarea`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #374151;
+  background-color: #ffffff;
+  resize: vertical;
+  transition: all 0.2s ease-in-out;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+`
+
 const AssistantButtons = styled.div`
   display: flex;
   gap: 10px;
@@ -73,7 +101,7 @@ export const AssistantInput = ({
   return (
     <AssistantSection>
       <StyledAssistantInput>
-        <textarea
+        <AssistantTextarea
           placeholder="请输入您的问题或指令..."
           rows={6}
           value={assistantInput}

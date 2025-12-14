@@ -81,7 +81,7 @@ export class AIGenerationAnalyzer {
                     if (markdownEnd !== -1) {
                         this.think += this.buffer.substring(0, markdownEnd)
                         this.state = ParsingState.FREE
-                        this.content = this.buffer.substring(markdownEnd + this.END_MARKDOWN_TAG.length)
+                        this.content += this.buffer.substring(markdownEnd + this.END_MARKDOWN_TAG.length)
                     } else {
                         this.content += this.buffer
                         this.buffer = ''

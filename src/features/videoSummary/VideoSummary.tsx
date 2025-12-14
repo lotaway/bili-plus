@@ -280,7 +280,6 @@ export const VideoSummary = () => {
     })
   }
 
-  // Custom hooks
   const { aiGenerationAnalyzer } = useAIAnalysis({
     appendThinkingContent,
     appendMarkdownContent,
@@ -315,19 +314,19 @@ export const VideoSummary = () => {
   return (
     <SidepaneContainer>
       <h3>字幕生成</h3>
-      
+
       <ActionButtons
         onExtract={handleExtract}
         onRequestSummarize={handleRequestSummarize}
         onRequestScreenshotSummarize={handleRequestScreenshotSummarize}
       />
-      
+
       <OutputSection>
         <ThinkingDisplay
           thinkingContent={outputContent.thinking}
           thinkingContainerRef={thinkingContainerRef}
         />
-        
+
         <ResultDisplay
           markdownContent={outputContent.markdown}
           messages={messages}
@@ -335,7 +334,7 @@ export const VideoSummary = () => {
           resultContainerRef={resultContainerRef}
           onDownloadMarkdown={handleDownloadMarkdown}
         />
-        
+
         <AssistantInput
           isAssistantRunning={isAssistantRunning}
           onAssistantStart={handleAssistantStart}

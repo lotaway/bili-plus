@@ -16,6 +16,34 @@ const DecisionButtons = styled.div`
   margin: 15px 0;
 `
 
+const FeedbackTextarea = styled.textarea`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #374151;
+  background-color: #ffffff;
+  resize: vertical;
+  transition: all 0.2s ease-in-out;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+`
+
 const DecisionButton = styled.button`
   padding: 8px 16px;
   border: none;
@@ -91,10 +119,9 @@ export const DecisionPanel = ({
           </DecisionButtons>
           {showFeedbackInput && (
             <div style={{ marginTop: '10px' }}>
-              <textarea
+              <FeedbackTextarea
                 placeholder="请输入您的反馈意见..."
                 rows={3}
-                style={{ width: '100%' }}
                 value={feedbackInput}
                 onChange={(e) => setFeedbackInput(e.target.value)}
               />
@@ -134,10 +161,9 @@ export const DecisionPanel = ({
           </DecisionButtons>
           {showFeedbackInput && (
             <div style={{ marginTop: '10px' }}>
-              <textarea
+              <FeedbackTextarea
                 placeholder="请输入您的反馈意见..."
                 rows={3}
-                style={{ width: '100%' }}
                 value={feedbackInput}
                 onChange={(e) => setFeedbackInput(e.target.value)}
               />
