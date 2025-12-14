@@ -3,6 +3,10 @@ export enum DownloadType {
     XMARKDOWN = "xmd",
     SRT = "srt",
     TEXT = "txt",
+    VIDEO_AUDIO = "video_audio",
+    AUDIO_ONLY = "audio_only", 
+    VIDEO_ONLY = "video_only",
+    MERGED = "merged",
 }
 
 export enum DocumentType {

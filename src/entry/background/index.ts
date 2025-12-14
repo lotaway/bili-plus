@@ -9,6 +9,8 @@ import { MessageType } from '../../enums/MessageType'
 import { SummarizeErrorResponse, SummarizeSuccessResponse } from '../../types/summarize'
 import { VideoData } from '../../types/video'
 import { BilibiliApi } from '../../services/BilibiliApi'
+import { DownloadType } from '../../enums/DownloadType'
+import { FFmpegUtils } from '../../utils/FFmpegUtils'
 
 class DownloadManager {
   private readonly bilibiliApi = new BilibiliApi()
@@ -20,6 +22,7 @@ class DownloadManager {
   private readonly statusCheckService = new StatusCheckService(this.llmRunner);
   private readonly downloadUtils = new DownloadUtils();
   private readonly videoInfoUtils = new VideoInfoUtils(this.subtitleFetcher);
+  private readonly ffmpegUtils = new FFmpegUtils();
   private readonly registedContentJss = new Map<string, boolean>()
   private readonly registerMaxSize = 10
 
@@ -296,7 +299,7 @@ class DownloadManager {
   }
 
   async handleDownloadVideo(message: any, sendResponse: (response?: any) => void) {
-    const { bvid, cid } = message.payload
+    const { bvid, cid, downloadType = DownloadType.VIDEO_ONLY, useChromeAPI = false } = message.payload
     if (!bvid || !cid) {
       sendResponse({ error: '缺少BVID或CID参数' })
       return
@@ -304,14 +307,98 @@ class DownloadManager {
 
     try {
       const { videoUrl, audioUrl, title } = await this.bilibiliApi.fetchPlayUrls(bvid, parseInt(cid))
-      await Promise.all([
-        this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
-        this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
-      ])
+
+      switch (downloadType) {
+        case DownloadType.AUDIO_ONLY:
+          if (useChromeAPI) {
+            await this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+          } else {
+            const audioBlob = await this.downloadUtils.downloadToBlob(audioUrl)
+            this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
+          }
+          break
+
+        case DownloadType.VIDEO_ONLY:
+          if (useChromeAPI) {
+            await this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`)
+          } else {
+            const videoBlob = await this.downloadUtils.downloadToBlob(videoUrl)
+            this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+          }
+          break
+
+        case DownloadType.VIDEO_AUDIO:
+          if (useChromeAPI) {
+            await Promise.all([
+              this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
+              this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+            ])
+          } else {
+            const [videoBlob, audioBlob] = await Promise.all([
+              this.downloadUtils.downloadToBlob(videoUrl),
+              this.downloadUtils.downloadToBlob(audioUrl)
+            ])
+            this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+            this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
+          }
+          break
+
+        case DownloadType.MERGED:
+          try {
+            const [videoBlob, audioBlob] = await Promise.all([
+              this.downloadUtils.downloadToBlob(videoUrl),
+              this.downloadUtils.downloadToBlob(audioUrl)
+            ])
+            const mergedBlob = await this.mergeVideoAudioWithFFmpeg(videoBlob, audioBlob)
+            if (useChromeAPI) {
+              const mergedUrl = URL.createObjectURL(mergedBlob)
+              await this.downloadUtils.downloadWithChromeAPI(mergedUrl, `${title}.mp4`)
+              URL.revokeObjectURL(mergedUrl)
+            } else {
+              this.downloadUtils.saveBlob(mergedBlob, `${title}.mp4`)
+            }
+          } catch (mergeError) {
+            console.error('合并失败，回退到分别下载:', mergeError)
+            if (useChromeAPI) {
+              await Promise.all([
+                this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
+                this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+              ])
+            } else {
+              const [videoBlob, audioBlob] = await Promise.all([
+                this.downloadUtils.downloadToBlob(videoUrl),
+                this.downloadUtils.downloadToBlob(audioUrl)
+              ])
+              this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+              this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
+            }
+            sendResponse({
+              success: true,
+              message: '合并失败，已分别下载视频和音频文件。请手动使用ffmpeg合并。'
+            })
+            return
+          }
+          break
+
+        default:
+          throw new Error(`不支持的下载类型: ${downloadType}`)
+      }
 
       sendResponse({ success: true, message: '下载完成' })
     } catch (error) {
       sendResponse({ error: error instanceof Error ? error.message : '下载失败' })
+    }
+  }
+
+  private async mergeVideoAudioWithFFmpeg(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+    try {
+      console.log('开始使用FFmpeg合并视频和音频...')
+      const mergedBlob = await this.ffmpegUtils.mergeVideoAudio(videoBlob, audioBlob)
+      console.log('FFmpeg合并完成')
+      return mergedBlob
+    } catch (error) {
+      console.error('FFmpeg合并失败:', error)
+      throw new Error(`视频合并失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 

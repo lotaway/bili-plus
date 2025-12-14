@@ -40,6 +40,10 @@ export class FileUtils {
       [DownloadType.MARKDOWN]: 'text/markdown',
       [DownloadType.XMARKDOWN]: 'text/x-markdown',
       [DownloadType.SRT]: 'application/x-subrip',
+      [DownloadType.VIDEO_AUDIO]: 'video/mp4',
+      [DownloadType.AUDIO_ONLY]: 'audio/mp4',
+      [DownloadType.VIDEO_ONLY]: 'video/mp4',
+      [DownloadType.MERGED]: 'video/mp4',
     }
     const blob = new Blob([text], {
       type: fileType2MediaType[fileType] || 'text/plain',

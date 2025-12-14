@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
 import { MessageType } from '../../enums/MessageType'
+import { DownloadType } from '../../enums/DownloadType'
 
 const Container = styled.div`
   padding: 20px;
@@ -31,6 +32,20 @@ const Input = styled.input`
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  
+  &:focus {
+    outline: none;
+    border-color: #00a1d6;
+  }
+`
+
+const Select = styled.select`
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
   
   &:focus {
     outline: none;
@@ -98,6 +113,7 @@ const InfoBox = styled.div`
 const VideoDownload: React.FC = () => {
   const [bvid, setBvid] = useState('')
   const [cid, setCid] = useState('')
+  const [downloadType, setDownloadType] = useState<DownloadType>(DownloadType.VIDEO_AUDIO)
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null)
 
@@ -132,16 +148,21 @@ const VideoDownload: React.FC = () => {
     try {
       const response = await chrome.runtime.sendMessage({
         type: MessageType.REQUEST_DOWNLOAD_VIDEO,
-        payload: { bvid, cid, useChromeAPI }
+        payload: { bvid, cid, downloadType, useChromeAPI }
       })
 
       if (response.error) {
         throw new Error(response.error)
       }
 
+      let successMessage = '下载完成！文件已保存到默认下载目录。'
+      if (downloadType === DownloadType.VIDEO_AUDIO) {
+        successMessage += '\n注意：需要手动使用ffmpeg合并音视频文件。'
+      }
+
       setStatus({
         type: 'success',
-        message: `下载完成！文件已保存到默认下载目录。\n注意：需要手动使用ffmpeg合并音视频文件。`
+        message: successMessage
       })
     } catch (error) {
       setStatus({
@@ -150,6 +171,21 @@ const VideoDownload: React.FC = () => {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const getDownloadButtonText = () => {
+    const baseText = isLoading ? '下载中...' : '下载'
+    
+    switch (downloadType) {
+      case DownloadType.AUDIO_ONLY:
+        return `${baseText}纯音频`
+      case DownloadType.VIDEO_ONLY:
+        return `${baseText}纯视频`
+      case DownloadType.MERGED:
+        return `${baseText}合并视频`
+      default:
+        return `${baseText}视频+音频`
     }
   }
 
@@ -185,6 +221,20 @@ const VideoDownload: React.FC = () => {
         />
       </InputGroup>
 
+      <InputGroup>
+        <Label htmlFor="downloadType">下载类型:</Label>
+        <Select
+          id="downloadType"
+          value={downloadType}
+          onChange={(e) => setDownloadType(e.target.value as DownloadType)}
+        >
+          <option value={DownloadType.VIDEO_AUDIO}>视频+音频（需手动合并）</option>
+          <option value={DownloadType.AUDIO_ONLY}>纯音频</option>
+          <option value={DownloadType.VIDEO_ONLY}>纯视频</option>
+          <option value={DownloadType.MERGED}>合并视频（自动合并）</option>
+        </Select>
+      </InputGroup>
+
       <SecondaryButton
         onClick={handleParseFromUrl}
         disabled={isLoading}
@@ -196,7 +246,7 @@ const VideoDownload: React.FC = () => {
         onClick={() => handleDownload(false)}
         disabled={isLoading}
       >
-        {isLoading ? '下载中...' : '下载视频+音频'}
+        {getDownloadButtonText()}
       </Button>
 
       <SecondaryButton
@@ -211,9 +261,9 @@ const VideoDownload: React.FC = () => {
         <br />
         1. B站使用DASH格式，音视频分离下载
         <br />
-        2. 下载后得到两个文件：视频(.mp4)和音频(.m4a)
+        2. 支持多种下载类型：纯音频、纯视频、合并下载
         <br />
-        3. 需要手动合并：<code>ffmpeg -i video.mp4 -i audio.m4a -c copy output.mp4</code>
+        3. 合并下载使用ffmpeg自动合并音视频文件
         <br />
         4. 静默下载需要Chrome下载权限，文件保存到默认下载目录
       </InfoBox>

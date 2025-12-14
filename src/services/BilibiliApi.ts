@@ -86,7 +86,7 @@ export class BilibiliApi {
       qn: quality.toString()
     })
 
-    const url = `https://api.bilibili.com/x/player/wbi/playurl?${params.toString()}`
+    const url = `${this.host}/x/player/wbi/playurl?${params.toString()}`
 
     const resp = await fetch(url, {
       credentials: "include"
