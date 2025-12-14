@@ -1,21 +1,16 @@
 import { useEffect, useRef } from 'react'
+import { useDispatch } from 'react-redux'
 import { AIGenerationAnalyzer } from '../../../services/AIGeneratioinAnalyzer'
-
-interface UseAIAnalysisProps {
-  appendThinkingContent: (content: string) => void
-  appendMarkdownContent: (content: string) => void
-  setMarkdownContent: (content: string) => void
-  setShowDownloadButton: (show: boolean) => void
-  setHasUserScrolled: (scrolled: boolean) => void
-}
-
-export const useAIAnalysis = ({
+import {
   appendThinkingContent,
   appendMarkdownContent,
   setMarkdownContent,
   setShowDownloadButton,
   setHasUserScrolled
-}: UseAIAnalysisProps) => {
+} from '../../../store/slices/videoSummarySlice'
+
+export const useAIAnalysis = () => {
+  const dispatch = useDispatch()
   const aiGenerationAnalyzerRef = useRef<AIGenerationAnalyzer | null>(null)
 
   useEffect(() => {
@@ -26,17 +21,17 @@ export const useAIAnalysis = ({
     
     const handleAnalyzerOutput = (data: { done: boolean, think: string, content: string }) => {
       if (data.done) {
-        appendThinkingContent(data.think)
-        setMarkdownContent(data.content)
-        setShowDownloadButton(true)
-        setHasUserScrolled(false)
+        dispatch(appendThinkingContent(data.think))
+        dispatch(setMarkdownContent(data.content))
+        dispatch(setShowDownloadButton(true))
+        dispatch(setHasUserScrolled(false))
         return
       }
       if (data.think) {
-        appendThinkingContent(data.think)
+        dispatch(appendThinkingContent(data.think))
       }
       if (data.content) {
-        appendMarkdownContent(data.content)
+        dispatch(appendMarkdownContent(data.content))
       }
     }
     
@@ -45,13 +40,7 @@ export const useAIAnalysis = ({
       aiGenerationAnalyzer.unsubscribe(subscriptionId)
       aiGenerationAnalyzer.reset()
     }
-  }, [
-    appendThinkingContent,
-    appendMarkdownContent,
-    setMarkdownContent,
-    setShowDownloadButton,
-    setHasUserScrolled
-  ])
+  }, [dispatch])
 
   return {
     aiGenerationAnalyzer: aiGenerationAnalyzerRef.current

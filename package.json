@@ -8,10 +8,13 @@
     "watch": "gulp"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.11.1",
     "@types/styled-components": "^5.1.36",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",
+    "react-redux": "^9.2.0",
+    "redux": "^5.0.1",
     "styled-components": "^6.1.19"
   },
   "devDependencies": {

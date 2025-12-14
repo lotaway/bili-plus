@@ -1,17 +1,20 @@
 import { useEffect } from 'react'
+import { useDispatch } from 'react-redux'
 import { ChromeMessage } from '../../../types/chrome'
 import { MessageType } from '../../../enums/MessageType'
 import { SummarizeResponse } from '../../../types/summarize'
+import {
+  setMessage,
+  setDecisionData,
+  appendThinkingContent,
+  appendMarkdownContent,
+  setMarkdownContent,
+  setShowDownloadButton,
+  setHasUserScrolled
+} from '../../../store/slices/videoSummarySlice'
 
-interface UseMessageHandlingProps {
-  handleSummarizeResponseStream: (data: SummarizeResponse) => void
-  handleAssistantResponseStream: (data: any) => void
-}
-
-export const useMessageHandling = ({
-  handleSummarizeResponseStream,
-  handleAssistantResponseStream
-}: UseMessageHandlingProps) => {
+export const useMessageHandling = () => {
+  const dispatch = useDispatch()
   useEffect(() => {
     const handleMessage = (message: ChromeMessage) => {
       switch (message.type) {
@@ -28,9 +31,39 @@ export const useMessageHandling = ({
       }
     }
 
+    const handleSummarizeResponseStream = (data: SummarizeResponse) => {
+      if ("error" in data) {
+        dispatch(setMessage(data.error))
+        return
+      }
+      
+      if (data.done) {
+        console.debug("Stream ended")
+        return
+      }
+    }
+
+    const handleAssistantResponseStream = (data: any) => {
+      if (data.metadata?.type === 'decision_required') {
+        dispatch(setDecisionData({
+          ...data,
+          ...data.metadata,
+          reason: data.metadata?.reason || data.reason,
+        }))
+        return
+      }
+      if (data.error) {
+        dispatch(setMessage(data.error))
+        return
+      }
+      if (data.thinking) {
+        dispatch(appendThinkingContent(data.thinking))
+      }
+    }
+
     chrome.runtime.onMessage.addListener(handleMessage)
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
     }
-  }, [handleSummarizeResponseStream, handleAssistantResponseStream])
+  }, [dispatch])
 }

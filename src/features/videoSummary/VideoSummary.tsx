@@ -1,9 +1,18 @@
-import { useRef, useState } from 'react'
+import { useRef, useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { useMessageHandling } from './hooks/useMessageHandling'
 import { useScrollManagement } from './hooks/useScrollManagement'
 import { useAIAnalysis } from './hooks/useAIAnalysis'
 import { useDecisionHandling } from './hooks/useDecisionHandling'
 import styled from 'styled-components'
+import {
+  setAssistantRunning,
+  setMessage,
+  clearOutput,
+  setDecisionData,
+  setHasUserScrolled,
+} from '../../store/slices/videoSummarySlice'
+import { RootState } from '../../store/store'
 
 const SidepaneContainer = styled.div`
   padding: 15px;
@@ -27,142 +36,39 @@ import { DecisionPanel } from '../../components/DecisionPanel'
 
 import { MessageType } from '../../enums/MessageType'
 import { DownloadType } from '../../enums/DownloadType'
-import { SummarizeResponse } from '../../types/summarize'
 import { FileUtils } from '../../utils/FileUtils'
-import { ParsingState } from '../../enums/ParseState'
-
-interface DecisionData {
-  reason: string
-  message?: string
-  max_iterations?: number
-  [key: string]: any
-}
-
-interface OutputContent {
-  markdown: string
-  thinking: string
-}
 
 export const VideoSummary = () => {
-  const [isAssistantRunning, setIsAssistantRunning] = useState(false)
-  const [outputContent, setOutputContent] = useState<OutputContent>({ markdown: '', thinking: '' })
-  const [decisionData, setDecisionData] = useState<DecisionData | null>(null)
-  const [hasUserScrolled, setHasUserScrolled] = useState(false)
-  const [messages, setMessages] = useState('')
-  const [showDownloadButton, setShowDownloadButton] = useState(false)
-
-  const parsingStateRef = useRef({
-    currentBuffer: '',
-    state: ParsingState.FREE,
-    thinkingBuffer: '',
-    markdownBuffer: ''
-  })
+  const dispatch = useDispatch()
+  const {
+    isAssistantRunning,
+    outputContent,
+    decisionData,
+    hasUserScrolled,
+    messages,
+    showDownloadButton
+  } = useSelector((state: RootState) => state.videoSummary)
 
   const resultContainerRef = useRef<HTMLDivElement>(null)
   const thinkingContainerRef = useRef<HTMLDivElement>(null)
-
-  const setMessage = (msg: string) => {
-    setMessages(msg)
-    setHasUserScrolled(false)
+  const setMessageWithScrollReset = (msg: string) => {
+    dispatch(setMessage(msg))
+    dispatch(setHasUserScrolled(false))
   }
 
-  const clearOutput = () => {
-    setMessages("")
-    setOutputContent({ markdown: '', thinking: '' })
-    setShowDownloadButton(false)
-    setDecisionData(null)
-    parsingStateRef.current = {
-      currentBuffer: '',
-      state: ParsingState.FREE,
-      thinkingBuffer: '',
-      markdownBuffer: ''
-    }
-  }
 
-  const appendMarkdownContent = (content: string) => {
-    setOutputContent((prev) => ({
-      ...prev,
-      markdown: prev.markdown + content,
-    }))
-    setHasUserScrolled(false)
-  }
 
-  const setMarkdownContent = (content: string) => {
-    setOutputContent(prev => ({ ...prev, markdown: content }))
-    setMessages('')
-    setShowDownloadButton(true)
-    setHasUserScrolled(false)
-  }
 
-  const appendThinkingContent = (content: string) => {
-    setOutputContent(prev => ({ ...prev, thinking: prev.thinking + content }))
-    setHasUserScrolled(false)
-  }
-
-  const handleSummarizeResponseStream = (data: SummarizeResponse) => {
-    if ("error" in data) {
-      setMessage(data.error)
-      return
-    }
-
-    if (data.done) {
-      console.debug("Stream ended")
-      if (data.content && aiGenerationAnalyzer) {
-        aiGenerationAnalyzer.reset()
-        aiGenerationAnalyzer.inputStream(data.content)
-      }
-      parsingStateRef.current = {
-        currentBuffer: '',
-        state: ParsingState.FREE,
-        thinkingBuffer: '',
-        markdownBuffer: ''
-      }
-      return
-    }
-    if (data.content && aiGenerationAnalyzer) {
-      aiGenerationAnalyzer.inputStream(data.content)
-    }
-  }
-
-  const handleAssistantResponseStream = (data: any) => {
-    if (data.metadata?.type === 'decision_required') {
-      setDecisionData({
-        ...data,
-        ...data.metadata,
-        reason: data.metadata?.reason || data.reason,
-      })
-      return
-    }
-    if (data.error) {
-      setMessage(data.error)
-      return
-    }
-    if (data.thinking) {
-      appendThinkingContent(data.thinking)
-    }
-
-    if (data.done && data.content) {
-      if (data.data && aiGenerationAnalyzer) {
-        aiGenerationAnalyzer.inputStream(data.data)
-      } else if (aiGenerationAnalyzer) {
-        aiGenerationAnalyzer.inputStream(data.content)
-      }
-      return
-    }
-    if (data.content && !data.thinking && aiGenerationAnalyzer) {
-      aiGenerationAnalyzer.inputStream(data.content)
-    }
-  }
 
   const handleExtract = async (mode: DownloadType) => {
-    setMessage('正在提取字幕...')
+    setMessageWithScrollReset('正在提取字幕...')
     const res = await sendMessage({
       type: MessageType.REQUEST_FETCH_SUBTITLE,
       payload: { mode },
     })
 
     if (res?.error) {
-      setMessage(res.error)
+      setMessageWithScrollReset(res.error)
       return
     }
 
@@ -179,54 +85,54 @@ export const VideoSummary = () => {
         textData.destory()
       }
     }
-    setMessage(`字幕提取完成:${downloadId}`)
+    setMessageWithScrollReset(`字幕提取完成:${downloadId}`)
   }
 
   const handleRequestSummarize = async () => {
-    clearOutput()
-    setMessage('正在使用AI处理字幕...')
+    dispatch(clearOutput())
+    setMessageWithScrollReset('正在使用AI处理字幕...')
     const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE })
     if (res?.error) {
-      setMessage(res.error)
+      setMessageWithScrollReset(res.error)
       return
     }
   }
 
   const handleRequestScreenshotSummarize = async () => {
-    clearOutput()
-    setMessage('正在截取屏幕...')
+    dispatch(clearOutput())
+    setMessageWithScrollReset('正在截取屏幕...')
     try {
       const screenshotDataUrl = await chrome.tabs.captureVisibleTab({
         format: 'png',
         quality: 80
       })
-      setMessage('正在使用AI分析界面...')
+      setMessageWithScrollReset('正在使用AI分析界面...')
       const res = await sendMessage({
         type: MessageType.REQUEST_SUMMARIZE_SCREENSHOT,
         payload: { screenshot: screenshotDataUrl }
       })
       if (res?.error) {
-        setMessage(res.error)
+        setMessageWithScrollReset(res.error)
         return
       }
     } catch (error) {
       console.error('截图失败:', error)
-      setMessage('截图失败，请重试')
+      setMessageWithScrollReset('截图失败，请重试')
     }
   }
 
   const handleAssistantStart = async (input: string) => {
     if (!input.trim()) {
-      setMessage('请输入您的问题或指令')
+      setMessageWithScrollReset('请输入您的问题或指令')
       return
     }
     if (isAssistantRunning) {
-      setMessage('AI智能体正在运行中，请先停止当前任务')
+      setMessageWithScrollReset('AI智能体正在运行中，请先停止当前任务')
       return
     }
 
-    setMessage('正在启动AI智能体...')
-    setIsAssistantRunning(true)
+    setMessageWithScrollReset('正在启动AI智能体...')
+    dispatch(setAssistantRunning(true))
 
     try {
       await sendMessage({
@@ -235,22 +141,22 @@ export const VideoSummary = () => {
       })
     } catch (error) {
       console.error('启动AI智能体失败:', error)
-      setMessage('启动AI智能体失败，请重试')
-      setIsAssistantRunning(false)
+      setMessageWithScrollReset('启动AI智能体失败，请重试')
+      dispatch(setAssistantRunning(false))
     }
   }
 
   const handleAssistantStop = async () => {
     if (!isAssistantRunning) return
 
-    setMessage('正在停止AI智能体...')
+    setMessageWithScrollReset('正在停止AI智能体...')
     try {
       await sendMessage({ type: MessageType.REQUEST_STOP_ASSISTANT })
     } catch (error) {
       console.error('停止AI智能体失败:', error)
     } finally {
-      setIsAssistantRunning(false)
-      setMessage('AI智能体已停止')
+      dispatch(setAssistantRunning(false))
+      setMessageWithScrollReset('AI智能体已停止')
     }
   }
 
@@ -280,35 +186,17 @@ export const VideoSummary = () => {
     })
   }
 
-  const { aiGenerationAnalyzer } = useAIAnalysis({
-    appendThinkingContent,
-    appendMarkdownContent,
-    setMarkdownContent,
-    setShowDownloadButton,
-    setHasUserScrolled
-  })
+  useAIAnalysis()
 
-  useMessageHandling({
-    handleSummarizeResponseStream,
-    handleAssistantResponseStream
-  })
+  useMessageHandling()
 
-  useScrollManagement({
-    resultContainerRef,
-    thinkingContainerRef,
-    hasUserScrolled,
-    setHasUserScrolled,
-    dependencies: [outputContent.markdown, outputContent.thinking, messages, hasUserScrolled]
-  })
+  useScrollManagement(resultContainerRef, thinkingContainerRef)
 
-  const { sendDecision } = useDecisionHandling({
-    appendMarkdownContent,
-    setMessages
-  })
+  const { sendDecision } = useDecisionHandling()
 
   const handleSendDecision = (decision: string, feedback: string = '') => {
     sendDecision(decision, feedback, decisionData)
-    setDecisionData(null)
+    dispatch(setDecisionData(null))
   }
 
   return (

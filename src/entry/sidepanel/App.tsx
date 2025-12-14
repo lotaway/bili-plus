@@ -1,31 +1,58 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { Provider } from 'react-redux'
+import { store } from '../../store/store'
+import { loadStateFromStorage, startAutoSave, stopAutoSave } from '../../store/storageManager'
 import TabContainer from '../../components/TabContainer'
 import Calculator from '../../features/calculator/calculator'
 import { VideoSummary } from '../../features/videoSummary/VideoSummary'
 import VideoDownload from '../../features/videoDownload/VideoDownload'
 
-const App: React.FC = () => {
-    const tabs = [
-        {
-            id: 'subtitle',
-            label: '字幕生成',
-            content: <VideoSummary />
-        },
-        {
-            id: 'calculator',
-            label: '贷款计算器',
-            content: <Calculator />
-        },
-        {
-            id: 'download',
-            label: '视频下载',
-            content: <VideoDownload />
-        }
-    ]
+const AppContent: React.FC = () => {
+  useEffect(() => {
+    const initializeApp = async () => {
+      const savedState = await loadStateFromStorage()
+      if (savedState) {
+        console.log('App state initialized from storage')
+      }
+      startAutoSave()
+    }
 
-    return (
-        <TabContainer tabs={tabs} defaultTab="subtitle" />
-    )
+    initializeApp()
+
+    return () => {
+      stopAutoSave()
+    }
+  }, [])
+
+  const tabs = [
+    {
+      id: 'subtitle',
+      label: '字幕生成',
+      content: <VideoSummary />
+    },
+    {
+      id: 'calculator',
+      label: '贷款计算器',
+      content: <Calculator />
+    },
+    {
+      id: 'download',
+      label: '视频下载',
+      content: <VideoDownload />
+    }
+  ]
+
+  return (
+    <TabContainer tabs={tabs} defaultTab="subtitle" />
+  )
+}
+
+const App: React.FC = () => {
+  return (
+    <Provider store={store}>
+      <AppContent />
+    </Provider>
+  )
 }
 
 export default App

@@ -1,20 +1,14 @@
 import { useEffect, useRef } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { RootState } from '../../../store/store'
+import { setHasUserScrolled } from '../../../store/slices/videoSummarySlice'
 
-interface UseScrollManagementProps {
-  resultContainerRef: React.RefObject<HTMLDivElement>
+export const useScrollManagement = (
+  resultContainerRef: React.RefObject<HTMLDivElement>,
   thinkingContainerRef: React.RefObject<HTMLDivElement>
-  hasUserScrolled: boolean
-  setHasUserScrolled: (scrolled: boolean) => void
-  dependencies: any[]
-}
-
-export const useScrollManagement = ({
-  resultContainerRef,
-  thinkingContainerRef,
-  hasUserScrolled,
-  setHasUserScrolled,
-  dependencies
-}: UseScrollManagementProps) => {
+) => {
+  const dispatch = useDispatch()
+  const { hasUserScrolled, outputContent, messages } = useSelector((state: RootState) => state.videoSummary)
   const scrollTimeoutRef = useRef<number>()
 
   useEffect(() => {
@@ -28,7 +22,7 @@ export const useScrollManagement = ({
     }
 
     scrollToBottom()
-  }, dependencies)
+  }, [resultContainerRef, thinkingContainerRef, hasUserScrolled, outputContent.markdown, outputContent.thinking, messages])
 
   useEffect(() => {
     const container = resultContainerRef.current
@@ -41,7 +35,7 @@ export const useScrollManagement = ({
 
       scrollTimeoutRef.current = setTimeout(() => {
         const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 10
-        setHasUserScrolled(!isAtBottom)
+        dispatch(setHasUserScrolled(!isAtBottom))
       }, 100) as unknown as number
     }
 
@@ -52,5 +46,5 @@ export const useScrollManagement = ({
         clearTimeout(scrollTimeoutRef.current)
       }
     }
-  }, [resultContainerRef, setHasUserScrolled])
+  }, [resultContainerRef, dispatch])
 }

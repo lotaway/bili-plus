@@ -1,18 +1,13 @@
+import { useDispatch } from 'react-redux'
 import { LLM_Runner } from '../../../services/LLM_Runner'
+import { appendMarkdownContent, setMessage } from '../../../store/slices/videoSummarySlice'
 
-interface UseDecisionHandlingProps {
-  appendMarkdownContent: (content: string) => void
-  setMessages: (messages: string | ((prev: string) => string)) => void
-}
-
-export const useDecisionHandling = ({
-  appendMarkdownContent,
-  setMessages
-}: UseDecisionHandlingProps) => {
+export const useDecisionHandling = () => {
+  const dispatch = useDispatch()
   const sendDecision = async (decision: string, feedback: string = '', decisionData: any) => {
     if (!decisionData) return
 
-    appendMarkdownContent('<p>正在处理您的决策...</p>')
+    dispatch(appendMarkdownContent('<p>正在处理您的决策...</p>'))
 
     try {
       const llmRunner = new LLM_Runner()
@@ -40,10 +35,10 @@ export const useDecisionHandling = ({
         throw new Error(`决策提交失败: ${await response.text()}`)
       }
 
-      setMessages(prev => prev + '<p>决策已提交，继续处理中...</p>')
+      dispatch(setMessage(prev => prev + '<p>决策已提交，继续处理中...</p>'))
     } catch (error: any) {
       console.error('Decision submission error:', error)
-      setMessages(prev => prev + `<p style="color: red;">决策提交失败: ${error.message}</p>`)
+      dispatch(setMessage(prev => prev + `<p style="color: red;">决策提交失败: ${error.message}</p>`))
     }
   }
 
