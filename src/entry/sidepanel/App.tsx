@@ -12,7 +12,7 @@ const AppContent: React.FC = () => {
     const initializeApp = async () => {
       const savedState = await loadStateFromStorage()
       if (savedState) {
-        console.log('App state initialized from storage')
+        console.debug('App state initialized from storage')
       }
       startAutoSave()
     }

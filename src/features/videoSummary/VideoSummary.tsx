@@ -2,7 +2,6 @@ import { useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useMessageHandling } from './hooks/useMessageHandling'
 import { useScrollManagement } from './hooks/useScrollManagement'
-import { useAIAnalysis } from './hooks/useAIAnalysis'
 import { useDecisionHandling } from './hooks/useDecisionHandling'
 import styled from 'styled-components'
 import {
@@ -45,7 +44,8 @@ export const VideoSummary = () => {
     outputContent,
     decisionData,
     messages,
-    showDownloadButton
+    showDownloadButton,
+    hasUserScrolled
   } = useSelector((state: RootState) => state.videoSummary)
 
   const resultContainerRef = useRef<HTMLDivElement>(null)
@@ -55,13 +55,9 @@ export const VideoSummary = () => {
     dispatch(setHasUserScrolled(false))
   }
 
-
-
-
-
   const handleExtract = async (mode: DownloadType) => {
     setMessageWithScrollReset('正在提取字幕...')
-    const res = await sendMessage({
+    const res = await chrome.runtime.sendMessage({
       type: MessageType.REQUEST_FETCH_SUBTITLE,
       payload: { mode },
     })
@@ -87,10 +83,10 @@ export const VideoSummary = () => {
     setMessageWithScrollReset(`字幕提取完成:${downloadId}`)
   }
 
-  const handleRequestSummarize = async () => {
+  const handleRequestSubtitleSummarize = async () => {
     dispatch(clearOutput())
     setMessageWithScrollReset('正在使用AI处理字幕...')
-    const res = await sendMessage({ type: MessageType.REQUEST_SUMMARIZE })
+    const res = await chrome.runtime.sendMessage({ type: MessageType.REQUEST_SUMMARIZE_SUBTITLE })
     if (res?.error) {
       setMessageWithScrollReset(res.error)
       return
@@ -106,7 +102,7 @@ export const VideoSummary = () => {
         quality: 80
       })
       setMessageWithScrollReset('正在使用AI分析界面...')
-      const res = await sendMessage({
+      const res = await chrome.runtime.sendMessage({
         type: MessageType.REQUEST_SUMMARIZE_SCREENSHOT,
         payload: { screenshot: screenshotDataUrl }
       })
@@ -134,7 +130,7 @@ export const VideoSummary = () => {
     dispatch(setAssistantRunning(true))
 
     try {
-      await sendMessage({
+      await chrome.runtime.sendMessage({
         type: MessageType.REQUEST_START_ASSISTANT,
         payload: { message: input.trim() },
       })
@@ -150,7 +146,7 @@ export const VideoSummary = () => {
 
     setMessageWithScrollReset('正在停止AI智能体...')
     try {
-      await sendMessage({ type: MessageType.REQUEST_STOP_ASSISTANT })
+      await chrome.runtime.sendMessage({ type: MessageType.REQUEST_STOP_ASSISTANT })
     } catch (error) {
       console.error('停止AI智能体失败:', error)
     } finally {
@@ -179,14 +175,6 @@ export const VideoSummary = () => {
     })
   }
 
-  const sendMessage = (payload: any): Promise<any> => {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(payload, resolve)
-    })
-  }
-
-  useAIAnalysis()
-
   useMessageHandling()
 
   useScrollManagement(resultContainerRef, thinkingContainerRef)
@@ -204,7 +192,7 @@ export const VideoSummary = () => {
 
       <ActionButtons
         onExtract={handleExtract}
-        onRequestSummarize={handleRequestSummarize}
+        onRequestSummarize={handleRequestSubtitleSummarize}
         onRequestScreenshotSummarize={handleRequestScreenshotSummarize}
       />
 

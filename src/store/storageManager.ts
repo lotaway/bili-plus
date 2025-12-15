@@ -8,7 +8,6 @@ export const saveStateToStorage = async () => {
     const state = store.getState()
     const serializedState = JSON.stringify(state)
     await chrome.storage.local.set({ [STORAGE_KEY]: serializedState })
-    console.debug('State saved to storage')
   } catch (error) {
     console.error('Failed to save state to storage:', error)
   }

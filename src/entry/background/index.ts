@@ -88,83 +88,6 @@ class DownloadManager {
     this.registedContentJss.set(sender.id as string, true)
   }
 
-  async handleSummarize(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
-    const isRegisted = this.registedContentJss.get(sender.id as string)
-    if (!isRegisted) {
-      sendResponse({
-        error: 'content.js maybe not registed, please try refresh the page',
-      })
-      return
-    }
-
-    const preResult = this.videoInfoUtils.checkVideoInfo()
-    if (preResult?.error) {
-      sendResponse(preResult)
-      return
-    }
-
-    const bvid = this.subtitleFetcher.bvid
-    const cid = this.subtitleFetcher.cid
-    const EVENT_TYPE = MessageType.SUMMARIZE_RESPONSE_STREAM
-
-    this.aiSubtitleHandler
-      .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
-        if (!sender.id) return
-        chrome.runtime.sendMessage(sender.id, {
-          type: EVENT_TYPE,
-          data: {
-            content: chunk,
-            bvid,
-            cid,
-            done: false,
-          } as SummarizeSuccessResponse,
-        })
-      })
-      .then((summaryResult) => {
-        if ('error' in summaryResult) {
-          throw new Error(summaryResult.error)
-        }
-
-        this.llmRunner.saveDocument({
-          title: summaryResult.title,
-          bvid,
-          cid,
-          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-          content: summaryResult.data.content,
-        })
-          .then(() => console.log('总结内容已保存到数据库'))
-          .catch(saveError => console.error('保存总结内容失败:', saveError))
-
-        if (sender.id) {
-          chrome.runtime.sendMessage(sender.id, {
-            type: EVENT_TYPE,
-            data: {
-              think: summaryResult.data.think,
-              content: summaryResult.data.content,
-              bvid,
-              cid,
-              done: true,
-            } as SummarizeSuccessResponse,
-          })
-        }
-        sendResponse({ done: true })
-      })
-      .catch((error) => {
-        console.error(error)
-        if (sender.id) {
-          chrome.runtime.sendMessage(sender.id, {
-            type: EVENT_TYPE,
-            data: {
-              error: error instanceof Error ? error.message : JSON.stringify(error),
-              bvid,
-              cid,
-            } as SummarizeErrorResponse,
-          })
-        }
-        sendResponse({ done: true })
-      })
-  }
-
   async handleSummarizeScreenshot(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     const isRegisted = this.registedContentJss.get(sender.id as string)
     if (!isRegisted) {
@@ -408,8 +331,8 @@ class DownloadManager {
         return this.handleRequestFetchSubtitle(message, sender, sendResponse)
       case MessageType.REGISTER_CONTENT_JS:
         return this.handleRegisterContentJs(sender)
-      case MessageType.REQUEST_SUMMARIZE:
-        return this.handleRequestSummarize(message, sender, sendResponse)
+      case MessageType.REQUEST_SUMMARIZE_SUBTITLE:
+        return this.handleRequestSummarizeSubtitle(message, sender, sendResponse)
       case MessageType.REQUEST_SUMMARIZE_SCREENSHOT:
         return this.handleRequestSummarizeScreenshot(message, sender, sendResponse)
       case MessageType.VIDEO_INFO_UPDATE:
@@ -454,7 +377,7 @@ class DownloadManager {
     return true
   }
 
-  private async handleRequestSummarize(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestSummarizeSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean | void {
     const isRegisted = this.registedContentJss.get(sender.id as string)
     if (!isRegisted) {
       sendResponse({
@@ -469,7 +392,7 @@ class DownloadManager {
     }
     const bvid = this.subtitleFetcher.bvid
     const cid = this.subtitleFetcher.cid
-    const EVENT_TYPE = MessageType.SUMMARIZE_RESPONSE_STREAM
+    const EVENT_TYPE = MessageType.SUMMARIZE_SUBTITLE_RESPONSE_STREAM
     this.aiSubtitleHandler
       .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
         if (!sender.id) {
@@ -489,18 +412,19 @@ class DownloadManager {
         if ('error' in summaryResult) {
           throw new Error(summaryResult.error)
         }
-        this.llmRunner.saveDocument({
-          title: summaryResult.title,
-          bvid,
-          cid,
-          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-          content: summaryResult.data.content,
-        })
-          .then(() =>
-            console.log('总结内容已保存到数据库'))
-          .catch(saveError => {
-            console.error('保存总结内容失败:', saveError)
+        if (summaryResult.data.content)
+          this.llmRunner.saveDocument({
+            title: summaryResult.title,
+            bvid,
+            cid,
+            source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+            content: summaryResult.data.content,
           })
+            .then(() =>
+              console.log('总结内容已保存到数据库'))
+            .catch(saveError => {
+              console.error('保存总结内容失败:', saveError)
+            })
 
         if (!sender.id) {
           return null

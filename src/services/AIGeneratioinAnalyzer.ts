@@ -16,7 +16,7 @@ export class AIGenerationAnalyzer {
     private streaming: boolean = false
     private subscribers: Map<string, Subscriber> = new Map()
 
-    constructor(private buffer: string = '') {
+    constructor(private buffer: string = '', private readonly withFrame = false) {
 
     }
 
@@ -28,13 +28,19 @@ export class AIGenerationAnalyzer {
         this.buffer += chunk
         if (this.subscribers.size === 0 || this.streaming)
             return
-        this.handeTimer && globalThis.cancelAnimationFrame(this.handeTimer)
-        this.handeTimer = globalThis.requestAnimationFrame(() => {
-            if (this.streaming)
-                return
-            this.handeTimer = undefined
-            this.outputStream()
-        })
+        if (this.withFrame) {
+            this.handeTimer && globalThis.cancelAnimationFrame(this.handeTimer)
+            this.handeTimer = globalThis.requestAnimationFrame(() => {
+                if (this.streaming)
+                    return
+                this.handeTimer = undefined
+                this.outputStream()
+            })
+        }
+        else if (this.streaming) {
+            return
+        }
+        this.outputStream()
     }
 
     outputStream() {
