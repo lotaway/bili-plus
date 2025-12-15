@@ -81,11 +81,88 @@ class DownloadManager {
       })
   }
 
-  handleRegisterContentJs(sender: chrome.runtime.MessageSender) {
+  handleRegisterContentJs(sender: chrome.runtime.MessageSender): boolean | void {
     if (this.registedContentJss.size > this.registerMaxSize - 1) {
       this.registedContentJss.delete(this.registedContentJss.keys().next().value as string)
     }
     this.registedContentJss.set(sender.id as string, true)
+  }
+
+  async handleSummarize(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+    const isRegisted = this.registedContentJss.get(sender.id as string)
+    if (!isRegisted) {
+      sendResponse({
+        error: 'content.js maybe not registed, please try refresh the page',
+      })
+      return
+    }
+
+    const preResult = this.videoInfoUtils.checkVideoInfo()
+    if (preResult?.error) {
+      sendResponse(preResult)
+      return
+    }
+
+    const bvid = this.subtitleFetcher.bvid
+    const cid = this.subtitleFetcher.cid
+    const EVENT_TYPE = MessageType.SUMMARIZE_SUBTITLE_RESPONSE_STREAM
+
+    this.aiSubtitleHandler
+      .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
+        if (!sender.id) return
+        chrome.runtime.sendMessage(sender.id, {
+          type: EVENT_TYPE,
+          data: {
+            content: chunk,
+            bvid,
+            cid,
+            done: false,
+          } as SummarizeSuccessResponse,
+        })
+      })
+      .then((summaryResult) => {
+        if ('error' in summaryResult) {
+          throw new Error(summaryResult.error)
+        }
+
+        this.llmRunner.saveDocument({
+          title: summaryResult.title,
+          bvid,
+          cid,
+          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+          content: summaryResult.data.content,
+        })
+          .then(() => console.log('总结内容已保存到数据库'))
+          .catch(saveError => console.error('保存总结内容失败:', saveError))
+
+        if (sender.id) {
+          chrome.runtime.sendMessage(sender.id, {
+            type: EVENT_TYPE,
+            data: {
+              think: summaryResult.data.think,
+              content: summaryResult.data.content,
+              bvid,
+              cid,
+              done: true,
+            } as SummarizeSuccessResponse,
+          })
+        }
+        sendResponse({ done: true })
+      })
+      .catch((error) => {
+        console.error(error)
+        if (sender.id) {
+          chrome.runtime.sendMessage(sender.id, {
+            type: EVENT_TYPE,
+            data: {
+              error: error instanceof Error ? error.message : JSON.stringify(error),
+              bvid,
+              cid,
+            } as SummarizeErrorResponse,
+          })
+        }
+        sendResponse({ done: true })
+      })
   }
 
   async handleSummarizeScreenshot(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
@@ -147,11 +224,11 @@ class DownloadManager {
       })
   }
 
-  handleVideoInfoUpdate(message: any) {
+  handleVideoInfoUpdate(message: any): boolean | void {
     this.subtitleFetcher.init(message.payload as VideoData)
   }
 
-  handleOpenSidePanel(sender: chrome.runtime.MessageSender) {
+  handleOpenSidePanel(sender: chrome.runtime.MessageSender): boolean | void {
     if (sender.tab?.windowId) {
       chrome.sidePanel.open({ windowId: sender.tab.windowId })
     }
@@ -325,7 +402,7 @@ class DownloadManager {
     }
   }
 
-  async handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+  handleMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response: any) => void) {
     switch (message.type) {
       case MessageType.REQUEST_FETCH_SUBTITLE:
         return this.handleRequestFetchSubtitle(message, sender, sendResponse)
@@ -352,7 +429,7 @@ class DownloadManager {
     }
   }
 
-  private async handleRequestFetchSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestFetchSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean | void {
     const preResult = this.videoInfoUtils.checkVideoInfo()
     if (preResult?.error) {
       sendResponse(preResult)
@@ -412,19 +489,18 @@ class DownloadManager {
         if ('error' in summaryResult) {
           throw new Error(summaryResult.error)
         }
-        if (summaryResult.data.content)
-          this.llmRunner.saveDocument({
-            title: summaryResult.title,
-            bvid,
-            cid,
-            source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-            content: summaryResult.data.content,
+        this.llmRunner.saveDocument({
+          title: summaryResult.title,
+          bvid,
+          cid,
+          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+          content: summaryResult.data.content,
+        })
+          .then(() =>
+            console.log('总结内容已保存到数据库'))
+          .catch(saveError => {
+            console.error('保存总结内容失败:', saveError)
           })
-            .then(() =>
-              console.log('总结内容已保存到数据库'))
-            .catch(saveError => {
-              console.error('保存总结内容失败:', saveError)
-            })
 
         if (!sender.id) {
           return null
@@ -459,7 +535,7 @@ class DownloadManager {
     return true
   }
 
-  private async handleRequestSummarizeScreenshot(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestSummarizeScreenshot(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean | void {
     const isRegisted = this.registedContentJss.get(sender.id as string)
     if (!isRegisted) {
       sendResponse({
@@ -534,7 +610,7 @@ class DownloadManager {
     return true
   }
 
-  private async handleRequestStartAssistant(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestStartAssistant(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean | void {
     const EVENT_TYPE = MessageType.ASSISTANT_RESPONSE_STREAM
     this.aiAgentRunner
       .runAgent(message.payload, (content, metadata) => {
@@ -577,7 +653,7 @@ class DownloadManager {
     return true
   }
 
-  private async handleRequestStopAssistant(sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestStopAssistant(sendResponse: (response?: any) => void): boolean | void {
     this.aiAgentRunner.stopAgent().then((stopped) => {
       sendResponse({
         stopped: stopped,
@@ -587,14 +663,18 @@ class DownloadManager {
     return true
   }
 
-  private async handleRequestVideoInfo(sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestVideoInfo(sendResponse: (response?: any) => void): boolean | void {
     const videoInfo = this.videoInfoUtils.checkVideoInfo()
     if (videoInfo.isOk) {
-      sendResponse({
-        bvid: this.subtitleFetcher.bvid,
-        cid: this.subtitleFetcher.cid,
-        aid: this.subtitleFetcher.aid,
-        title: await this.subtitleFetcher.getTitle()
+      this.subtitleFetcher.getTitle().then(title => {
+        sendResponse({
+          bvid: this.subtitleFetcher.bvid,
+          cid: this.subtitleFetcher.cid,
+          aid: this.subtitleFetcher.aid,
+          title,
+        })
+      }).catch(error => {
+        sendResponse({ error: new Error(`Get title failed: ${error}`) })
       })
     } else {
       sendResponse({ error: videoInfo.error })
@@ -602,24 +682,26 @@ class DownloadManager {
     return true
   }
 
-  private async handleRequestDownloadVideo(message: any, sendResponse: (response?: any) => void): Promise<boolean> {
+  private handleRequestDownloadVideo(message: any, sendResponse: (response?: any) => void): boolean | void {
     const { bvid, cid } = message.payload
     if (!bvid || !cid) {
       sendResponse({ error: '缺少BVID或CID参数' })
       return true
     }
-
-    try {
-      const { videoUrl, audioUrl, title } = await this.bilibiliApi.fetchPlayUrls(bvid, parseInt(cid))
-      await Promise.all([
-        this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
-        this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
-      ])
-
-      sendResponse({ success: true, message: '下载完成' })
-    } catch (error) {
-      sendResponse({ error: error instanceof Error ? error.message : '下载失败' })
-    }
+    this.bilibiliApi.fetchPlayUrls(bvid, parseInt(cid))
+      .then(data => {
+        const { videoUrl, audioUrl, title } = data
+        return Promise.all([
+          this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
+          this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+        ])
+      })
+      .then(() => {
+        sendResponse({ success: true, message: '下载完成' })
+      })
+      .catch(error => {
+        sendResponse({ error: error instanceof Error ? error.message : '下载失败' })
+      })
     return true
   }
 }

@@ -123,7 +123,7 @@ const VideoDownload: React.FC = () => {
         type: MessageType.REQUEST_VIDEO_INFO
       })
 
-      if (response.error) {
+      if (response?.error) {
         setStatus({ type: 'error', message: response.error })
         return
       }
@@ -176,7 +176,7 @@ const VideoDownload: React.FC = () => {
 
   const getDownloadButtonText = () => {
     const baseText = isLoading ? '下载中...' : '下载'
-    
+
     switch (downloadType) {
       case DownloadType.AUDIO_ONLY:
         return `${baseText}纯音频`
