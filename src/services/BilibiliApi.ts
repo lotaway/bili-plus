@@ -268,6 +268,7 @@ export class BilibiliApi {
       fnval?: number
       fourk?: number
       platform?: string
+      headers?: HeadersInit
     } = {}
   ): Promise<PlayUrlResult> {
     if (!bvid || !cid) {
@@ -292,10 +293,8 @@ export class BilibiliApi {
     })
 
     const url = `${this.host}/x/player/wbi/playurl?${params.toString()}`
-
-    const resp = await fetch(url, {
-      credentials: "include"
-    })
+    const _headers = await this.fillHeader(options.headers)
+    const resp = await fetch(url, { headers: _headers })
 
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
@@ -331,13 +330,14 @@ export class BilibiliApi {
     }
     if (data.data.durl && data.data.durl.length > 0) {
       const durl = data.data.durl[0]
+      const videoUrl = durl.url
       return {
-        videoUrl: durl.url,
+        videoUrl: videoUrl,
         audioUrl: '', // MP4 格式音频视频合并
         title: data.data.accept_description?.[0] ?? bvid
       }
     }
 
-    throw new Error("无法获取视频播放地址：响应中未包含有效的视频流数据")
+    throw new Error(`无法获取视频播放地址：响应中未包含有效的视频流数据。API 响应: ${JSON.stringify(data, null, 2)}`)
   }
 }

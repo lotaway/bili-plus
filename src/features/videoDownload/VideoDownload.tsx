@@ -100,16 +100,6 @@ const Status = styled.div<{ type: 'info' | 'success' | 'error' }>`
   }}
 `
 
-const InfoBox = styled.div`
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 4px;
-  padding: 15px;
-  margin-top: 20px;
-  font-size: 14px;
-  line-height: 1.5;
-`
-
 const VideoDownload: React.FC = () => {
   const [bvid, setBvid] = useState('')
   const [cid, setCid] = useState('')
@@ -255,18 +245,6 @@ const VideoDownload: React.FC = () => {
       >
         {isLoading ? '下载中...' : '静默下载（使用Chrome API）'}
       </SecondaryButton>
-
-      <InfoBox>
-        <strong>使用说明：</strong>
-        <br />
-        1. B站使用DASH格式，音视频分离下载
-        <br />
-        2. 支持多种下载类型：纯音频、纯视频、合并下载
-        <br />
-        3. 合并下载使用ffmpeg自动合并音视频文件
-        <br />
-        4. 静默下载需要Chrome下载权限，文件保存到默认下载目录
-      </InfoBox>
     </Container>
   )
 }
