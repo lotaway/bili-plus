@@ -79,7 +79,7 @@ export class SubtitleFetcher {
           videoKeys.length - this.MAX_STORED_VIDEOS
         )
         await chrome.storage.local.remove(keysToRemove)
-        console.log(`清理了 ${keysToRemove.length} 个过期的视频存储`)
+        console.debug(`清理了 ${keysToRemove.length} 个过期的视频存储`)
       }
     } catch (error) {
       console.error('清理存储时出错:', error)
