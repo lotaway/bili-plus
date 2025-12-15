@@ -6,6 +6,187 @@ export type PlayUrlResult = {
   title: string
 }
 
+// 视频流格式常量
+export const VideoFormat = {
+  MP4: 1,        // MP4 格式
+  DASH: 16,      // DASH 格式
+  DASH_HDR: 80,  // DASH + HDR (16 | 64)
+  DASH_DOLBY: 272, // DASH + 杜比音频 (16 | 256)
+  DASH_DOLBY_VISION: 528, // DASH + 杜比视界 (16 | 512)
+  DASH_4K: 144,  // DASH + 4K (16 | 128)
+  DASH_8K: 1040, // DASH + 8K (16 | 1024)
+  DASH_AV1: 2064, // DASH + AV1 (16 | 2048)
+  ALL_DASH: 4048 // 所有可用 DASH 流
+} as const
+
+// 视频清晰度常量
+export const VideoQuality = {
+  LD_240P: 6,    // 240P 极速
+  SD_360P: 16,   // 360P 流畅
+  SD_480P: 32,   // 480P 清晰
+  HD_720P: 64,   // 720P 高清
+  HD_720P60: 74, // 720P 60帧
+  FHD_1080P: 80, // 1080P 高清
+  AI_ENHANCED: 100, // 智能修复
+  FHD_1080P_PLUS: 112, // 1080P+ 高码率
+  FHD_1080P60: 116, // 1080P 60帧
+  UHD_4K: 120,   // 4K 超清
+  HDR: 125,      // HDR 真彩色
+  DOLBY_VISION: 126, // 杜比视界
+  UHD_8K: 127,   // 8K 超高清
+  HDR_VIVID: 129 // HDR Vivid
+} as const
+
+// 平台常量
+export const Platform = {
+  PC: 'pc',      // Web 端
+  HTML5: 'html5' // 移动端 HTML5
+} as const
+
+export type PlayUrlResponse = {
+  code: number
+  message: string
+  ttl: number
+  data: {
+    from: string
+    result: string
+    message: string
+    quality: number
+    format: string
+    timelength: number
+    accept_format: string
+    accept_description: string[]
+    accept_quality: number[]
+    video_codecid?: number
+    seek_param?: string
+    seek_type?: string
+    durl?: Array<{
+      order: number
+      length: number
+      size: number
+      ahead: string
+      vhead: string
+      url: string
+      backup_url: string[]
+    }>
+    dash?: {
+      duration: number
+      minBufferTime: number
+      min_buffer_time: number
+      video: Array<{
+        id: number
+        baseUrl: string
+        backupUrl: string[]
+        bandwidth: number
+        mimeType: string
+        mime_type: string
+        codecs: string
+        width: number
+        height: number
+        frameRate: string
+        frame_rate: string
+        sar: string
+        startWithSap: number
+        start_with_sap: number
+        SegmentBase: {
+          Initialization: string
+          indexRange: string
+        }
+        segment_base: {
+          initialization: string
+          index_range: string
+        }
+        codecid: number
+      }>
+      audio: Array<{
+        id: number
+        baseUrl: string
+        backupUrl: string[]
+        bandwidth: number
+        mimeType: string
+        mime_type: string
+        codecs: string
+        startWithSap: number
+        start_with_sap: number
+        SegmentBase: {
+          Initialization: string
+          indexRange: string
+        }
+        segment_base: {
+          initialization: string
+          index_range: string
+        }
+        codecid: number
+      }>
+      dolby?: {
+        type: number
+        audio: Array<{
+          id: number
+          baseUrl: string
+          backupUrl: string[]
+          bandwidth: number
+          mimeType: string
+          mime_type: string
+          codecs: string
+          startWithSap: number
+          start_with_sap: number
+          SegmentBase: {
+            Initialization: string
+            indexRange: string
+          }
+          segment_base: {
+            initialization: string
+            index_range: string
+          }
+          codecid: number
+        }>
+      }
+      flac?: {
+        audio: Array<{
+          id: number
+          baseUrl: string
+          backupUrl: string[]
+          bandwidth: number
+          mimeType: string
+          mime_type: string
+          codecs: string
+          startWithSap: number
+          start_with_sap: number
+          SegmentBase: {
+            Initialization: string
+            indexRange: string
+          }
+          segment_base: {
+            initialization: string
+            index_range: string
+          }
+          codecid: number
+        }>
+      }
+    }
+    support_formats: Array<{
+      quality: number
+      format: string
+      new_description: string
+      display_desc: string
+      superscript: string
+      codecs: string | null
+      can_watch_qn_reason: number
+      limit_watch_reason: number
+      report: Record<string, unknown>
+    }>
+    high_format?: any
+    last_play_time?: number
+    last_play_cid?: number
+    view_info?: any
+    play_conf?: {
+      is_new_description: boolean
+    }
+    cur_language?: string
+    cur_production_type?: number
+  }
+}
+
 export class BilibiliApi {
   private readonly host: string = '';
 
@@ -78,12 +259,36 @@ export class BilibiliApi {
     return await fetch(subUrl, { headers }).then((r) => r.json())
   }
 
-  async fetchPlayUrls(bvid: string, cid: number, quality = 80): Promise<PlayUrlResult> {
+  // [DOC](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/video/videostream_url.md)
+  async fetchPlayUrls(
+    bvid: string,
+    cid: number,
+    options: {
+      quality?: number
+      fnval?: number
+      fourk?: number
+      platform?: string
+    } = {}
+  ): Promise<PlayUrlResult> {
+    if (!bvid || !cid) {
+      throw new Error("bvid 和 cid 参数不能为空")
+    }
+    const {
+      quality = VideoQuality.FHD_1080P,
+      fnval = VideoFormat.MP4,
+      fourk = 0,
+      platform = Platform.PC
+    } = options
+
     const params = new URLSearchParams({
       bvid,
       cid: cid.toString(),
-      fourk: "1",
-      qn: quality.toString()
+      qn: quality.toString(),
+      fnval: fnval.toString(),
+      fourk: fourk.toString(),
+      fnver: '0',
+      platform,
+      otype: 'json'
     })
 
     const url = `${this.host}/x/player/wbi/playurl?${params.toString()}`
@@ -92,17 +297,47 @@ export class BilibiliApi {
       credentials: "include"
     })
 
-    const data = await resp.json()
-
-    if (data.code !== 0) throw new Error(data.message)
-
-    const dash = data.data.dash
-    if (!dash) throw new Error("非 DASH 视频")
-
-    return {
-      videoUrl: dash.video[0].baseUrl,
-      audioUrl: dash.audio[0].baseUrl,
-      title: data.data.accept_description?.[0] ?? bvid
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
     }
+
+    const data = await resp.json() as PlayUrlResponse
+
+    if (data.code !== 0) {
+      throw new Error(`API 错误 ${data.code}: ${data.message}`)
+    }
+
+    if (data.data.dash) {
+      const dash = data.data.dash
+
+      if (!dash.video || dash.video.length === 0) {
+        throw new Error("DASH 格式视频流数据为空")
+      }
+
+      if (!dash.audio || dash.audio.length === 0) {
+        throw new Error("DASH 格式音频流数据为空")
+      }
+
+      const videoStream = dash.video.sort((a, b) => b.bandwidth - a.bandwidth)[0]
+      const audioStream = dash.audio.sort((a, b) => b.bandwidth - a.bandwidth)[0]
+      const dolbyAudio = dash.dolby?.audio?.[0]
+      const flacAudio = dash.flac?.audio?.[0]
+
+      return {
+        videoUrl: videoStream.baseUrl,
+        audioUrl: dolbyAudio?.baseUrl || flacAudio?.baseUrl || audioStream.baseUrl,
+        title: data.data.accept_description?.[0] ?? bvid
+      }
+    }
+    if (data.data.durl && data.data.durl.length > 0) {
+      const durl = data.data.durl[0]
+      return {
+        videoUrl: durl.url,
+        audioUrl: '', // MP4 格式音频视频合并
+        title: data.data.accept_description?.[0] ?? bvid
+      }
+    }
+
+    throw new Error("无法获取视频播放地址：响应中未包含有效的视频流数据")
   }
 }
