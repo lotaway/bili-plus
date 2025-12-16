@@ -85,6 +85,7 @@ export const VideoSummary = () => {
 
   const handleRequestSubtitleSummarize = async () => {
     dispatch(clearOutput())
+    clearAnaylazeContent()
     setMessageWithScrollReset('正在使用AI处理字幕...')
     const res = await chrome.runtime.sendMessage({ type: MessageType.REQUEST_SUMMARIZE_SUBTITLE })
     if (res?.error) {
@@ -175,7 +176,7 @@ export const VideoSummary = () => {
     })
   }
 
-  useMessageHandling()
+  const { clearAnaylazeContent } = useMessageHandling()
 
   useScrollManagement(resultContainerRef, thinkingContainerRef)
 

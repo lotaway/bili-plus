@@ -11,12 +11,17 @@ import {
   setMarkdownContent,
   setShowDownloadButton,
   setHasUserScrolled,
+  setThinkingContent,
 } from '../../../store/slices/videoSummarySlice'
 import { AIGenerationAnalyzer } from '../../../services/AIGeneratioinAnalyzer'
 
 export const useMessageHandling = () => {
   const dispatch = useDispatch()
   const aiAnalyzerRef = useRef<AIGenerationAnalyzer | null>(null)
+
+  function clearAnaylazeContent() {
+    aiAnalyzerRef.current?.reset()
+  }
 
   useEffect(() => {
     if (!aiAnalyzerRef.current) {
@@ -27,7 +32,7 @@ export const useMessageHandling = () => {
     const handleAnalyzerOutput = (data: { done: boolean, think: string, content: string }) => {
       if (data.done) {
         if (data.think) {
-          dispatch(appendThinkingContent(data.think))
+          dispatch(setThinkingContent(data.think))
         }
         if (data.content) {
           dispatch(setMarkdownContent(data.content))
@@ -37,7 +42,7 @@ export const useMessageHandling = () => {
         return
       }
       if (data.think) {
-        dispatch(appendThinkingContent(data.think))
+        dispatch(setThinkingContent(data.think))
       }
       if (data.content) {
         dispatch(appendMarkdownContent(data.content))
@@ -113,4 +118,8 @@ export const useMessageHandling = () => {
       aiAnalyzer.reset()
     }
   }, [dispatch])
+
+  return {
+    clearAnaylazeContent,
+  }
 }

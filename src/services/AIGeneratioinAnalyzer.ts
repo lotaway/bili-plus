@@ -117,8 +117,6 @@ export class AIGenerationAnalyzer {
     }
 
     reset() {
-        this.subscribers.clear()
-        this.subscribers = new Map()
         this.state = ParsingState.FREE
         this.buffer = ''
         this.think = ''

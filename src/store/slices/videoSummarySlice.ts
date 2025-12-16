@@ -61,6 +61,10 @@ export const videoSummarySlice = createSlice({
       state.outputContent.thinking += action.payload
       state.hasUserScrolled = false
     },
+    setThinkingContent: (state, action: PayloadAction<string>) => {
+      state.outputContent.thinking = action.payload
+      state.hasUserScrolled = false
+    },
     setDecisionData: (state, action: PayloadAction<DecisionData | null>) => {
       state.decisionData = action.payload
     },
@@ -80,6 +84,7 @@ export const {
   appendMarkdownContent,
   setMarkdownContent,
   appendThinkingContent,
+  setThinkingContent,
   setDecisionData,
   setHasUserScrolled,
   setShowDownloadButton,
