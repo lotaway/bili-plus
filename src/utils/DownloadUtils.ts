@@ -18,25 +18,25 @@ export class DownloadUtils {
     const url = URL.createObjectURL(blob)
     a.href = url
     a.download = filename
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
   async downloadWithChromeAPI(url: string, filename: string): Promise<void> {
-    // 对于 B 站视频 URL，先下载到 Blob 再使用 Chrome API 下载
     if (url.includes('bilibili.com') || url.includes('bilivideo.com')) {
       try {
         const blob = await this.downloadToBlob(url)
         const blobUrl = URL.createObjectURL(blob)
-        
+
         return new Promise<void>((resolve, reject) => {
           chrome.downloads.download({
             url: blobUrl,
             filename: filename,
             saveAs: false
           }, (downloadId) => {
-            URL.revokeObjectURL(blobUrl) // 清理 Blob URL
-            
+            URL.revokeObjectURL(blobUrl)
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message))
             } else {
@@ -48,7 +48,7 @@ export class DownloadUtils {
         throw new Error(`B站视频下载失败: ${error instanceof Error ? error.message : '未知错误'}`)
       }
     }
-    
+
     // 对于普通 URL，直接使用 Chrome 下载 API
     return new Promise<void>((resolve, reject) => {
       chrome.downloads.download({

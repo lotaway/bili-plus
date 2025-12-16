@@ -164,6 +164,39 @@ const VideoDownload: React.FC = () => {
     }
   }
 
+  const handlePageContextDownload = async () => {
+    if (!bvid || !cid) {
+      setStatus({ type: 'error', message: '请先输入BVID和CID' })
+      return
+    }
+
+    setIsLoading(true)
+    setStatus({ type: 'info', message: '开始页面上下文下载...' })
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.REQUEST_DOWNLOAD_VIDEO,
+        payload: { bvid, cid, downloadType }
+      })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      setStatus({
+        type: 'success',
+        message: '页面上下文下载完成！文件已通过浏览器下载。'
+      })
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: `页面上下文下载失败: ${error instanceof Error ? error.message : '未知错误'}`
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const getDownloadButtonText = () => {
     const baseText = isLoading ? '下载中...' : '下载'
 
@@ -244,6 +277,13 @@ const VideoDownload: React.FC = () => {
         disabled={isLoading}
       >
         {isLoading ? '下载中...' : '静默下载（使用Chrome API）'}
+      </SecondaryButton>
+
+      <SecondaryButton
+        onClick={handlePageContextDownload}
+        disabled={isLoading}
+      >
+        {isLoading ? '下载中...' : '页面上下文下载（同源下载）'}
       </SecondaryButton>
     </Container>
   )
