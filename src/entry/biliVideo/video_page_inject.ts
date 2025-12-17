@@ -128,7 +128,7 @@ class VideoPageInjectActivity {
         const videoBlob = await utils.downloadToBlob(playUrlInfo.videoUrl)
         const audioBlob = await utils.downloadToBlob(playUrlInfo.audioUrl)
         const mergeBlob = await this.mergeVideoAudioWithFFmpeg(videoBlob, audioBlob)
-        await utils.saveBlob(mergeBlob, VIDEO_FILE_NAME)
+        await utils.saveBlob(mergeBlob, VIDEO_FILE_NAME.replace(".video", ""))
         return { success: true, message: '视频和音频合并完成' }
       default:
         throw new Error(`不支持的下载类型: ${downloadType}`)
