@@ -174,15 +174,17 @@ const VideoDownload: React.FC = () => {
     setStatus({ type: 'info', message: '开始页面上下文下载...' })
 
     try {
-      const response = await chrome.runtime.sendMessage({
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (!tab?.id) {
+        throw new Error("Can't found activate tab")
+      }
+      const response = await chrome.tabs.sendMessage(tab.id, {
         type: MessageType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
         payload: { bvid, cid, downloadType }
       })
-
-      if (response.error) {
-        throw new Error(response.error)
+      if (!response || response?.error) {
+        throw new Error(response?.error ?? "Unresponse error")
       }
-
       setStatus({
         type: 'success',
         message: '页面上下文下载完成！文件已通过浏览器下载。'

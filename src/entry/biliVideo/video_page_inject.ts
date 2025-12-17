@@ -32,7 +32,7 @@ function addDownloadListener() {
     if (
       event.source !== window ||
       event.data?.source !== PageType.CONTENT_SCRIPT ||
-      event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO
+      event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE
     ) {
       return
     }
@@ -44,13 +44,13 @@ function addDownloadListener() {
 
       window.postMessage({
         source: PageType.VIDEO_PAGE_INJECT,
-        type: PageEventType.REQUEST_DOWNLOAD_VIDEO,
+        type: PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
         payload: result
       }, '*')
     } catch (error) {
       window.postMessage({
         source: PageType.VIDEO_PAGE_INJECT,
-        type: PageEventType.REQUEST_DOWNLOAD_VIDEO,
+        type: PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
         payload: {
           error: error instanceof Error ? error.message : '下载失败'
         }

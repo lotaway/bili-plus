@@ -31,6 +31,9 @@ function addListener() {
       case PageEventType.VIDEO_INFO_INIT:
         await chrome.runtime.sendMessage({
           type: MessageType.VIDEO_INFO_UPDATE,
+          sender: {
+            id: chrome.runtime.id,
+          },
           payload: event.data.payload as VideoData,
         })
         break
@@ -48,6 +51,7 @@ function addListener() {
 type ChromeMessageEvent = [message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void]
 
 function handleMessage(...args: ChromeMessageEvent) {
+  console.debug(`content script handle message: ${args[0]}`)
   const [message, sender, sendResponse] = args
   switch (message.type) {
     case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE:
@@ -61,14 +65,14 @@ function handleRequestVideoDownloadInPage(...args: ChromeMessageEvent) {
   const [message, sender, sendResponse] = args
   window.postMessage({
     source: PageType.CONTENT_SCRIPT,
-    type: PageEventType.REQUEST_DOWNLOAD_VIDEO,
+    type: PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
     payload: message.payload
   }, '*')
   const handleResponse = (event: MessageEvent) => {
     if (
       event.source !== window ||
       event.data?.source !== PageType.VIDEO_PAGE_INJECT ||
-      event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO
+      event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE
     ) {
       return
     }
