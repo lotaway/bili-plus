@@ -3,6 +3,7 @@ import { VideoData } from '../../types/video'
 import { PageEventType } from '../../enums/PageEventType'
 import { BilibiliApi } from '../../services/BilibiliApi'
 import { DownloadUtils } from '../../utils/DownloadUtils'
+import { DownloadType } from '../../enums/DownloadType'
 
 let isWindowActivate = true
 
@@ -71,14 +72,14 @@ async function handleVideoDownload(bvid: string, cid: string, downloadType: stri
     utils.saveBlob(blob, filename)
   }
   switch (downloadType) {
-    case 'VIDEO_AUDIO':
+    case DownloadType.VIDEO_AUDIO:
       await downloadFile(playUrlInfo.videoUrl, `${videoData.title}.video.mp4`)
       await downloadFile(playUrlInfo.audioUrl, `${videoData.title}.audio.m4a`)
       return { success: true, message: '视频和音频下载完成' }
-    case 'AUDIO_ONLY':
+    case DownloadType.AUDIO_ONLY:
       await downloadFile(playUrlInfo.audioUrl, `${videoData.title}.audio.m4a`)
       return { success: true, message: '音频下载完成' }
-    case 'VIDEO_ONLY':
+    case DownloadType.VIDEO_ONLY:
       await downloadFile(playUrlInfo.videoUrl, `${videoData.title}.video.mp4`)
       return { success: true, message: '视频下载完成' }
     default:
