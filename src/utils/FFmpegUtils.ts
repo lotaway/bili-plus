@@ -14,7 +14,7 @@ export class FFmpegUtils {
 
     const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd'
     this.ffmpeg.on('log', ({ message }) => {
-      console.log('[FFmpeg]', message)
+      console.debug('[FFmpeg]', message)
     })
     try {
       await this.ffmpeg.load({
@@ -22,7 +22,7 @@ export class FFmpegUtils {
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       })
       this.loaded = true
-      console.log('FFmpeg loaded successfully')
+      console.debug('FFmpeg loaded successfully')
     } catch (error) {
       console.error('Failed to load FFmpeg:', error)
       throw error

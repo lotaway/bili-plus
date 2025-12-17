@@ -161,7 +161,7 @@ const App: React.FC = () => {
 
   return (
     <div className="popup">
-      <h3>🎬 Bilibili 字幕提取器</h3>
+      <h3>🎬 Bilibili Plus</h3>
       <div className="config-section">
         <h4>AI 配置</h4>
         <div className="form-group">

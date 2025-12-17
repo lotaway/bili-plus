@@ -16,10 +16,12 @@ const StyledAssistantInput = styled.div`
   border: 1px solid #e9ecef;
   border-radius: 8px;
   padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 `
 
 const AssistantTextarea = styled.textarea`
-  width: 100%;
   padding: 12px;
   border: 1px solid #d1d5db;
   border-radius: 6px;

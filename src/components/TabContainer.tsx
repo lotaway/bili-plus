@@ -25,14 +25,17 @@ const TabHeader = styled.div`
 `
 
 const TabButton = styled.button<{ active: boolean }>`
-  padding: 12px 20px;
+  padding: 8px 16px;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: ${props => props.active ? '#007bff' : '#6c757d'};
   border-bottom: 2px solid ${props => props.active ? '#007bff' : 'transparent'};
   transition: all 0.2s;
+  flex: 1;
+  text-align: center;
+  min-width: 0;
 
   &:hover {
     background: #e9ecef;
@@ -47,7 +50,7 @@ const TabButton = styled.button<{ active: boolean }>`
 const TabContent = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
+  padding: 10px;
 `
 
 const TabContainer: React.FC<TabContainerProps> = ({ tabs, defaultTab }) => {

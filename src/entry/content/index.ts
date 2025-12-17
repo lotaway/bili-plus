@@ -1,4 +1,4 @@
-import { PageEventType } from '../../enums/PageEventType'
+import { RequestPageEventType } from '../../enums/PageEventType'
 import { MessageType } from '../../enums/MessageType'
 import { PageType } from '../../enums/PageType'
 import { VideoData } from '../../types/video'
@@ -17,41 +17,42 @@ function addListener() {
     type: MessageType.REGISTER_CONTENT_JS,
   }).catch(err => console.error(err))
 
-  chrome.runtime.onMessage.addListener(handleMessage)
+  chrome.runtime.onMessage.addListener(handleChromeMessage)
 
-  window.addEventListener('message', async (event) => {
-    if (
-      event.source !== window ||
-      event.data?.source !== PageType.VIDEO_PAGE_INJECT
-    ) {
-      return
-    }
+  window.addEventListener('message', handlerWindowMessage)
+}
 
-    switch (event.data.type) {
-      case PageEventType.VIDEO_INFO_INIT:
-        await chrome.runtime.sendMessage({
-          type: MessageType.VIDEO_INFO_UPDATE,
-          sender: {
-            id: chrome.runtime.id,
-          },
-          payload: event.data.payload as VideoData,
-        })
-        break
-      case PageEventType.REQUEST_OPEN_SIDE_PANEL:
-        chrome.runtime.sendMessage({
-          type: MessageType.OPEN_SIDE_PANEL,
-        })
-        break
-      default:
-        break
-    }
-  })
+async function handlerWindowMessage(event: MessageEvent) {
+  if (
+    event.source !== window ||
+    event.data?.source !== PageType.VIDEO_PAGE_INJECT
+  ) {
+    return
+  }
+
+  switch (event.data.type) {
+    case RequestPageEventType.VIDEO_INFO_INIT:
+      await chrome.runtime.sendMessage({
+        type: MessageType.VIDEO_INFO_UPDATE,
+        sender: {
+          id: chrome.runtime.id,
+        },
+        payload: event.data.payload as VideoData,
+      })
+      break
+    case RequestPageEventType.REQUEST_OPEN_SIDE_PANEL:
+      chrome.runtime.sendMessage({
+        type: MessageType.OPEN_SIDE_PANEL,
+      })
+      break
+    default:
+      break
+  }
 }
 
 type ChromeMessageEvent = [message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void]
 
-function handleMessage(...args: ChromeMessageEvent) {
-  console.debug(`content script handle message: ${args[0]}`)
+function handleChromeMessage(...args: ChromeMessageEvent) {
   const [message, sender, sendResponse] = args
   switch (message.type) {
     case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE:
@@ -65,14 +66,14 @@ function handleRequestVideoDownloadInPage(...args: ChromeMessageEvent) {
   const [message, sender, sendResponse] = args
   window.postMessage({
     source: PageType.CONTENT_SCRIPT,
-    type: PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
+    type: RequestPageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
     payload: message.payload
   }, '*')
   const handleResponse = (event: MessageEvent) => {
     if (
       event.source !== window ||
       event.data?.source !== PageType.VIDEO_PAGE_INJECT ||
-      event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE
+      event.data?.type !== RequestPageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE
     ) {
       return
     }

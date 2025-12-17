@@ -1,7 +1,7 @@
 {
   "name": "bili-plus",
   "version": "1.0.1",
-  "description": "Bilibili 字幕提取器",
+  "description": "Bilibili Plus",
   "scripts": {
     "build": "tsc && vite build && vite build -c vite.content.config.ts && vite build -c vite.inject.config.ts",
     "preview": "vite preview",

@@ -5,10 +5,10 @@ import { calcMonthlyPayment } from '../../utils/loan'
 import { CALC_CONFIG } from './calculatorConfig'
 
 const CalculatorContainer = styled.div`
-  padding: 15px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 10px;
 `
 
 const CalculatorInputGroup = styled.div`

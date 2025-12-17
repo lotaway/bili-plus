@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "key": "CHROMEEXTENSIONKEYBILIBILIPLUS01",
-    "name": "Bilibili 字幕提取器",
+    "name": "Bilibili Plus",
     "version": "1.0.1",
     "description": "增强B站功能如提取字幕总结等",
     "permissions": [

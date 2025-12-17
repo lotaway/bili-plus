@@ -14,17 +14,17 @@ import {
 import { RootState } from '../../store/store'
 
 const SidepaneContainer = styled.div`
-  padding: 15px;
+  padding: 10px;
   max-height: 100vh;
   display: flex;
   flex-direction: column;
 `
 
 const OutputSection = styled.div`
-  margin: 15px 0;
+  margin: 10px 0;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 10px;
 `
 
 import { ActionButtons } from '../../components/ActionButtons'

@@ -1,9 +1,9 @@
 export class DownloadUtils {
-  async downloadToBlob(url: string): Promise<Blob> {
+  async downloadToBlob(url: string, host = 'https://www.bilibili.com/'): Promise<Blob> {
     const res = await fetch(url, {
       credentials: "include",
       headers: {
-        'Referer': 'https://www.bilibili.com/',
+        'Referer': host,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     })

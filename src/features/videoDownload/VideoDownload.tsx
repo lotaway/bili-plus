@@ -4,7 +4,7 @@ import { MessageType } from '../../enums/MessageType'
 import { DownloadType } from '../../enums/DownloadType'
 
 const Container = styled.div`
-  padding: 20px;
+  padding: 10px;
   max-width: 400px;
   margin: 0 auto;
 `
@@ -164,15 +164,13 @@ const VideoDownload: React.FC = () => {
     }
   }
 
-  const handlePageContextDownload = async () => {
+  const handleVideoDownloadInPage = async () => {
     if (!bvid || !cid) {
       setStatus({ type: 'error', message: '请先输入BVID和CID' })
       return
     }
-
     setIsLoading(true)
     setStatus({ type: 'info', message: '开始页面上下文下载...' })
-
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
       if (!tab?.id) {
@@ -266,26 +264,17 @@ const VideoDownload: React.FC = () => {
       >
         从当前页面解析
       </SecondaryButton>
-
       <Button
-        onClick={() => handleDownload(false)}
+        onClick={handleVideoDownloadInPage}
         disabled={isLoading}
       >
         {getDownloadButtonText()}
       </Button>
-
       <SecondaryButton
         onClick={() => handleDownload(true)}
         disabled={isLoading}
       >
         {isLoading ? '下载中...' : '静默下载（使用Chrome API）'}
-      </SecondaryButton>
-
-      <SecondaryButton
-        onClick={handlePageContextDownload}
-        disabled={isLoading}
-      >
-        {isLoading ? '下载中...' : '页面上下文下载（同源下载）'}
       </SecondaryButton>
     </Container>
   )
