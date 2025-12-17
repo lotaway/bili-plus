@@ -207,14 +207,14 @@ export class BilibiliApi {
     return url
   }
 
-  async getCookiesByChrome(): Promise<chrome.cookies.Cookie[]> {
-    if (typeof chrome !== undefined) {
+  async getCookies(): Promise<chrome.cookies.Cookie[]> {
+    if (typeof chrome !== undefined && chrome.cookies?.getAll) {
       return await chrome.cookies.getAll({
         domain: this.host.replace('https://api', ''),
       })
     }
-    return document.cookie.split("&").map(item => {
-      const [name, value] = item.split("=")
+    return document.cookie.split(";").map(item => {
+      const [name, value] = item.trim().split("=")
       return {
         domain: this.host.replace('https://api', ''),
         name,
@@ -236,7 +236,7 @@ export class BilibiliApi {
 
   async fillHeader(headers?: HeadersInit): Promise<HeadersInit> {
     if (!headers) {
-      const cookieHeader = this.buildCookieHeader(await this.getCookiesByChrome())
+      const cookieHeader = this.buildCookieHeader(await this.getCookies())
       headers = this.buildHeader(cookieHeader)
     }
     return headers
