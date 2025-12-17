@@ -422,7 +422,7 @@ class DownloadManager {
         return this.handleRequestStopAssistant(sendResponse)
       case MessageType.REQUEST_VIDEO_INFO:
         return this.handleRequestVideoInfo(sendResponse)
-      case MessageType.REQUEST_DOWNLOAD_VIDEO:
+      case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_BG:
         return this.handleRequestDownloadVideo(message, sendResponse)
       default:
         break

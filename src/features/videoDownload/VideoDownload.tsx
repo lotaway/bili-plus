@@ -137,7 +137,7 @@ const VideoDownload: React.FC = () => {
 
     try {
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.REQUEST_DOWNLOAD_VIDEO,
+        type: MessageType.REQUEST_DOWNLOAD_VIDEO_IN_BG,
         payload: { bvid, cid, downloadType, useChromeAPI }
       })
 
@@ -175,7 +175,7 @@ const VideoDownload: React.FC = () => {
 
     try {
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.REQUEST_DOWNLOAD_VIDEO,
+        type: MessageType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
         payload: { bvid, cid, downloadType }
       })
 

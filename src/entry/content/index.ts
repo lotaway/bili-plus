@@ -17,30 +17,7 @@ function addListener() {
     type: MessageType.REGISTER_CONTENT_JS,
   }).catch(err => console.error(err))
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === MessageType.REQUEST_DOWNLOAD_VIDEO) {
-      window.postMessage({
-        source: PageType.CONTENT_SCRIPT,
-        type: PageEventType.REQUEST_DOWNLOAD_VIDEO,
-        payload: message.payload
-      }, '*')
-      const handleResponse = (event: MessageEvent) => {
-        if (
-          event.source !== window ||
-          event.data?.source !== PageType.VIDEO_PAGE_INJECT ||
-          event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO
-        ) {
-          return
-        }
-        sendResponse(event.data.payload)
-        window.removeEventListener('message', handleResponse)
-      }
-
-      window.addEventListener('message', handleResponse)
-      return true
-    }
-    return false
-  })
+  chrome.runtime.onMessage.addListener(handleMessage)
 
   window.addEventListener('message', async (event) => {
     if (
@@ -66,6 +43,41 @@ function addListener() {
         break
     }
   })
+}
+
+type ChromeMessageEvent = [message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void]
+
+function handleMessage(...args: ChromeMessageEvent) {
+  const [message, sender, sendResponse] = args
+  switch (message.type) {
+    case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE:
+      handleRequestVideoDownloadInPage(...args)
+      return true
+  }
+  return false
+}
+
+function handleRequestVideoDownloadInPage(...args: ChromeMessageEvent) {
+  const [message, sender, sendResponse] = args
+  window.postMessage({
+    source: PageType.CONTENT_SCRIPT,
+    type: PageEventType.REQUEST_DOWNLOAD_VIDEO,
+    payload: message.payload
+  }, '*')
+  const handleResponse = (event: MessageEvent) => {
+    if (
+      event.source !== window ||
+      event.data?.source !== PageType.VIDEO_PAGE_INJECT ||
+      event.data?.type !== PageEventType.REQUEST_DOWNLOAD_VIDEO
+    ) {
+      return
+    }
+    sendResponse(event.data.payload)
+    window.removeEventListener('message', handleResponse)
+  }
+
+  window.addEventListener('message', handleResponse)
+  return true
 }
 
 function injectScript() {
