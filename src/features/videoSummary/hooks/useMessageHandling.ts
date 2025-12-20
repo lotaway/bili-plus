@@ -12,6 +12,7 @@ import {
   setShowDownloadButton,
   setHasUserScrolled,
   setThinkingContent,
+  setAssistantRunning,
 } from '../../../store/slices/videoSummarySlice'
 import { AIGenerationAnalyzer } from '../../../services/AIGeneratioinAnalyzer'
 
@@ -31,6 +32,11 @@ export const useMessageHandling = () => {
 
     const handleAnalyzerOutput = (data: { done: boolean, think: string, content: string }) => {
       if (data.done) {
+        if (!data.content || data.content.trim() === '') {
+          dispatch(setMessage('无内容'))
+          dispatch(setAssistantRunning(false))
+          return
+        }
         if (data.think) {
           dispatch(setThinkingContent(data.think))
         }
@@ -39,6 +45,7 @@ export const useMessageHandling = () => {
         }
         dispatch(setShowDownloadButton(true))
         dispatch(setHasUserScrolled(false))
+        dispatch(setAssistantRunning(false))
         return
       }
       if (data.think) {
@@ -73,10 +80,16 @@ export const useMessageHandling = () => {
       }
       if (data.done) {
         console.debug("Stream ended")
+        if (!data.content || data.content.trim() === '') {
+          dispatch(setMessage('无内容'))
+          dispatch(setAssistantRunning(false))
+          return
+        }
         if (data.content && aiAnalyzer) {
           aiAnalyzer.reset()
           aiAnalyzer.inputStream(data.content)
         }
+        dispatch(setAssistantRunning(false)) // 添加这行来重置运行状态
         return
       }
       if (data.content && aiAnalyzer) {
@@ -104,6 +117,7 @@ export const useMessageHandling = () => {
           aiAnalyzer.reset()
           aiAnalyzer.inputStream(data.content)
         }
+        dispatch(setAssistantRunning(false)) // 添加这行来重置运行状态
         return
       }
       if (data.content && aiAnalyzer) {

@@ -6,7 +6,9 @@ import {
   appendMarkdownContent,
   setMarkdownContent,
   setShowDownloadButton,
-  setHasUserScrolled
+  setHasUserScrolled,
+  setAssistantRunning,
+  setMessage
 } from '../../../store/slices/videoSummarySlice'
 
 export const useAIAnalysis = () => {
@@ -18,13 +20,19 @@ export const useAIAnalysis = () => {
       aiGenerationAnalyzerRef.current = new AIGenerationAnalyzer()
     }
     const aiGenerationAnalyzer = aiGenerationAnalyzerRef.current
-    
+
     const handleAnalyzerOutput = (data: { done: boolean, think: string, content: string }) => {
       if (data.done) {
+        if (!data.content || data.content.trim() === '') {
+          dispatch(setMessage('无内容'))
+          dispatch(setAssistantRunning(false))
+          return
+        }
         dispatch(appendThinkingContent(data.think))
         dispatch(setMarkdownContent(data.content))
         dispatch(setShowDownloadButton(true))
         dispatch(setHasUserScrolled(false))
+        dispatch(setAssistantRunning(false))
         return
       }
       if (data.think) {
@@ -34,7 +42,6 @@ export const useAIAnalysis = () => {
         dispatch(appendMarkdownContent(data.content))
       }
     }
-    
     const subscriptionId = aiGenerationAnalyzer.subscribe(handleAnalyzerOutput)
     return () => {
       aiGenerationAnalyzer.unsubscribe(subscriptionId)
