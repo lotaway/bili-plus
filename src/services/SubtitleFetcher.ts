@@ -113,7 +113,7 @@ export class SubtitleFetcher {
       this.videoInfo.cid
     )
     const pref = subtitles.find((s: any) =>
-      ['zh-CN', 'zh', 'ai-zh'].includes(s.lan)
+      ['zh-CN', 'zh', 'ai-zh', "en", "ai-en"].includes(s.lan)
     )
     if (!pref) return { error: '无可用字幕' }
     return await this.api.getSubtitleJson(pref.subtitle_url, headers)
