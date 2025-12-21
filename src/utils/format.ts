@@ -1,9 +1,16 @@
-export const parseNumber = (v: string | number): number => {
-  if (typeof v === 'number') return v
-  return Number(String(v).replace(/[^0-9.]/g, ''))
+export function formatFileSize(bytes: number, decimals: number = 2): string {
+  if (bytes === 0) return '0 B'
+
+  const k = 1024
+  const dm = decimals < 0 ? 0 : decimals
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
 }
 
-export const formatCurrency = (v: number): string => {
-  if (!v && v !== 0) return ''
-  return 'R ' + parseNumber(v).toLocaleString('en-ZA')
+export function calculateProgress(loaded: number, total: number): number {
+  if (total === 0) return 0
+  return Math.round((loaded / total) * 100)
 }

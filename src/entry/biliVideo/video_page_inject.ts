@@ -110,23 +110,38 @@ class VideoPageInjectActivity {
     const playUrlInfo = await api.fetchPlayUrls(bvid, parseInt(cid))
     const VIDEO_FILE_NAME = `${videoData.title}.video.mp4`
     const AUDIO_FILE_NAME = `${videoData.title}.audio.m4a`
+    const sendProgressUpdate = (fileType: string, progress: { loaded: number; total: number }) => {
+      window.postMessage({
+        source: PageType.VIDEO_PAGE_INJECT,
+        type: RequestPageEventType.DOWNLOAD_PROGRESS_UPDATE,
+        payload: {
+          bvid,
+          cid,
+          fileType,
+          loaded: progress.loaded,
+          total: progress.total,
+          timestamp: Date.now()
+        }
+      }, '*')
+    }
+
     switch (downloadType) {
       case DownloadType.VIDEO_AUDIO:
         await Promise.all([
-          this.downloadFile(playUrlInfo.videoUrl, VIDEO_FILE_NAME),
-          this.downloadFile(playUrlInfo.audioUrl, AUDIO_FILE_NAME),
+          this.downloadFile(playUrlInfo.videoUrl, VIDEO_FILE_NAME, (progress) => sendProgressUpdate('video', progress)),
+          this.downloadFile(playUrlInfo.audioUrl, AUDIO_FILE_NAME, (progress) => sendProgressUpdate('audio', progress)),
         ])
         return { success: true, message: '视频和音频下载完成' }
       case DownloadType.AUDIO_ONLY:
-        await this.downloadFile(playUrlInfo.audioUrl, AUDIO_FILE_NAME)
+        await this.downloadFile(playUrlInfo.audioUrl, AUDIO_FILE_NAME, (progress) => sendProgressUpdate('audio', progress))
         return { success: true, message: '音频下载完成' }
       case DownloadType.VIDEO_ONLY:
-        await this.downloadFile(playUrlInfo.videoUrl, VIDEO_FILE_NAME)
+        await this.downloadFile(playUrlInfo.videoUrl, VIDEO_FILE_NAME, (progress) => sendProgressUpdate('video', progress))
         return { success: true, message: '视频下载完成' }
       case DownloadType.MERGED:
         const utils = new DownloadUtils()
-        const videoBlob = await utils.downloadToBlob(playUrlInfo.videoUrl)
-        const audioBlob = await utils.downloadToBlob(playUrlInfo.audioUrl)
+        const videoBlob = await utils.downloadToBlob(playUrlInfo.videoUrl, undefined, (progress) => sendProgressUpdate('video', progress))
+        const audioBlob = await utils.downloadToBlob(playUrlInfo.audioUrl, undefined, (progress) => sendProgressUpdate('audio', progress))
         const mergeBlob = await this.mergeVideoAudioWithFFmpeg(videoBlob, audioBlob)
         await utils.saveBlob(mergeBlob, VIDEO_FILE_NAME.replace(".video", ""))
         return { success: true, message: '视频和音频合并完成' }
@@ -135,9 +150,9 @@ class VideoPageInjectActivity {
     }
   }
 
-  async downloadFile(url: string, filename: string) {
+  async downloadFile(url: string, filename: string, onProgress?: (progress: { loaded: number; total: number }) => void) {
     const utils = new DownloadUtils()
-    const blob = await utils.downloadToBlob(url)
+    const blob = await utils.downloadToBlob(url, undefined, onProgress)
     utils.saveBlob(blob, filename)
   }
 

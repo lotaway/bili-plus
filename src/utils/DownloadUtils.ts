@@ -1,5 +1,9 @@
 export class DownloadUtils {
-  async downloadToBlob(url: string, host = 'https://www.bilibili.com/'): Promise<Blob> {
+  async downloadToBlob(
+    url: string,
+    host = 'https://www.bilibili.com/',
+    onProgress?: (progress: { loaded: number; total: number }) => void
+  ): Promise<Blob> {
     const res = await fetch(url, {
       credentials: "include",
       headers: {
@@ -10,7 +14,31 @@ export class DownloadUtils {
 
     if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`)
 
-    return await res.blob()
+    const reader = res.body?.getReader()
+    if (!reader) throw new Error('无法读取响应流')
+
+    const contentLength = parseInt(res.headers.get('content-length') || '0')
+    let receivedLength = 0
+    const chunks: Uint8Array[] = []
+
+    while (true) {
+      const { done, value } = await reader.read()
+
+      if (done) break
+
+      chunks.push(value)
+      receivedLength += value.length
+
+      if (onProgress) {
+        onProgress({
+          loaded: receivedLength,
+          total: contentLength
+        })
+      }
+    }
+
+    const blob = new Blob(chunks)
+    return blob
   }
 
   saveBlob(blob: Blob, filename: string) {
@@ -24,10 +52,14 @@ export class DownloadUtils {
     URL.revokeObjectURL(url)
   }
 
-  async downloadWithChromeAPI(url: string, filename: string): Promise<void> {
+  async downloadWithChromeAPI(
+    url: string,
+    filename: string,
+    onProgress?: (progress: { loaded: number; total: number }) => void
+  ): Promise<void> {
     if (url.includes('bilibili.com') || url.includes('bilivideo.com')) {
       try {
-        const blob = await this.downloadToBlob(url)
+        const blob = await this.downloadToBlob(url, undefined, onProgress)
         const blobUrl = URL.createObjectURL(blob)
 
         return new Promise<void>((resolve, reject) => {
@@ -49,7 +81,6 @@ export class DownloadUtils {
       }
     }
 
-    // 对于普通 URL，直接使用 Chrome 下载 API
     return new Promise<void>((resolve, reject) => {
       chrome.downloads.download({
         url: url,
