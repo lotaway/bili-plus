@@ -275,14 +275,15 @@ const VideoDownload: React.FC = () => {
     }
   }
 
+  const resetProgress = () => {
+    setProgress(null)
+  }
+
   useEffect(() => {
     const handleProgressMessage = (message: any) => {
       if (message.type === MessageType.DOWNLOAD_PROGRESS_UPDATE) {
         setProgress(message.data)
       }
-    }
-    const resetProgress = () => {
-      setProgress(null)
     }
     chrome.runtime.onMessage.addListener(handleProgressMessage)
 

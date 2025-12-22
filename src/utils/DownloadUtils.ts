@@ -37,7 +37,7 @@ export class DownloadUtils {
       }
     }
 
-    const blob = new Blob(chunks)
+    const blob = new Blob(chunks as any)
     return blob
   }
 
