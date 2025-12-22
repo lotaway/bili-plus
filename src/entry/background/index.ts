@@ -125,15 +125,16 @@ class DownloadManager {
           throw new Error(summaryResult.error)
         }
 
-        this.llmRunner.saveDocument({
-          title: summaryResult.title,
-          bvid,
-          cid,
-          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-          content: summaryResult.data.content,
-        })
-          .then(() => console.log('总结内容已保存到数据库'))
-          .catch(saveError => console.error('保存总结内容失败:', saveError))
+        if (summaryResult.data.content)
+          this.llmRunner.saveDocument({
+            title: summaryResult.title,
+            bvid,
+            cid,
+            source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+            content: summaryResult.data.content,
+          })
+            .then(() => console.debug('总结内容已保存到数据库'))
+            .catch(saveError => console.error('保存总结内容失败:', saveError))
 
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
@@ -505,18 +506,19 @@ class DownloadManager {
         if ('error' in summaryResult) {
           throw new Error(summaryResult.error)
         }
-        this.llmRunner.saveDocument({
-          title: summaryResult.title,
-          bvid,
-          cid,
-          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-          content: summaryResult.data.content,
-        })
-          .then(() =>
-            console.log('总结内容已保存到数据库'))
-          .catch(saveError => {
-            console.error('保存总结内容失败:', saveError)
+        if (summaryResult.data.content)
+          this.llmRunner.saveDocument({
+            title: summaryResult.title,
+            bvid,
+            cid,
+            source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+            content: summaryResult.data.content,
           })
+            .then(() =>
+              console.debug('总结内容已保存到数据库'))
+            .catch(saveError => {
+              console.error('保存总结内容失败:', saveError)
+            })
 
         if (!sender.id) {
           return null

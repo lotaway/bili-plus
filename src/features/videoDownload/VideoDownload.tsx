@@ -292,7 +292,6 @@ const VideoDownload: React.FC = () => {
     }
   }, [])
 
-  // 渲染进度显示
   const renderProgress = () => {
     if (!progress) return null
 
