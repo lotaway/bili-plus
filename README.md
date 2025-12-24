@@ -33,11 +33,23 @@ BILI PLUS 是一个增强 B 站体验的浏览器扩展，提供多种实用功�
 
 ## 项目结构
 
+本项目采用typescript+react+vite制作chrome浏览器插件，通过协调页面、插件、后端接口共同完成任务，目录结构如下：
+
+- `public` - 公共文件，包含浏览器插件声明文件
+- `components` - 前端组件
+- `src/entry` - 入口文件，加载各个模块,vite需按照这些入口编译输出成多个文件
 - `src/entry/background` - 后台脚本，处理核心任务
 - `src/entry/content` - 内容脚本，连接页面与扩展
-- `src/entry/biliVideo` - 页面注入脚本，获取视频信息
-- `src/entry/popup` - 弹出页面，用于配置和设置
-- `src/entry/sidepanel` - 侧边栏界面，主要功能操作区域
+- `src/entry/biliVideo` - 页面注入脚本，获取页面信息和执行页面操作
+- `src/entry/popup` - 弹出页面，用于全局配置和设置用户喜好
+- `src/entry/sidepanel` - 侧边栏界面，主要功能操作区域和统一信息输出
+- `src/enums` - 各种状态、类型枚举
+- `src/features` - 功能模块，entry里实际功能实现是放在这里
+- `src/services` - 服务模块，包含调用接口或者设备功能调用
+- `src/store` - 数据与应用状态存储
+- `src/styles` - 公共UI样式
+- `src/types` - 类型定义文件
+- `src/utils` - 通用工具函数
 
 ## 待实现功能
 
