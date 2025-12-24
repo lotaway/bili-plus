@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { MessageType } from '../../enums/MessageType'
 import { DownloadType } from '../../enums/DownloadType'
+import { formatFileSize, calculateProgress } from '../../utils/format'
 
 const Container = styled.div`
   padding: 10px;
@@ -100,15 +101,73 @@ const Status = styled.div<{ type: 'info' | 'success' | 'error' }>`
   }}
 `
 
+const ProgressContainer = styled.div`
+  margin-bottom: 15px;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+`
+
+const ProgressHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: bold;
+`
+
+const ProgressBarContainer = styled.div`
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+`
+
+const ProgressBar = styled.div<{ progress: number }>`
+  height: 100%;
+  background-color: #00a1d6;
+  border-radius: 4px;
+  width: ${props => props.progress}%;
+  transition: width 0.3s ease;
+`
+
+const ProgressInfo = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+`
+
+const FileType = styled.span`
+  font-weight: bold;
+  color: #333;
+`
+
+interface DownloadProgress {
+  bvid: string
+  cid: string
+  fileType: string
+  loaded: number
+  total: number
+  timestamp: number
+}
+
 const VideoDownload: React.FC = () => {
   const [bvid, setBvid] = useState('')
   const [cid, setCid] = useState('')
   const [downloadType, setDownloadType] = useState<DownloadType>(DownloadType.VIDEO_AUDIO)
   const [isLoading, setIsLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null)
+  const [progress, setProgress] = useState<DownloadProgress | null>(null)
 
   const handleParseFromUrl = async () => {
     try {
+      resetProgress()
       const response = await chrome.runtime.sendMessage({
         type: MessageType.REQUEST_VIDEO_INFO
       })
@@ -133,6 +192,7 @@ const VideoDownload: React.FC = () => {
     }
 
     setIsLoading(true)
+    resetProgress()
     setStatus({ type: 'info', message: '开始下载...' })
 
     try {
@@ -161,6 +221,7 @@ const VideoDownload: React.FC = () => {
       })
     } finally {
       setIsLoading(false)
+      resetProgress()
     }
   }
 
@@ -170,6 +231,7 @@ const VideoDownload: React.FC = () => {
       return
     }
     setIsLoading(true)
+    resetProgress()
     setStatus({ type: 'info', message: '开始页面上下文下载...' })
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -194,6 +256,7 @@ const VideoDownload: React.FC = () => {
       })
     } finally {
       setIsLoading(false)
+      resetProgress()
     }
   }
 
@@ -212,6 +275,46 @@ const VideoDownload: React.FC = () => {
     }
   }
 
+  const resetProgress = () => {
+    setProgress(null)
+  }
+
+  useEffect(() => {
+    const handleProgressMessage = (message: any) => {
+      if (message.type === MessageType.DOWNLOAD_PROGRESS_UPDATE) {
+        setProgress(message.data)
+      }
+    }
+    chrome.runtime.onMessage.addListener(handleProgressMessage)
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleProgressMessage)
+    }
+  }, [])
+
+  const renderProgress = () => {
+    if (!progress) return null
+
+    const progressPercent = calculateProgress(progress.loaded, progress.total)
+    const fileTypeText = progress.fileType === 'video' ? '视频' : '音频'
+
+    return (
+      <ProgressContainer>
+        <ProgressHeader>
+          <FileType>{fileTypeText}下载进度</FileType>
+          <span>{progressPercent}%</span>
+        </ProgressHeader>
+        <ProgressBarContainer>
+          <ProgressBar progress={progressPercent} />
+        </ProgressBarContainer>
+        <ProgressInfo>
+          <span>已下载: {formatFileSize(progress.loaded)}</span>
+          <span>总大小: {formatFileSize(progress.total)}</span>
+        </ProgressInfo>
+      </ProgressContainer>
+    )
+  }
+
   return (
     <Container>
       <Title>B站视频下载</Title>
@@ -221,6 +324,8 @@ const VideoDownload: React.FC = () => {
           {status.message}
         </Status>
       )}
+
+      {renderProgress()}
 
       <InputGroup>
         <Label htmlFor="bvid">BVID:</Label>

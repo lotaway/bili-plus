@@ -125,15 +125,16 @@ class DownloadManager {
           throw new Error(summaryResult.error)
         }
 
-        this.llmRunner.saveDocument({
-          title: summaryResult.title,
-          bvid,
-          cid,
-          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-          content: summaryResult.data.content,
-        })
-          .then(() => console.log('总结内容已保存到数据库'))
-          .catch(saveError => console.error('保存总结内容失败:', saveError))
+        if (summaryResult.data.content)
+          this.llmRunner.saveDocument({
+            title: summaryResult.title,
+            bvid,
+            cid,
+            source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+            content: summaryResult.data.content,
+          })
+            .then(() => console.debug('总结内容已保存到数据库'))
+            .catch(saveError => console.error('保存总结内容失败:', saveError))
 
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
@@ -298,7 +299,7 @@ class DownloadManager {
     }
   }
 
-  async handleDownloadVideo(message: any, sendResponse: (response?: any) => void) {
+  async handleDownloadVideo(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     const { bvid, cid, downloadType = DownloadType.VIDEO_ONLY, useChromeAPI = false } = message.payload
     if (!bvid || !cid) {
       sendResponse({ error: '缺少BVID或CID参数' })
@@ -308,21 +309,37 @@ class DownloadManager {
     try {
       const { videoUrl, audioUrl, title } = await this.bilibiliApi.fetchPlayUrls(bvid, parseInt(cid))
 
+      const createProgressCallback = (fileType: string) => (progress: { loaded: number; total: number }) => {
+        if (sender.id) {
+          chrome.runtime.sendMessage(sender.id, {
+            type: MessageType.DOWNLOAD_PROGRESS_UPDATE,
+            data: {
+              bvid,
+              cid,
+              fileType,
+              loaded: progress.loaded,
+              total: progress.total,
+              timestamp: Date.now()
+            }
+          })
+        }
+      }
+
       switch (downloadType) {
         case DownloadType.AUDIO_ONLY:
           if (useChromeAPI) {
-            await this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+            await this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`, createProgressCallback('audio'))
           } else {
-            const audioBlob = await this.downloadUtils.downloadToBlob(audioUrl)
+            const audioBlob = await this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
             this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
           }
           break
 
         case DownloadType.VIDEO_ONLY:
           if (useChromeAPI) {
-            await this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`)
+            await this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`, createProgressCallback('video'))
           } else {
-            const videoBlob = await this.downloadUtils.downloadToBlob(videoUrl)
+            const videoBlob = await this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video'))
             this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
           }
           break
@@ -330,13 +347,13 @@ class DownloadManager {
         case DownloadType.VIDEO_AUDIO:
           if (useChromeAPI) {
             await Promise.all([
-              this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
-              this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+              this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`, createProgressCallback('video')),
+              this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`, createProgressCallback('audio'))
             ])
           } else {
             const [videoBlob, audioBlob] = await Promise.all([
-              this.downloadUtils.downloadToBlob(videoUrl),
-              this.downloadUtils.downloadToBlob(audioUrl)
+              this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video')),
+              this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
             ])
             this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
             this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
@@ -346,8 +363,8 @@ class DownloadManager {
         case DownloadType.MERGED:
           try {
             const [videoBlob, audioBlob] = await Promise.all([
-              this.downloadUtils.downloadToBlob(videoUrl),
-              this.downloadUtils.downloadToBlob(audioUrl)
+              this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video')),
+              this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
             ])
             const mergedBlob = await this.mergeVideoAudioWithFFmpeg(videoBlob, audioBlob)
             if (useChromeAPI) {
@@ -361,13 +378,13 @@ class DownloadManager {
             console.error('合并失败，回退到分别下载:', mergeError)
             if (useChromeAPI) {
               await Promise.all([
-                this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`),
-                this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`)
+                this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`, createProgressCallback('video')),
+                this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`, createProgressCallback('audio'))
               ])
             } else {
               const [videoBlob, audioBlob] = await Promise.all([
-                this.downloadUtils.downloadToBlob(videoUrl),
-                this.downloadUtils.downloadToBlob(audioUrl)
+                this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video')),
+                this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
               ])
               this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
               this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
@@ -489,18 +506,19 @@ class DownloadManager {
         if ('error' in summaryResult) {
           throw new Error(summaryResult.error)
         }
-        this.llmRunner.saveDocument({
-          title: summaryResult.title,
-          bvid,
-          cid,
-          source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
-          content: summaryResult.data.content,
-        })
-          .then(() =>
-            console.log('总结内容已保存到数据库'))
-          .catch(saveError => {
-            console.error('保存总结内容失败:', saveError)
+        if (summaryResult.data.content)
+          this.llmRunner.saveDocument({
+            title: summaryResult.title,
+            bvid,
+            cid,
+            source: this.subtitleFetcher.getVideoDetailPageUrl().toString(),
+            content: summaryResult.data.content,
           })
+            .then(() =>
+              console.debug('总结内容已保存到数据库'))
+            .catch(saveError => {
+              console.error('保存总结内容失败:', saveError)
+            })
 
         if (!sender.id) {
           return null

@@ -81,7 +81,35 @@ function handleRequestVideoDownloadInPage(...args: ChromeMessageEvent) {
     window.removeEventListener('message', handleResponse)
   }
 
+  const handleProgressMessage = (event: MessageEvent) => {
+    if (
+      event.source !== window ||
+      event.data?.source !== PageType.VIDEO_PAGE_INJECT ||
+      event.data?.type !== RequestPageEventType.DOWNLOAD_PROGRESS_UPDATE
+    ) {
+      return
+    }
+
+    if (sender.id) {
+      chrome.runtime.sendMessage(sender.id, {
+        type: MessageType.DOWNLOAD_PROGRESS_UPDATE,
+        data: event.data.payload
+      })
+    }
+  }
+
   window.addEventListener('message', handleResponse)
+  window.addEventListener('message', handleProgressMessage)
+
+  const cleanup = () => {
+    window.removeEventListener('message', handleResponse)
+    window.removeEventListener('message', handleProgressMessage)
+  }
+
+  setTimeout(() => {
+    cleanup()
+  }, 5 * 60 * 1000)
+
   return true
 }
 
