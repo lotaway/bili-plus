@@ -1,5 +1,5 @@
 import { useDispatch } from 'react-redux'
-import { LLM_Runner } from '../../../services/LLM_Runner'
+import { LLMProviderManager } from '../../../services/LLMProviderManager'
 import { appendMarkdownContent, setMessage } from '../../../store/slices/videoSummarySlice'
 
 export const useDecisionHandling = () => {
@@ -10,10 +10,12 @@ export const useDecisionHandling = () => {
     dispatch(appendMarkdownContent('<p>正在处理您的决策...</p>'))
 
     try {
-      const llmRunner = new LLM_Runner()
-      const result = await llmRunner.init()
-      if (result.error) {
-        throw result.error
+      const llmProviderManager = new LLMProviderManager()
+      await llmProviderManager.init()
+      const currentConfig = await llmProviderManager.provider
+      
+      if (!currentConfig) {
+        throw new Error('没有可用的LLM provider配置')
       }
 
       const decisionPayload = {
@@ -22,11 +24,11 @@ export const useDecisionHandling = () => {
         ...decisionData,
       }
 
-      const response = await fetch(`${llmRunner.config.aiEndpoint}/agents/decision`, {
+      const response = await fetch(`${currentConfig.endpoint}/agents/decision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${llmRunner.config.aiKey ?? ''}`,
+          Authorization: `Bearer ${currentConfig.apiKey ?? ''}`,
         },
         body: JSON.stringify(decisionPayload),
       })

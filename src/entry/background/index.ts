@@ -1,8 +1,9 @@
 import { SubtitleFetcher } from '../../services/SubtitleFetcher'
-import { AISubtitleHandler, LLM_Runner } from '../../services/LLM_Runner'
-import { AIAgentRunner } from '../../services/AIAgentRunner'
+import { LLMProviderManager } from '../../services/LLMProviderManager'
+import { AISubtitleHandler } from '../../services/AISubtitleHandler'
+import { AIAgentRunnerNew } from '../../services/AIAgentRunnerNew'
 import { StorageCleanupService } from '../../services/StorageCleanupService'
-import { StatusCheckService } from '../../services/StatusCheckService'
+import { StatusCheckServiceNew } from '../../services/StatusCheckServiceNew'
 import { DownloadUtils } from '../../utils/DownloadUtils'
 import { VideoInfoUtils } from '../../utils/VideoInfoUtils'
 import { MessageType } from '../../enums/MessageType'
@@ -15,11 +16,11 @@ import { FFmpegUtils } from '../../utils/FFmpegUtils'
 class DownloadManager {
   private readonly bilibiliApi = new BilibiliApi()
   private readonly subtitleFetcher = new SubtitleFetcher(this.bilibiliApi);
-  private readonly llmRunner = new LLM_Runner();
-  private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmRunner);
-  private readonly aiAgentRunner = new AIAgentRunner(this.llmRunner);
+  private readonly llmProviderManager = new LLMProviderManager();
+  private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmProviderManager);
+  private readonly aiAgentRunner = new AIAgentRunnerNew(this.llmProviderManager);
   private readonly storageCleanupService = new StorageCleanupService();
-  private readonly statusCheckService = new StatusCheckService(this.llmRunner);
+  private readonly statusCheckService = new StatusCheckServiceNew(this.llmProviderManager);
   private readonly downloadUtils = new DownloadUtils();
   private readonly videoInfoUtils = new VideoInfoUtils(this.subtitleFetcher);
   private readonly ffmpegUtils = new FFmpegUtils();
@@ -32,7 +33,7 @@ class DownloadManager {
   }
 
   async init() {
-    await this.llmRunner.init()
+    await this.llmProviderManager.init()
     await this.storageCleanupService.initializeStorageCleanup()
   }
 
@@ -126,7 +127,7 @@ class DownloadManager {
         }
 
         if (summaryResult.data.content)
-          this.llmRunner.saveDocument({
+          this.llmProviderManager.saveDocument({
             title: summaryResult.title,
             bvid,
             cid,
@@ -184,7 +185,7 @@ class DownloadManager {
     }
 
     const EVENT_TYPE = MessageType.SUMMARIZE_SCREENSHOT_RESPONSE_STREAM
-    this.llmRunner.analyzeScreenshot(screenshotDataUrl, (chunk) => {
+    this.llmProviderManager.analyzeScreenshot(screenshotDataUrl, (chunk) => {
       if (!sender.id) return
       chrome.runtime.sendMessage(sender.id, {
         type: EVENT_TYPE,
@@ -507,7 +508,7 @@ class DownloadManager {
           throw new Error(summaryResult.error)
         }
         if (summaryResult.data.content)
-          this.llmRunner.saveDocument({
+          this.llmProviderManager.saveDocument({
             title: summaryResult.title,
             bvid,
             cid,
@@ -571,7 +572,7 @@ class DownloadManager {
     }
 
     const EVENT_TYPE = MessageType.SUMMARIZE_SCREENSHOT_RESPONSE_STREAM
-    this.llmRunner.analyzeScreenshot(screenshotDataUrl, (chunk) => {
+    this.llmProviderManager.analyzeScreenshot(screenshotDataUrl, (chunk) => {
       if (!sender.id) {
         return
       }

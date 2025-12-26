@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { LLM_Runner } from '../../services/LLM_Runner'
+import { LLMProviderManager } from '../../services/LLMProviderManager'
+import { LLMProviderConfig } from '../../types/llm-provider'
 
 interface ModelInfo {
   name: string
@@ -10,12 +11,10 @@ interface ModelInfo {
 }
 
 const App: React.FC = () => {
-  const [config, setConfig] = useState({
-    aiProvider: '',
-    aiEndpoint: '',
-    aiKey: '',
-    aiModel: 'gpt-3.5-turbo',
-  })
+  const [providers, setProviders] = useState<LLMProviderConfig[]>([])
+  const [currentProviderId, setCurrentProviderId] = useState<string>('')
+  const [editingProvider, setEditingProvider] = useState<LLMProviderConfig | null>(null)
+  const [isAddingNew, setIsAddingNew] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [apiStatus, setApiStatus] = useState<{
     ok: boolean
@@ -26,7 +25,7 @@ const App: React.FC = () => {
   const [isLoadingModels, setIsLoadingModels] = useState(false)
 
   useEffect(() => {
-    loadConfig()
+    loadProviders()
     loadApiStatus()
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area === 'local' && changes.apiStatus) {
@@ -41,12 +40,6 @@ const App: React.FC = () => {
     }
   }, [])
 
-  useEffect(() => {
-    if (config.aiEndpoint && config.aiKey) {
-      loadModelList()
-    }
-  }, [config.aiEndpoint, config.aiKey])
-
   const loadApiStatus = async () => {
     try {
       const result = await chrome.storage.local.get('apiStatus')
@@ -58,23 +51,22 @@ const App: React.FC = () => {
     }
   }
 
-  const loadConfig = async () => {
-    const stored = await chrome.storage.sync.get([
-      'aiProvider',
-      'aiEndpoint',
-      'aiKey',
-      'aiModel',
-    ])
-    setConfig({
-      aiProvider: stored.aiProvider || '',
-      aiEndpoint: stored.aiEndpoint || '',
-      aiKey: stored.aiKey || '',
-      aiModel: stored.aiModel || 'gpt-3.5-turbo',
-    })
+  const loadProviders = async () => {
+    try {
+      const llmProviderManager = new LLMProviderManager()
+      await llmProviderManager.init()
+      const config = await llmProviderManager.getConfig()
+      setProviders(config.providers || [])
+      setCurrentProviderId(config.selectedProviderId || '')
+    } catch (error) {
+      console.error('加载provider配置失败:', error)
+      setProviders([])
+      setCurrentProviderId('')
+    }
   }
 
-  const loadModelList = async () => {
-    if (!config.aiEndpoint || !config.aiKey) {
+  const loadModelList = async (provider: LLMProviderConfig) => {
+    if (!provider.endpoint || !provider.apiKey) {
       return
     }
 
@@ -91,9 +83,9 @@ const App: React.FC = () => {
         }
       }
 
-      const llmRunner = new LLM_Runner()
-      await llmRunner.init()
-      const models = await llmRunner.getAvailableModels()
+      const llmProviderManager = new LLMProviderManager()
+      await llmProviderManager.init()
+      const models = await llmProviderManager.getAvailableModels(provider.id)
       setModelList(models)
 
       await chrome.storage.local.set({
@@ -111,29 +103,106 @@ const App: React.FC = () => {
     }
   }
 
-  const handleSaveConfig = async () => {
-    if (config.aiEndpoint && config.aiKey && config.aiModel) {
-      try {
-        const llmRunner = new LLM_Runner()
-        await llmRunner.init()
-        const isValidModel = await llmRunner.validateModel(config.aiModel)
+  const handleAddProvider = () => {
+    const newProvider: LLMProviderConfig = {
+      id: `provider_${Date.now()}`,
+      name: '',
+      type: 'custom',
+      endpoint: '',
+      apiKey: '',
+      defaultModel: 'gpt-3.5-turbo',
+      enabled: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+    setEditingProvider(newProvider)
+    setIsAddingNew(true)
+  }
 
-        if (!isValidModel && modelList.length > 0) {
-          showMessage('选择的模型不在可用列表中，请重新选择', 'error')
-          return
-        }
-      } catch (error) {
-        console.error('模型验证失败:', error)
-        showMessage('模型验证失败，请检查配置', 'error')
-        return
-      }
+  const handleEditProvider = (provider: LLMProviderConfig) => {
+    setEditingProvider({ ...provider })
+    setIsAddingNew(false)
+  }
+
+  const handleDeleteProvider = async (providerId: string) => {
+    if (providers.length <= 1) {
+      showMessage('至少需要保留一个provider', 'error')
+      return
     }
 
-    await chrome.storage.sync.set(config).catch((error) => {
-      console.error(error)
-      showMessage(error.message)
-    })
-    showMessage('配置已保存', 'success')
+    if (currentProviderId === providerId) {
+      showMessage('不能删除当前正在使用的provider，请先切换到其他provider', 'error')
+      return
+    }
+
+    if (window.confirm('确定要删除这个provider吗？')) {
+      const updatedProviders = providers.filter(p => p.id !== providerId)
+      await saveProviders(updatedProviders, currentProviderId)
+      showMessage('provider已删除', 'success')
+    }
+  }
+
+  const handleSwitchProvider = async (providerId: string) => {
+    await saveProviders(providers, providerId)
+    showMessage('已切换到新的provider', 'success')
+  }
+
+  const handleSaveProvider = async () => {
+    if (!editingProvider) return
+
+    if (!editingProvider.name.trim()) {
+      showMessage('请输入provider名称', 'error')
+      return
+    }
+
+    if (!editingProvider.endpoint.trim()) {
+      showMessage('请输入API地址', 'error')
+      return
+    }
+
+    if (!editingProvider.apiKey.trim()) {
+      showMessage('请输入API密钥', 'error')
+      return
+    }
+
+    if (!editingProvider.defaultModel.trim()) {
+      showMessage('请输入模型名称', 'error')
+      return
+    }
+
+    let updatedProviders: LLMProviderConfig[]
+    if (isAddingNew) {
+      updatedProviders = [...providers, editingProvider]
+    } else {
+      updatedProviders = providers.map(p => 
+        p.id === editingProvider.id ? editingProvider : p
+      )
+    }
+
+    const newCurrentProviderId = isAddingNew && providers.length === 0 ? editingProvider.id : currentProviderId
+    await saveProviders(updatedProviders, newCurrentProviderId)
+    
+    setEditingProvider(null)
+    setIsAddingNew(false)
+    showMessage(isAddingNew ? 'provider已添加' : 'provider已更新', 'success')
+  }
+
+  const saveProviders = async (providersList: LLMProviderConfig[], currentId: string) => {
+    try {
+      const llmProviderManager = new LLMProviderManager()
+      await llmProviderManager.init()
+      await llmProviderManager.saveConfig({
+        providers: providersList,
+        selectedProviderId: currentId,
+        version: 1
+      })
+      
+      setProviders(providersList)
+      setCurrentProviderId(currentId)
+    } catch (error) {
+      console.error('保存provider配置失败:', error)
+      showMessage('保存配置失败', 'error')
+    }
   }
 
   const handleOpenSidePanel = async () => {
@@ -159,83 +228,153 @@ const App: React.FC = () => {
     console.log("Cleanup storage clicked")
   }
 
+  const currentProvider = providers.find(p => p.id === currentProviderId)
+
   return (
     <div className="popup">
       <h3>🎬 Bilibili Plus</h3>
+      
       <div className="config-section">
-        <h4>AI 配置</h4>
-        <div className="form-group">
-          <label htmlFor="aiProvider">API 提供商</label>
-          <input
-            type="text"
-            id="aiProvider"
-            placeholder="例如: OpenAI, Anthropic 等"
-            value={config.aiProvider}
-            onChange={(e) => setConfig({ ...config, aiProvider: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="aiEndpoint">API 地址</label>
-          <input
-            type="text"
-            id="aiEndpoint"
-            placeholder="例如: https://api.openai.com/v1"
-            value={config.aiEndpoint}
-            onChange={(e) => setConfig({ ...config, aiEndpoint: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="aiKey">API 密钥</label>
-          <input
-            type="password"
-            id="aiKey"
-            placeholder="输入您的API密钥"
-            value={config.aiKey}
-            onChange={(e) => setConfig({ ...config, aiKey: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="aiModel">模型名称</label>
-          {isLoadingModels ? (
-            <select id="aiModel" disabled>
-              <option>加载模型中...</option>
-            </select>
-          ) : modelList.length > 0 ? (
-            <select
-              id="aiModel"
-              value={config.aiModel}
-              onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
-            >
-              <option value="">请选择模型</option>
-              {modelList.map((model) => (
-                <option key={model.name} value={model.name}>
-                  {model.name} ({model.version}) - {model.owned_by}
-                </option>
-              ))}
-            </select>
+        <h4>LLM Provider 管理</h4>
+        
+        {/* Providers列表 */}
+        <div className="providers-list">
+          {providers.length === 0 ? (
+            <p className="no-providers">暂无配置的provider</p>
           ) : (
-            <input
-              type="text"
-              id="aiModel"
-              placeholder="例如: gpt-3.5-turbo"
-              value={config.aiModel}
-              onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
-            />
-          )}
-          {modelList.length === 0 && config.aiEndpoint && config.aiKey && (
-            <button
-              type="button"
-              className="refresh-models-btn"
-              onClick={loadModelList}
-              disabled={isLoadingModels}
-            >
-              {isLoadingModels ? '加载中...' : '刷新模型列表'}
-            </button>
+            providers.map(provider => (
+              <div key={provider.id} className={`provider-item ${provider.id === currentProviderId ? 'active' : ''}`}>
+                <div className="provider-info">
+                  <span className="provider-name">{provider.name || '未命名'}</span>
+                  <span className="provider-model">{provider.defaultModel}</span>
+                  {provider.id === currentProviderId && (
+                    <span className="current-badge">当前使用</span>
+                  )}
+                </div>
+                <div className="provider-actions">
+                  <button 
+                    className="action-btn switch-btn"
+                    onClick={() => handleSwitchProvider(provider.id)}
+                    disabled={provider.id === currentProviderId}
+                  >
+                    切换
+                  </button>
+                  <button 
+                    className="action-btn edit-btn"
+                    onClick={() => handleEditProvider(provider)}
+                  >
+                    编辑
+                  </button>
+                  <button 
+                    className="action-btn delete-btn"
+                    onClick={() => handleDeleteProvider(provider.id)}
+                    disabled={providers.length <= 1}
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
-        <button id="saveConfig" onClick={handleSaveConfig}>
-          保存配置
+
+        <button className="add-provider-btn" onClick={handleAddProvider}>
+          + 添加新的Provider
         </button>
+
+        {/* 编辑/添加Provider表单 */}
+        {editingProvider && (
+          <div className="provider-form">
+            <h5>{isAddingNew ? '添加新的Provider' : '编辑Provider'}</h5>
+            <div className="form-group">
+              <label htmlFor="providerName">Provider名称</label>
+              <input
+                type="text"
+                id="providerName"
+                placeholder="例如: OpenAI配置"
+                value={editingProvider.name}
+                onChange={(e) => setEditingProvider({ ...editingProvider, name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="providerType">API提供商</label>
+              <input
+                type="text"
+                id="providerType"
+                placeholder="例如: OpenAI, Anthropic 等"
+                value={editingProvider.type}
+                onChange={(e) => setEditingProvider({ ...editingProvider, type: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="aiEndpoint">API地址</label>
+              <input
+                type="text"
+                id="aiEndpoint"
+                placeholder="例如: https://api.openai.com/v1"
+                value={editingProvider.endpoint}
+                onChange={(e) => setEditingProvider({ ...editingProvider, endpoint: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="aiKey">API密钥</label>
+              <input
+                type="password"
+                id="aiKey"
+                placeholder="输入您的API密钥"
+                value={editingProvider.apiKey}
+                onChange={(e) => setEditingProvider({ ...editingProvider, apiKey: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="aiModel">模型名称</label>
+              {isLoadingModels ? (
+                <select id="aiModel" disabled>
+                  <option>加载模型中...</option>
+                </select>
+              ) : modelList.length > 0 ? (
+                <select
+                  id="aiModel"
+                  value={editingProvider.defaultModel}
+                  onChange={(e) => setEditingProvider({ ...editingProvider, defaultModel: e.target.value })}
+                >
+                  <option value="">请选择模型</option>
+                  {modelList.map((model) => (
+                    <option key={model.name} value={model.name}>
+                      {model.name} ({model.version}) - {model.owned_by}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  id="aiModel"
+                  placeholder="例如: gpt-3.5-turbo"
+                  value={editingProvider.defaultModel}
+                  onChange={(e) => setEditingProvider({ ...editingProvider, defaultModel: e.target.value })}
+                />
+              )}
+              {modelList.length === 0 && editingProvider.endpoint && editingProvider.apiKey && (
+                <button
+                  type="button"
+                  className="refresh-models-btn"
+                  onClick={() => loadModelList(editingProvider)}
+                  disabled={isLoadingModels}
+                >
+                  {isLoadingModels ? '加载中...' : '刷新模型列表'}
+                </button>
+              )}
+            </div>
+            <div className="form-actions">
+              <button className="save-btn" onClick={handleSaveProvider}>
+                保存
+              </button>
+              <button className="cancel-btn" onClick={() => setEditingProvider(null)}>
+                取消
+              </button>
+            </div>
+          </div>
+        )}
 
         {apiStatus && (
           <div className="api-status-section">

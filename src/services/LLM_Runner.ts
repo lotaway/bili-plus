@@ -432,11 +432,11 @@ export class LLM_Runner {
 }
 
 export class AISubtitleHandler {
-  private llmRunner: LLM_Runner
+  private llmProvider: any
   isBusy = false
 
-  constructor(llmRunner: LLM_Runner) {
-    this.llmRunner = llmRunner
+  constructor(llmProvider: any) {
+    this.llmProvider = llmProvider
   }
 
   get prompt() {
@@ -483,7 +483,7 @@ export class AISubtitleHandler {
 字幕内容：
 ${text}`
 
-    const result = await this.llmRunner.callLLM(
+    const result = await this.llmProvider.callLLM(
       [
         {
           role: 'user',
