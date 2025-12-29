@@ -1,9 +1,9 @@
 import { SubtitleFetcher } from '../../services/SubtitleFetcher'
 import { LLMProviderManager } from '../../services/LLMProviderManager'
 import { AISubtitleHandler } from '../../services/AISubtitleHandler'
-import { AIAgentRunnerNew } from '../../services/AIAgentRunnerNew'
+import { AIAgentRunner } from '../../services/AIAgentRunner'
 import { StorageCleanupService } from '../../services/StorageCleanupService'
-import { StatusCheckServiceNew } from '../../services/StatusCheckServiceNew'
+import { StatusCheckService } from '../../services/StatusCheckService'
 import { DownloadUtils } from '../../utils/DownloadUtils'
 import { VideoInfoUtils } from '../../utils/VideoInfoUtils'
 import { MessageType } from '../../enums/MessageType'
@@ -18,9 +18,9 @@ class DownloadManager {
   private readonly subtitleFetcher = new SubtitleFetcher(this.bilibiliApi);
   private readonly llmProviderManager = new LLMProviderManager();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmProviderManager);
-  private readonly aiAgentRunner = new AIAgentRunnerNew(this.llmProviderManager);
+  private readonly aiAgentRunner = new AIAgentRunner(this.llmProviderManager);
   private readonly storageCleanupService = new StorageCleanupService();
-  private readonly statusCheckService = new StatusCheckServiceNew(this.llmProviderManager);
+  private readonly statusCheckService = new StatusCheckService(this.llmProviderManager);
   private readonly downloadUtils = new DownloadUtils();
   private readonly videoInfoUtils = new VideoInfoUtils(this.subtitleFetcher);
   private readonly ffmpegUtils = new FFmpegUtils();

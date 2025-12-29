@@ -1,11 +1,16 @@
-import { LLM_Runner } from './LLM_Runner'
+/**
+ * 状态检查服务
+ * 使用LLMProviderManager进行API状态检查和模型列表缓存
+ */
+
+import { LLMProviderManager } from './LLMProviderManager'
 
 export class StatusCheckService {
-  private pollingCheckTimer: number | null = null
-  private _lastModelListFetchTime: number = 0
-  private readonly MODEL_LIST_CACHE_DURATION = 5 * 60 * 1000
+  private pollingCheckTimer: number | null = null;
+  private _lastModelListFetchTime: number = 0;
+  private readonly MODEL_LIST_CACHE_DURATION = 5 * 60 * 1000;
 
-  constructor(private readonly llmRunner: LLM_Runner) {}
+  constructor(private readonly llmProviderManager: LLMProviderManager) { }
 
   isPopupOpen(): boolean {
     try {
@@ -50,16 +55,16 @@ export class StatusCheckService {
     const shouldCheckApi = popupOpen || sidepanelOpen
 
     if (shouldCheckApi) {
-      if (!this.llmRunner.isApiStatusCheckRunning()) {
-        this.llmRunner.initializeApiStatusCheck()
+      if (!this.llmProviderManager.isApiStatusCheckRunning()) {
+        this.llmProviderManager.initializeApiStatusCheck()
         console.debug('启动API状态检查（popup或sidepanel已打开）')
 
         // API状态检查启动后，获取模型列表
         await this.fetchAndCacheModelList()
       }
     } else {
-      if (this.llmRunner.isApiStatusCheckRunning()) {
-        this.llmRunner.stopApiStatusCheck()
+      if (this.llmProviderManager.isApiStatusCheckRunning()) {
+        this.llmProviderManager.stopApiStatusCheck()
         console.debug('停止API状态检查（popup和sidepanel都已关闭）')
       }
     }
@@ -73,8 +78,8 @@ export class StatusCheckService {
     }
 
     try {
-      await this.llmRunner.init()
-      const models = await this.llmRunner.getAvailableModels()
+      await this.llmProviderManager.init()
+      const models = await this.llmProviderManager.getAvailableModels()
 
       if (models.length > 0) {
         // 缓存模型列表到本地存储
@@ -82,8 +87,8 @@ export class StatusCheckService {
           modelList: {
             models,
             lastUpdated: now,
-            source: 'background_polling'
-          }
+            source: 'background_polling',
+          },
         })
         this._lastModelListFetchTime = now
       }

@@ -221,6 +221,34 @@ export class LLM_Runner {
     return models.some(model => model.name === modelName)
   }
 
+  static async fetchModelListForEndpoint(endpoint: string): Promise<ModelInfo[]> {
+    if (!endpoint) {
+      console.error('Endpoint不能为空')
+      return []
+    }
+
+    try {
+      const signal = AbortSignal.timeout(5000)
+      const response = await fetch(`${endpoint}/api/tags`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const modelList = await response.json() as ModelInfo[]
+      return modelList
+    } catch (error) {
+      console.error('获取模型列表失败:', error)
+      return []
+    }
+  }
+
   get defaultRequestBody() {
     return {
       stream: true,

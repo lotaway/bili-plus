@@ -1,13 +1,18 @@
+/**
+ * AI Agent 运行器
+ * 使用LLMProviderManager运行AI Agent
+ */
+
 import { StreamUtils } from '../utils/streamUtils'
-import { LLM_Runner } from './LLM_Runner'
+import { LLMProviderManager } from './LLMProviderManager'
 
 export class AIAgentRunner {
   isBusy = false;
   #abortController: AbortController | null = null;
-  private readonly llmRunner: LLM_Runner
+  private readonly llmProviderManager: LLMProviderManager
 
-  constructor(llmRunner: LLM_Runner) {
-    this.llmRunner = llmRunner
+  constructor(llmProviderManager: LLMProviderManager) {
+    this.llmProviderManager = llmProviderManager
   }
 
   static defaultModelName() {
@@ -21,24 +26,25 @@ export class AIAgentRunner {
     if (this.isBusy) {
       return { error: '当前正在处理中，请稍后再试' }
     }
-    const result = await this.llmRunner.syncConfig()
-    if (result.error) {
-      return { error: result.error }
+
+    // 检查是否有选中的provider
+    if (!this.llmProviderManager.provider) {
+      return { error: '请先配置并选择LLM provider' }
     }
 
     this.isBusy = true
     this.#abortController = new AbortController()
 
     try {
-      const agentResponse = await fetch(`${this.llmRunner.apiPrefixWithVersion}/agents/run`, {
+      const agentResponse = await fetch(`${this.llmProviderManager.apiPrefixWithVersion}/agents/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.llmRunner.config.aiKey ?? ''}`,
+          Authorization: `Bearer ${this.llmProviderManager.provider.apiKey ?? ''}`,
         },
         body: JSON.stringify({
           messages: [payload.message],
-          model: this.llmRunner.config.aiModel || AIAgentRunner.defaultModelName(),
+          model: this.llmProviderManager.provider.defaultModel || AIAgentRunner.defaultModelName(),
         }),
         signal: this.#abortController.signal,
       })
@@ -48,6 +54,7 @@ export class AIAgentRunner {
           cause: agentResponse,
         })
       }
+
       if (!agentResponse.body) throw new Error('No response body')
 
       const reader = agentResponse.body.getReader()

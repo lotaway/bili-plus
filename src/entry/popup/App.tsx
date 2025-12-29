@@ -85,7 +85,7 @@ const App: React.FC = () => {
 
       const llmProviderManager = new LLMProviderManager()
       await llmProviderManager.init()
-      const models = await llmProviderManager.getAvailableModels(provider.id)
+      const models = await llmProviderManager.fetchModelListForProvider(provider)
       setModelList(models)
 
       await chrome.storage.local.set({

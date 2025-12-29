@@ -69,9 +69,9 @@ export class SubtitleFetcher {
   async cleanupOldStorage() {
     try {
       const allData = await chrome.storage.local.get(null)
-      const videoKeys = Object.keys(allData).filter(
+      const videoKeys = allData ? Object.keys(allData).filter(
         (key) => key.startsWith('BV') || /^\d+$/.test(key)
-      )
+      ) : []
 
       if (videoKeys.length > this.MAX_STORED_VIDEOS) {
         const keysToRemove = videoKeys.slice(

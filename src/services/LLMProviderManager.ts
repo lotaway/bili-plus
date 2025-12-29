@@ -8,6 +8,7 @@ import {
 } from '../types/llm-provider'
 import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
 import { StreamUtils } from '../utils/streamUtils'
+import { LLM_Runner } from './LLM_Runner'
 
 interface ModelInfo {
   name: string
@@ -387,6 +388,14 @@ export class LLMProviderManager {
       await this.fetchModelList()
     }
     return this.modelList
+  }
+
+  async fetchModelListForProvider(provider: LLMProviderConfig): Promise<ModelInfo[]> {
+    if (!provider.endpoint) {
+      console.error('Provider配置不完整，无法获取模型列表')
+      return []
+    }
+    return await LLM_Runner.fetchModelListForEndpoint(provider.endpoint)
   }
 
   async saveConfig(config: LLMProvidersConfig): Promise<boolean> {
