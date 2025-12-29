@@ -4,28 +4,13 @@ import { StreamUtils } from '../utils/streamUtils'
 import { FileUtils } from '../utils/FileUtils'
 import { SubtitleFetcher } from './SubtitleFetcher'
 import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
+import { ModelInfo, VersionInfo } from '../types/llm-provider'
 
 interface Config {
   aiProvider: string
   aiEndpoint: string
   aiKey: string
   aiModel: string
-}
-
-interface VersionInfo {
-  model_name: string
-  version: string
-  object: string
-  owned_by: string
-  api_version: string
-}
-
-interface ModelInfo {
-  name: string
-  version: string
-  object: string
-  owned_by: string
-  api_version: string
 }
 
 interface ImportDocumentData {
@@ -117,6 +102,17 @@ export class LLM_Runner {
 
   private async checkApiStatus() {
     try {
+      const result = await this.checkApiStatusNow()
+      if ('error' in result) {
+        console.error('API状态检查失败:', result.error)
+      }
+    } finally {
+      this.scheduleApiCheck()
+    }
+  }
+
+  async checkApiStatusNow(): Promise<{ ok: boolean, message: string } | { error: string }> {
+    try {
       const signal = AbortSignal.timeout(5000)
       const result = await this.syncConfig()
       if (result.error) {
@@ -143,6 +139,7 @@ export class LLM_Runner {
         }
       })
       console.log(`API状态检查: ${isApiOk ? '正常' : '异常'}`)
+      return { ok: isApiOk, message: isApiOk ? 'API服务正常' : 'API服务异常' }
     } catch (error) {
       console.error('API状态检查失败:', error)
       await chrome.storage.local.set({
@@ -152,8 +149,7 @@ export class LLM_Runner {
           message: `API检查失败: ${error instanceof Error ? error.message : '未知错误'}`
         }
       })
-    } finally {
-      this.scheduleApiCheck()
+      return { error: error instanceof Error ? error.message : '未知错误' }
     }
   }
 

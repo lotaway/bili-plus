@@ -1,36 +1,15 @@
 import {
   LLMProviderConfig,
   LLMProvidersConfig,
+  ModelInfo,
+  VersionInfo,
+} from '../types/llm-provider'
+import {
   getLLMProvidersConfig,
   getSelectedProvider,
   selectProvider,
-  validateProviderConfig
-} from '../types/llm-provider'
-import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
-import { StreamUtils } from '../utils/streamUtils'
+} from './LLMProviderService'
 import { LLM_Runner } from './LLM_Runner'
-
-interface ModelInfo {
-  name: string
-  version: string
-  object: string
-  owned_by: string
-  api_version: string
-}
-
-interface VersionInfo {
-  model_name: string
-  version: string
-  object: string
-  owned_by: string
-  api_version: string
-}
-
-interface ApiStatus {
-  ok: boolean
-  lastChecked: string
-  message: string
-}
 
 export class LLMProviderManager {
   private apiCheckTimeout: number | null = null;
@@ -40,6 +19,7 @@ export class LLMProviderManager {
   private _modelList: ModelInfo[] = [];
   private _modelListFetched = false;
   private isBusy = false;
+  private llmRunner: LLM_Runner | null = null;
 
   static defaultModelName() {
     return 'gpt-3.5-turbo'
@@ -81,12 +61,34 @@ export class LLMProviderManager {
   async syncCurrentProvider(): Promise<void> {
     const provider = await getSelectedProvider()
     this.currentProvider = provider
+    await this.updateLLMRunner()
 
     if (provider) {
       console.log(`当前选中的LLM provider: ${provider.name} (${provider.id})`)
     } else {
       console.warn('没有可用的LLM provider，请先配置')
     }
+  }
+
+  private async updateLLMRunner(): Promise<void> {
+    if (!this.currentProvider) {
+      this.llmRunner = null
+      return
+    }
+
+    const runnerConfig = {
+      aiProvider: this.currentProvider.type,
+      aiEndpoint: this.currentProvider.endpoint,
+      aiKey: this.currentProvider.apiKey,
+      aiModel: this.currentProvider.defaultModel,
+    }
+
+    if (!this.llmRunner) {
+      this.llmRunner = new LLM_Runner()
+    }
+
+    await chrome.storage.sync.set(runnerConfig)
+    await this.llmRunner.syncConfig()
   }
 
   async switchProvider(providerId: string): Promise<boolean> {
@@ -99,11 +101,6 @@ export class LLMProviderManager {
       this._modelList = []
     }
     return success
-  }
-
-  async getAvailableProviders(): Promise<LLMProviderConfig[]> {
-    const config = await getLLMProvidersConfig()
-    return config.providers.filter(p => p.enabled)
   }
 
   initializeApiStatusCheck() {
@@ -131,41 +128,34 @@ export class LLMProviderManager {
   }
 
   private async checkApiStatus() {
-    if (!this.currentProvider) {
+    if (!this.currentProvider || !this.llmRunner) {
       console.warn('没有选中的LLM provider，跳过API状态检查')
       this.scheduleApiCheck()
       return
     }
 
     try {
-      const signal = AbortSignal.timeout(5000)
+      const result = await this.llmRunner.checkApiStatusNow()
 
-      if (!this._versionInfoFetched) {
-        await this.fetchVersionInfo()
+      if ('error' in result) {
+        console.error(`API状态检查失败 (${this.currentProvider.name}):`, result.error)
+        await chrome.storage.local.set({
+          apiStatus: {
+            ok: false,
+            lastChecked: new Date().toLocaleString(),
+            message: `API检查失败: ${result.error}`
+          }
+        })
+      } else {
+        console.log(`API状态检查 (${this.currentProvider.name}): ${result.ok ? '正常' : '异常'}`)
+        await chrome.storage.local.set({
+          apiStatus: {
+            ok: result.ok,
+            lastChecked: new Date().toLocaleString(),
+            message: result.message
+          }
+        })
       }
-
-      const response = await fetch(`${this.currentProvider.endpoint}/api/show`, {
-        method: 'POST',
-        headers: this.defaultHeaders(false),
-        signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const isApiOk = data?.ok === true
-
-      await chrome.storage.local.set({
-        apiStatus: {
-          ok: isApiOk,
-          lastChecked: new Date().toLocaleString(),
-          message: isApiOk ? 'API服务正常' : 'API服务异常'
-        }
-      })
-
-      console.log(`API状态检查 (${this.currentProvider.name}): ${isApiOk ? '正常' : '异常'}`)
     } catch (error) {
       console.error(`API状态检查失败 (${this.currentProvider?.name || '未知'}):`, error)
       await chrome.storage.local.set({
@@ -207,23 +197,12 @@ export class LLMProviderManager {
   }
 
   async fetchModelList(): Promise<ModelInfo[]> {
-    if (!this.currentProvider?.endpoint) {
+    if (!this.currentProvider || !this.llmRunner) {
       return []
     }
 
     try {
-      const signal = AbortSignal.timeout(5000)
-      const response = await fetch(`${this.currentProvider.endpoint}/api/tags`, {
-        method: 'GET',
-        headers: this.defaultHeaders(false),
-        signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const modelList = await response.json() as ModelInfo[]
+      const modelList = await this.llmRunner.fetchModelList()
       this._modelList = modelList
       this._modelListFetched = true
       return modelList
@@ -267,7 +246,7 @@ export class LLMProviderManager {
       onProgress?: (chunk: string) => void
     } = {}
   ) {
-    if (!this.currentProvider) {
+    if (!this.currentProvider || !this.llmRunner) {
       return { error: '请先配置并选择LLM provider' }
     }
 
@@ -277,36 +256,11 @@ export class LLMProviderManager {
 
     this.isBusy = true
     try {
-      const bodyData = {
-        ...this.defaultRequestBody,
-        model: this.currentProvider.defaultModel ?? LLMProviderManager.defaultModelName(),
-        messages,
-        temperature: options.temperature ?? 0.7,
+      return await this.llmRunner.callLLM(messages, {
+        temperature: options.temperature,
         stream: options.stream,
-      }
-
-      const signal = AbortSignal.timeout(5 * 60 * 1000)
-      const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
-        method: 'POST',
-        headers: this.defaultHeaders(),
-        body: JSON.stringify(bodyData),
-        signal,
+        onProgress: options.onProgress
       })
-
-      if (!response.body) throw new Error('No response body')
-      const reader = response.body.getReader()
-
-      const fullResponse = await new StreamUtils().readStream(
-        reader,
-        (content, _metadata) => {
-          if (content && options.onProgress) {
-            options.onProgress(content)
-          }
-        }
-      )
-
-      const data = new AIGenerationAnalyzer(fullResponse).analyze()
-      return { data }
     } finally {
       this.isBusy = false
     }
@@ -316,7 +270,7 @@ export class LLMProviderManager {
     screenshotDataUrl: string,
     onProgress?: (chunk: string) => void
   ) {
-    if (!this.currentProvider) {
+    if (!this.currentProvider || !this.llmRunner) {
       return { error: '请先配置并选择LLM provider' }
     }
 
@@ -326,41 +280,7 @@ export class LLMProviderManager {
 
     this.isBusy = true
     try {
-      const bodyData = {
-        ...this.defaultRequestBody,
-        model: this.currentProvider.defaultModel ?? LLMProviderManager.defaultModelName(),
-        messages: [
-          {
-            role: 'user',
-            content: `分析以下截图内容:\n\n![screenshot](${screenshotDataUrl})`,
-          },
-        ],
-        temperature: 0.7,
-        stream: true,
-      }
-
-      const signal = AbortSignal.timeout(5 * 60 * 1000)
-      const response = await fetch(`${this.apiPrefixWithVersion}/chat/completions`, {
-        method: 'POST',
-        headers: this.defaultHeaders(),
-        body: JSON.stringify(bodyData),
-        signal,
-      })
-
-      if (!response.body) throw new Error('No response body')
-      const reader = response.body.getReader()
-
-      const fullResponse = await new StreamUtils().readStream(
-        reader,
-        (content, _metadata) => {
-          if (content && onProgress) {
-            onProgress(content)
-          }
-        }
-      )
-
-      const data = new AIGenerationAnalyzer(fullResponse).analyze()
-      return { data }
+      return await this.llmRunner.analyzeScreenshot(screenshotDataUrl, onProgress)
     } finally {
       this.isBusy = false
     }
