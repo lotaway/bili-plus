@@ -32,11 +32,6 @@ export const useMessageHandling = () => {
 
     const handleAnalyzerOutput = (data: { done: boolean, think: string, content: string }) => {
       if (data.done) {
-        if (!data.content || data.content.trim() === '') {
-          dispatch(setMessage('无内容'))
-          dispatch(setAssistantRunning(false))
-          return
-        }
         if (data.think) {
           dispatch(setThinkingContent(data.think))
         }
@@ -115,7 +110,7 @@ export const useMessageHandling = () => {
         console.debug("Stream ended")
         if (data.content && aiAnalyzer) {
           aiAnalyzer.reset()
-          aiAnalyzer.inputStream(data.content)
+          aiAnalyzer.inputStream(data.content, true)
         }
         dispatch(setAssistantRunning(false)) // 添加这行来重置运行状态
         return

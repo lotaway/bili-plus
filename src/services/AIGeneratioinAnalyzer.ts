@@ -24,7 +24,7 @@ export class AIGenerationAnalyzer {
         return `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     }
 
-    inputStream(chunk: string) {
+    inputStream(chunk: string, isDone: boolean = false) {
         this.buffer += chunk
         if (this.subscribers.size === 0 || this.streaming)
             return
@@ -40,18 +40,20 @@ export class AIGenerationAnalyzer {
         else if (this.streaming) {
             return
         }
-        this.outputStream()
+        this.outputStream(isDone)
     }
 
-    outputStream() {
+    outputStream(isDone: boolean = false) {
         this.streaming = true
+        this.state = ParsingState.GENERATING
         try {
             while (this.buffer.length > 0) {
-                if (this.state === ParsingState.FREE) {
+                if (this.state === ParsingState.GENERATING) {
                     let thinkingStartIndex = this.buffer.indexOf(this.START_THINK_TAG)
                     const thinkingEndIndex = this.buffer.indexOf(this.END_THINK_TAG)
 
                     if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
+                        this.state = ParsingState.GENERATING
                         thinkingStartIndex = 0
                         const contentBefore = this.buffer.substring(thinkingStartIndex, thinkingEndIndex)
                         this.think += (this.content + contentBefore)
@@ -64,9 +66,10 @@ export class AIGenerationAnalyzer {
                         this.state = ParsingState.THINKING
                         this.buffer = this.buffer.substring(thinkingStartIndex + this.START_THINK_TAG.length)
                     } else if (markdownStartIndex !== -1) {
-                        this.state = ParsingState.GENERATING
+                        this.state = ParsingState.CONTENTING
                         this.buffer = this.buffer.substring(markdownStartIndex + this.START_MARKDOWN_TAG.length)
                     } else {
+                        this.state = ParsingState.GENERATING
                         this.content += this.buffer
                         this.buffer = ''
                     }
@@ -75,20 +78,21 @@ export class AIGenerationAnalyzer {
                     const thinkingEnd = this.buffer.indexOf(this.END_THINK_TAG)
                     if (thinkingEnd !== -1) {
                         this.think += this.buffer.substring(0, thinkingEnd)
-                        this.state = ParsingState.FREE
+                        this.state = ParsingState.GENERATING
                         this.buffer = this.buffer.substring(thinkingEnd + this.END_THINK_TAG.length)
                     } else {
                         this.think += this.buffer
                         this.buffer = ''
                     }
                 }
-                if (this.state === ParsingState.GENERATING) {
+                if (this.state === ParsingState.CONTENTING || this.state === ParsingState.GENERATING) {
                     const markdownEnd = this.buffer.indexOf(this.END_MARKDOWN_TAG)
                     if (markdownEnd !== -1) {
                         this.think += this.buffer.substring(0, markdownEnd)
                         this.state = ParsingState.FREE
                         this.content += this.buffer.substring(markdownEnd + this.END_MARKDOWN_TAG.length)
                     } else {
+                        this.state = ParsingState.CONTENTING
                         this.content += this.buffer
                         this.buffer = ''
                     }
@@ -96,7 +100,7 @@ export class AIGenerationAnalyzer {
             }
             this.subscribers.forEach(subscriber => {
                 subscriber({
-                    done: this.buffer.length === 0 && this.state === ParsingState.FREE,
+                    done: isDone || this.state === ParsingState.FREE,
                     think: this.think,
                     content: this.content,
                 })
@@ -126,13 +130,20 @@ export class AIGenerationAnalyzer {
     }
 
     analyze(buffer: string = this.buffer) {
-        const exp = new RegExp(`^(${this.START_THINK_TAG})?[\\s\\S]*?${this.END_THINK_TAG}\\s*`)
-        const think = exp.exec(buffer)
-        const output = buffer.replace(exp, '')
+        const chunks = buffer.split(this.END_THINK_TAG)
+        let think = ''
+        let output = ''
+        if (chunks.length >= 2) {
+            think = chunks[0].replace(this.START_THINK_TAG, '').trim()
+            output = chunks[1].trim()
+        }
+        else {
+            output = buffer.trim()
+        }
         const matchs = new RegExp(`${this.START_MARKDOWN_TAG}([\\s\\S]+?)${this.END_MARKDOWN_TAG}`).exec(output)
         const cleanContent = (matchs?.[1] ?? output).replace(new RegExp(`${this.END_OF_SENTENCE}$`), '')
         return {
-            think: think?.[0] ?? '',
+            think,
             content: cleanContent,
         }
     }

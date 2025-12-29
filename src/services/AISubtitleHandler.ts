@@ -3,15 +3,15 @@
  * 使用LLMProviderManager处理字幕总结
  */
 
-import { SubtitleFetcher } from './SubtitleFetcher';
-import { LLMProviderManager } from './LLMProviderManager';
+import { SubtitleFetcher } from './SubtitleFetcher'
+import { LLMProviderManager } from './LLMProviderManager'
 
 export class AISubtitleHandler {
-  private llmProviderManager: LLMProviderManager;
+  private llmProviderManager: LLMProviderManager
   isBusy = false;
 
   constructor(llmProviderManager: LLMProviderManager) {
-    this.llmProviderManager = llmProviderManager;
+    this.llmProviderManager = llmProviderManager
   }
 
   get prompt() {
@@ -19,7 +19,7 @@ export class AISubtitleHandler {
 1. 去除所有礼貌用语、空泛介绍、玩笑话、广告、评价和不客观的观点
 2. 保留对核心问题的介绍、解析、可行方式、步骤和示例
 3. 可以轻度补充缺失的内容
-4. 输出为结构清晰的Markdown格式`;
+4. 输出为结构清晰的Markdown格式`
   }
 
   async summarizeSubtitlesHandler(
@@ -27,21 +27,21 @@ export class AISubtitleHandler {
     onProgress?: (chunk: string) => void
   ): Promise<{ title: string; data: { think: string; content: string } } | { error: string }> {
     if (this.isBusy) {
-      return { error: '当前正在处理中，请稍后再试' };
+      return { error: '当前正在处理中，请稍后再试' }
     }
-    
-    const subJson = await fetcher.getSubtitlesText();
-    if (subJson.error) return subJson;
 
-    const subtitles = fetcher.bilisub2text(subJson);
-    const title = await fetcher.getTitle().catch(() => '');
-    
-    this.isBusy = true;
+    const subJson = await fetcher.getSubtitlesText()
+    if (subJson.error) return subJson
+
+    const subtitles = fetcher.bilisub2text(subJson)
+    const title = await fetcher.getTitle().catch(() => '')
+
+    this.isBusy = true
     try {
-      const summary = await this.processWithAI(title, subtitles, onProgress);
-      return { title, data: summary };
+      const summary = await this.processWithAI(title, subtitles, onProgress)
+      return { title, data: summary }
     } finally {
-      this.isBusy = false;
+      this.isBusy = false
     }
   }
 
@@ -54,7 +54,7 @@ export class AISubtitleHandler {
 
 视频标题：${title}
 字幕内容：
-${text}`;
+${text}`
 
     const result = await this.llmProviderManager.callLLM(
       [
@@ -68,12 +68,12 @@ ${text}`;
         stream: true,
         onProgress,
       }
-    );
-    
-    if (result.error) {
-      throw new Error(result.error);
+    )
+
+    if ('error' in result) {
+      throw new Error(result.error)
     }
-    
-    return result.data ?? { think: '', content: '' };
+
+    return result.data ?? { think: '', content: '' }
   }
 }
