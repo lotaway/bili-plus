@@ -47,6 +47,8 @@ export class AIGenerationAnalyzer {
         this.streaming = true
         this.state = ParsingState.GENERATING
         try {
+            const thinkBefore = this.think
+            const contentBefore = this.content
             while (this.buffer.length > 0) {
                 if (this.state === ParsingState.GENERATING) {
                     let thinkingStartIndex = this.buffer.indexOf(this.START_THINK_TAG)
@@ -55,8 +57,8 @@ export class AIGenerationAnalyzer {
                     if (thinkingEndIndex !== -1 && (thinkingStartIndex === -1 || thinkingEndIndex < thinkingStartIndex)) {
                         this.state = ParsingState.GENERATING
                         thinkingStartIndex = 0
-                        const contentBefore = this.buffer.substring(thinkingStartIndex, thinkingEndIndex)
-                        this.think += (this.content + contentBefore)
+                        const contentBeforeTag = this.buffer.substring(thinkingStartIndex, thinkingEndIndex)
+                        this.think += (this.content + contentBeforeTag)
                         this.content = ''
                         this.buffer = this.buffer.substring(thinkingEndIndex + this.END_THINK_TAG.length)
                         continue
@@ -69,7 +71,6 @@ export class AIGenerationAnalyzer {
                         this.state = ParsingState.CONTENTING
                         this.buffer = this.buffer.substring(markdownStartIndex + this.START_MARKDOWN_TAG.length)
                     } else {
-                        this.state = ParsingState.GENERATING
                         this.content += this.buffer
                         this.buffer = ''
                     }
@@ -85,27 +86,31 @@ export class AIGenerationAnalyzer {
                         this.buffer = ''
                     }
                 }
-                if (this.state === ParsingState.CONTENTING || this.state === ParsingState.GENERATING) {
+                if (this.state === ParsingState.CONTENTING) {
                     const markdownEnd = this.buffer.indexOf(this.END_MARKDOWN_TAG)
                     if (markdownEnd !== -1) {
-                        this.think += this.buffer.substring(0, markdownEnd)
+                        this.content += this.buffer.substring(0, markdownEnd)
                         this.state = ParsingState.FREE
-                        this.content += this.buffer.substring(markdownEnd + this.END_MARKDOWN_TAG.length)
+                        this.buffer = this.buffer.substring(markdownEnd + this.END_MARKDOWN_TAG.length)
                     } else {
-                        this.state = ParsingState.CONTENTING
                         this.content += this.buffer
                         this.buffer = ''
                     }
                 }
             }
+
             const done = isDone ?? this.state === ParsingState.FREE
-            this.subscribers.forEach(subscriber => {
-                subscriber({
-                    done,
-                    think: this.think,
-                    content: this.content,
+            const newThink = this.think.substring(thinkBefore.length)
+            const newContent = this.content.substring(contentBefore.length)
+            if (newThink || newContent || done) {
+                this.subscribers.forEach(subscriber => {
+                    subscriber({
+                        done,
+                        think: done ? this.think : this.think,
+                        content: done ? this.content : newContent,
+                    })
                 })
-            })
+            }
         } finally {
             this.streaming = false
         }

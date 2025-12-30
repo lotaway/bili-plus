@@ -125,19 +125,15 @@ const App: React.FC = () => {
   }
 
   const handleDeleteProvider = async (providerId: string) => {
-    if (providers.length <= 1) {
-      showMessage('至少需要保留一个provider', 'error')
-      return
-    }
-
-    if (currentProviderId === providerId) {
+    if (currentProviderId === providerId && providers.length > 1) {
       showMessage('不能删除当前正在使用的provider，请先切换到其他provider', 'error')
       return
     }
 
     if (window.confirm('确定要删除这个provider吗？')) {
       const updatedProviders = providers.filter(p => p.id !== providerId)
-      await saveProviders(updatedProviders, currentProviderId)
+      const newCurrentId = currentProviderId === providerId || updatedProviders.length === 0 ? '' : currentProviderId
+      await saveProviders(updatedProviders, newCurrentId)
       showMessage('provider已删除', 'success')
     }
   }
@@ -174,14 +170,14 @@ const App: React.FC = () => {
     if (isAddingNew) {
       updatedProviders = [...providers, editingProvider]
     } else {
-      updatedProviders = providers.map(p => 
+      updatedProviders = providers.map(p =>
         p.id === editingProvider.id ? editingProvider : p
       )
     }
 
     const newCurrentProviderId = isAddingNew && providers.length === 0 ? editingProvider.id : currentProviderId
     await saveProviders(updatedProviders, newCurrentProviderId)
-    
+
     setEditingProvider(null)
     setIsAddingNew(false)
     showMessage(isAddingNew ? 'provider已添加' : 'provider已更新', 'success')
@@ -196,7 +192,7 @@ const App: React.FC = () => {
         selectedProviderId: currentId,
         version: 1
       })
-      
+
       setProviders(providersList)
       setCurrentProviderId(currentId)
     } catch (error) {
@@ -232,12 +228,11 @@ const App: React.FC = () => {
 
   return (
     <div className="popup">
-      <h3>🎬 Bilibili Plus</h3>
-      
+      <h3>Settings</h3>
+
       <div className="config-section">
         <h4>LLM Provider 管理</h4>
-        
-        {/* Providers列表 */}
+
         <div className="providers-list">
           {providers.length === 0 ? (
             <p className="no-providers">暂无配置的provider</p>
@@ -252,23 +247,22 @@ const App: React.FC = () => {
                   )}
                 </div>
                 <div className="provider-actions">
-                  <button 
+                  <button
                     className="action-btn switch-btn"
                     onClick={() => handleSwitchProvider(provider.id)}
                     disabled={provider.id === currentProviderId}
                   >
                     切换
                   </button>
-                  <button 
+                  <button
                     className="action-btn edit-btn"
                     onClick={() => handleEditProvider(provider)}
                   >
                     编辑
                   </button>
-                  <button 
+                  <button
                     className="action-btn delete-btn"
                     onClick={() => handleDeleteProvider(provider.id)}
-                    disabled={providers.length <= 1}
                   >
                     删除
                   </button>
@@ -282,7 +276,6 @@ const App: React.FC = () => {
           + 添加新的Provider
         </button>
 
-        {/* 编辑/添加Provider表单 */}
         {editingProvider && (
           <div className="provider-form">
             <h5>{isAddingNew ? '添加新的Provider' : '编辑Provider'}</h5>

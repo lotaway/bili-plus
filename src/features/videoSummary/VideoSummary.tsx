@@ -177,6 +177,7 @@ export const VideoSummary = () => {
   }
 
   const { clearAnaylazeContent } = useMessageHandling()
+  // const clearAnaylazeContent = () => {}
 
   useScrollManagement(resultContainerRef, thinkingContainerRef)
 

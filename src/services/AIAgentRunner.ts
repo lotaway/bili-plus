@@ -27,7 +27,6 @@ export class AIAgentRunner {
       return { error: '当前正在处理中，请稍后再试' }
     }
 
-    // 检查是否有选中的provider
     if (!this.llmProviderManager.provider) {
       return { error: '请先配置并选择LLM provider' }
     }

@@ -8,6 +8,7 @@ import {
   getLLMProvidersConfig,
   getSelectedProvider,
   selectProvider,
+  saveLLMProvidersConfig,
 } from './LLMProviderService'
 import { LLM_Runner } from './LLM_Runner'
 
@@ -87,8 +88,12 @@ export class LLMProviderManager {
       this.llmRunner = new LLM_Runner()
     }
 
-    await chrome.storage.sync.set(runnerConfig)
-    await this.llmRunner.syncConfig()
+    try {
+      await chrome.storage.sync.set(runnerConfig)
+      await this.llmRunner.syncConfig()
+    } catch (error) {
+      console.error('更新LLM Runner配置失败:', error)
+    }
   }
 
   async switchProvider(providerId: string): Promise<boolean> {
@@ -170,32 +175,6 @@ export class LLMProviderManager {
     }
   }
 
-  private async fetchVersionInfo() {
-    if (!this.currentProvider?.endpoint) {
-      return
-    }
-
-    try {
-      const signal = AbortSignal.timeout(5000)
-      const response = await fetch(`${this.currentProvider.endpoint}/api/version`, {
-        method: 'GET',
-        headers: this.defaultHeaders(false),
-        signal,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const versionData = await response.json() as VersionInfo
-      this._versionInfo = versionData
-      this._versionInfoFetched = true
-      console.log('版本信息获取成功:', versionData)
-    } catch (error) {
-      console.error('获取版本信息失败:', error)
-    }
-  }
-
   async fetchModelList(): Promise<ModelInfo[]> {
     if (!this.currentProvider || !this.llmRunner) {
       return []
@@ -247,6 +226,14 @@ export class LLMProviderManager {
     } = {}
   ) {
     if (!this.currentProvider || !this.llmRunner) {
+      try {
+        await this.syncCurrentProvider()
+      } catch (error) {
+        console.error('初始化LLMProviderManager失败:', error)
+      }
+    }
+
+    if (!this.currentProvider || !this.llmRunner) {
       return { error: '请先配置并选择LLM provider' }
     }
 
@@ -270,6 +257,14 @@ export class LLMProviderManager {
     screenshotDataUrl: string,
     onProgress?: (chunk: string) => void
   ) {
+    if (!this.currentProvider || !this.llmRunner) {
+      try {
+        await this.syncCurrentProvider()
+      } catch (error) {
+        console.error('初始化LLMProviderManager失败:', error)
+      }
+    }
+
     if (!this.currentProvider || !this.llmRunner) {
       return { error: '请先配置并选择LLM provider' }
     }
@@ -320,11 +315,14 @@ export class LLMProviderManager {
 
   async saveConfig(config: LLMProvidersConfig): Promise<boolean> {
     try {
-      await chrome.storage.sync.set({
-        llmProviders: config.providers,
-        currentLLMProviderId: config.selectedProviderId
-      })
-
+      await saveLLMProvidersConfig(config)
+      if (config.selectedProviderId && config.providers && config.providers.length > 0) {
+        const selectedProvider = config.providers.find(p => p.id === config.selectedProviderId)
+        if (selectedProvider) {
+          this.currentProvider = selectedProvider
+          await this.updateLLMRunner()
+        }
+      }
       await this.syncCurrentProvider()
       return true
     } catch (error) {
