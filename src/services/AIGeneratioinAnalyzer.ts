@@ -24,7 +24,7 @@ export class AIGenerationAnalyzer {
         return `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     }
 
-    inputStream(chunk: string, isDone: boolean = false) {
+    inputStream(chunk: string, isDone?: boolean) {
         this.buffer += chunk
         if (this.subscribers.size === 0 || this.streaming)
             return
@@ -43,7 +43,7 @@ export class AIGenerationAnalyzer {
         this.outputStream(isDone)
     }
 
-    outputStream(isDone: boolean = false) {
+    outputStream(isDone?: boolean) {
         this.streaming = true
         this.state = ParsingState.GENERATING
         try {
@@ -98,9 +98,10 @@ export class AIGenerationAnalyzer {
                     }
                 }
             }
+            const done = isDone ?? this.state === ParsingState.FREE
             this.subscribers.forEach(subscriber => {
                 subscriber({
-                    done: isDone || this.state === ParsingState.FREE,
+                    done,
                     think: this.think,
                     content: this.content,
                 })

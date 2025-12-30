@@ -80,16 +80,10 @@ export const useMessageHandling = () => {
           dispatch(setAssistantRunning(false))
           return
         }
-        if (data.content && aiAnalyzer) {
-          aiAnalyzer.reset()
-          aiAnalyzer.inputStream(data.content)
-        }
+        aiAnalyzer.reset()
         dispatch(setAssistantRunning(false)) // 添加这行来重置运行状态
-        return
       }
-      if (data.content && aiAnalyzer) {
-        aiAnalyzer.inputStream(data.content)
-      }
+      data.content && aiAnalyzer.inputStream(data.content, data.done)
     }
 
     const handleAssistantResponseStream = (data: AgentResponse) => {
@@ -116,7 +110,7 @@ export const useMessageHandling = () => {
         return
       }
       if (data.content && aiAnalyzer) {
-        aiAnalyzer.inputStream(data.content)
+        aiAnalyzer.inputStream(data.content, false)
       }
     }
 
