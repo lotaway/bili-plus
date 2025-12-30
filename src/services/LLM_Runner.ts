@@ -284,16 +284,17 @@ export class LLM_Runner {
     this.isBusy = true
     try {
       // @TODO REMOVE BEFORE RELEASE
-      if (true) {
-        const fullResponse = "<think>llm provider改成混合llama.cpp作为gguf模型加载和推理后端（插件没有正常输出生成内容需要排查问题）</think>```markdown把飞行摇杆和踏板变成辅助工作按钮，还可区别浅按和深按，如果可行，加入摇杆给脚控制。Window测试ComfyUI 图片替换视频人物节点效果（按照视频流程完成下载和测试）```"
-        const chunks = fullResponse.split('')
-        for (const content of chunks) {
-          await new Promise(resolve => setTimeout(resolve, 30))
-          options?.onProgress?.(content)
-        }
-        const data = new AIGenerationAnalyzer(fullResponse).analyze()
-        return { data }
-      }
+      // const mock = true
+      // if (mock) {
+      //   const fullResponse = "<think>llm provider改成混合llama.cpp作为gguf模型加载和推理后端（插件没有正常输出生成内容需要排查问题）</think>```markdown把飞行摇杆和踏板变成辅助工作按钮，还可区别浅按和深按，如果可行，加入摇杆给脚控制。Window测试ComfyUI 图片替换视频人物节点效果（按照视频流程完成下载和测试）```"
+      //   const chunks = fullResponse.split('')
+      //   for (const content of chunks) {
+      //     await new Promise(resolve => setTimeout(resolve, 30))
+      //     options?.onProgress?.(content)
+      //   }
+      //   const data = new AIGenerationAnalyzer(fullResponse).analyze()
+      //   return { data }
+      // }
       const bodyData = {
         ...this.defaultRequestBody,
         model: this.config.aiModel ?? LLM_Runner.defaultModelName(),
