@@ -222,7 +222,7 @@ export class LLMProviderManager {
     options: {
       temperature?: number
       stream?: boolean
-      onProgress?: (chunk: string) => void
+      onProgress?: (chunk: string, metadata?: any) => void
     } = {}
   ) {
     if (!this.currentProvider || !this.llmRunner) {

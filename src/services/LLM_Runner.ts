@@ -271,7 +271,7 @@ export class LLM_Runner {
     options: {
       temperature?: number
       stream?: boolean
-      onProgress?: (chunk: string) => void
+      onProgress?: (chunk: string, metadata?: any) => void
     } = {}
   ) {
     if (this.isBusy) {
@@ -315,9 +315,11 @@ export class LLM_Runner {
 
       const fullResponse = await new StreamUtils().readStream(
         reader,
-        (content, _metadata) => {
+        (content, metadata) => {
           if (content && options.onProgress) {
-            options.onProgress(content)
+            options.onProgress(content, metadata)
+          } else if (metadata && options.onProgress) {
+            options.onProgress('', metadata)
           }
         }
       )
@@ -396,7 +398,7 @@ export class LLM_Runner {
 
   async analyzeScreenshot(
     screenshotDataUrl: string,
-    onProgress?: (chunk: string) => void
+    onProgress?: (chunk: string, metadata?: any) => void
   ): Promise<{ data: { think: string, content: string } } | { error: string }> {
     if (this.isBusy) {
       return { error: '当前正在处理中，请稍后再试' }
@@ -450,9 +452,11 @@ export class LLM_Runner {
 
       const fullResponse = await new StreamUtils().readStream(
         reader,
-        (content, _metadata) => {
+        (content, metadata) => {
           if (content && onProgress) {
-            onProgress(content)
+            onProgress(content, metadata)
+          } else if (metadata && onProgress) {
+            onProgress('', metadata)
           }
         }
       )

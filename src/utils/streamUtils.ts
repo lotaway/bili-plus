@@ -1,3 +1,19 @@
+export interface StreamChunkData {
+  id?: string
+  object?: string
+  created?: number
+  model?: string
+  choices: Array<{
+    index: number
+    delta: {
+      content?: string
+      role?: string
+    }
+    finish_reason?: string | null
+  }>
+  agent_metadata?: any
+}
+
 export class StreamUtils {
   async readStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -16,21 +32,36 @@ export class StreamUtils {
       const SPLIT = '\n'
       const lines = buffer.split(SPLIT)
       buffer = lines.pop() || ''
-
+      const DATA_PREFIX = 'data: '
       for (const line of lines) {
-        if (line.startsWith('data:') && !line.includes('[DONE]')) {
-          try {
-            const data = JSON.parse(line.substring(5))
-            const agentMetadata = data.agent_metadata
-            onProgress?.('', agentMetadata)
-            const content = data.choices[0]?.delta?.content
-            if (content) {
-              fullResponse += content
-              onProgress?.(content, null)
+        if (line.includes('[DONE]')) {
+          break
+        }
+        if (!line.startsWith(DATA_PREFIX)) {
+          continue
+        }
+        try {
+          const data: StreamChunkData = JSON.parse(line.substring(DATA_PREFIX.length))
+          const agentMetadata = data.agent_metadata
+          const finishReason = data.choices[0]?.finish_reason
+          const content = data.choices[0]?.delta?.content
+          let metadata: any = null
+          if (finishReason || agentMetadata) {
+            metadata = { ...agentMetadata }
+            if (finishReason) {
+              metadata.finish_reason = finishReason
             }
-          } catch (e) {
-            console.error('Error parsing stream data:', e)
           }
+          if (!content && metadata) {
+            onProgress?.('', metadata)
+          }
+
+          if (content) {
+            fullResponse += content
+            onProgress?.(content, metadata)
+          }
+        } catch (e) {
+          console.error('Error parsing stream data:', e)
         }
       }
     }

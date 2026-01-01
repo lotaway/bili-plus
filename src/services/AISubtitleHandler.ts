@@ -38,7 +38,13 @@ export class AISubtitleHandler {
 
     this.isBusy = true
     try {
-      const summary = await this.processWithAI(title, subtitles, onProgress)
+      const adaptedOnProgress = onProgress
+        ? (chunk: string, metadata?: any) => {
+          onProgress(chunk)
+        }
+        : undefined
+
+      const summary = await this.processWithAI(title, subtitles, adaptedOnProgress)
       return { title, data: summary }
     } finally {
       this.isBusy = false
@@ -48,7 +54,7 @@ export class AISubtitleHandler {
   async processWithAI(
     title: string,
     text: string,
-    onProgress?: (chunk: string) => void
+    onProgress?: (chunk: string, metadata?: any) => void
   ): Promise<{ think: string; content: string }> {
     const completePrompt = `${this.prompt}
 
@@ -56,24 +62,71 @@ export class AISubtitleHandler {
 字幕内容：
 ${text}`
 
-    const result = await this.llmProviderManager.callLLM(
-      [
+    let accumulatedContent = ''
+    let finalThink = ''
+    let attemptCount = 0
+    const maxAttempts = 3
+
+    while (attemptCount < maxAttempts) {
+      attemptCount++
+      const messages: { role: string; content: string }[] = [
         {
           role: 'user',
           content: completePrompt,
         },
-      ],
-      {
-        temperature: 0.7,
-        stream: true,
-        onProgress,
+      ]
+      if (attemptCount > 1 && accumulatedContent) {
+        messages.push({
+          role: 'assistant',
+          content: accumulatedContent,
+        })
       }
-    )
 
-    if ('error' in result) {
-      throw new Error(result.error)
+      let receivedFinishReason: string | null = null
+      let currentAttemptContent = ''
+
+      const result = await this.llmProviderManager.callLLM(
+        messages,
+        {
+          temperature: 0.7,
+          stream: true,
+          onProgress: (chunk: string, metadata?: any) => {
+            if (chunk) {
+              accumulatedContent += chunk
+              currentAttemptContent += chunk
+            }
+            if (metadata?.finish_reason) {
+              receivedFinishReason = metadata.finish_reason
+            }
+            if (onProgress) {
+              onProgress(chunk, metadata)
+            }
+          },
+        }
+      )
+
+      if ('error' in result) {
+        throw new Error(result.error)
+      }
+      const data = result.data ?? { think: '', content: '' }
+      if (data.think) {
+        finalThink = data.think
+      }
+      if (receivedFinishReason === 'length' && attemptCount < maxAttempts) {
+        console.log(`检测到finish_reason: "length"，尝试续传 (第${attemptCount}次)`)
+        continue
+      } else {
+        console.log(`生成完成，finish_reason: ${receivedFinishReason || '正常结束'}`)
+        return {
+          think: finalThink,
+          content: accumulatedContent,
+        }
+      }
     }
-
-    return result.data ?? { think: '', content: '' }
+    console.log(`达到最大续传尝试次数 (${maxAttempts})，返回当前内容`)
+    return {
+      think: finalThink,
+      content: accumulatedContent,
+    }
   }
 }
