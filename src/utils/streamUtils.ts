@@ -1,18 +1,5 @@
-export interface StreamChunkData {
-  id?: string
-  object?: string
-  created?: number
-  model?: string
-  choices: Array<{
-    index: number
-    delta: {
-      content?: string
-      role?: string
-    }
-    finish_reason?: string | null
-  }>
-  agent_metadata?: any
-}
+import { CompletionData } from "../types/CompletionData"
+
 
 export class StreamUtils {
   async readStream(
@@ -41,7 +28,7 @@ export class StreamUtils {
           continue
         }
         try {
-          const data: StreamChunkData = JSON.parse(line.substring(DATA_PREFIX.length))
+          const data: CompletionData = JSON.parse(line.substring(DATA_PREFIX.length))
           const agentMetadata = data.agent_metadata
           const finishReason = data.choices[0]?.finish_reason
           const content = data.choices[0]?.delta?.content
