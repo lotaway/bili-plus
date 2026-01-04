@@ -6,6 +6,7 @@ import TabContainer from '../../components/TabContainer'
 import Calculator from '../../features/calculator/calculator'
 import { VideoSummary } from '../../features/videoSummary/VideoSummary'
 import VideoDownload from '../../features/videoDownload/VideoDownload'
+import StudyAutomationPanel from '../../features/studyAutomation/StudyAutomationPanel'
 
 const AppContent: React.FC = () => {
   useEffect(() => {
@@ -39,6 +40,11 @@ const AppContent: React.FC = () => {
       id: 'download',
       label: '视频下载',
       content: <VideoDownload />
+    },
+    {
+      id: 'study',
+      label: '自动学习',
+      content: <StudyAutomationPanel />
     }
   ]
 

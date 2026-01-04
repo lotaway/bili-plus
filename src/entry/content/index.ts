@@ -2,6 +2,7 @@ import { RequestPageEventType } from '../../enums/PageEventType'
 import { MessageType } from '../../enums/MessageType'
 import { PageType } from '../../enums/PageType'
 import { VideoData } from '../../types/video'
+import { StudyAutomation } from '../../services/StudyAutomation'
 
 export { }
 
@@ -58,6 +59,9 @@ function handleChromeMessage(...args: ChromeMessageEvent) {
     case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE:
       handleRequestVideoDownloadInPage(...args)
       return true
+    case MessageType.START_STUDY_AUTOMATION:
+      handleStartStudyAutomation(...args)
+      return true
   }
   return false
 }
@@ -110,6 +114,18 @@ function handleRequestVideoDownloadInPage(...args: ChromeMessageEvent) {
     cleanup()
   }, 5 * 60 * 1000)
 
+  return true
+}
+
+function handleStartStudyAutomation(...args: ChromeMessageEvent) {
+  const [message, sender, sendResponse] = args
+  const studyAutomation = new StudyAutomation()
+  studyAutomation.startAutomation()
+    .then(() => sendResponse({ success: true }))
+    .catch(err => {
+      console.error('Study automation failed:', err)
+      sendResponse({ error: String(err) })
+    })
   return true
 }
 
