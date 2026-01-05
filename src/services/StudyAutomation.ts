@@ -8,7 +8,7 @@ export interface BiliVideoInfo {
 
 export class StudyAutomation {
     private llmProviderManager = new LLMProviderManager()
-    private baseUrl = 'http://localhost:5051' // @TODO configable in user ui
+    private baseUrl = 'http://localhost:5051'
 
     constructor() {
         this.llmProviderManager.init()
@@ -16,6 +16,11 @@ export class StudyAutomation {
 
     async startAutomation() {
         console.log('[Study Automation] Starting...')
+
+        const storageResult = await chrome.storage.local.get('studyAutomationBaseUrl')
+        if (storageResult.studyAutomationBaseUrl) {
+            this.baseUrl = storageResult.studyAutomationBaseUrl
+        }
 
         const configResp = await fetch(`${this.baseUrl}/api/config`)
         const config = await configResp.json()
@@ -26,7 +31,7 @@ export class StudyAutomation {
         let filteredVideos = allVideos.filter(v => {
             const title = v.title.toLowerCase()
             if (title.length < 5) return false // N = 5
-            const blackList = ['开箱', '日常', 'vlog', '记录', '娱乐']
+            const blackList = ['番剧', '动漫', '游戏', '开箱', '日常', 'vlog', '记录', '娱乐']
             if (blackList.some(kw => title.includes(kw))) return false
             return true
         })
@@ -45,7 +50,7 @@ export class StudyAutomation {
                 continue
             }
 
-            const prompt = `Please analyze these Bilibili video titles and determine which ones are "tutorials" or "knowledge-based". 
+            const prompt = `Please analyze these Bilibili video titles and determine which ones are "tutorials" or "knowledge-based" about real world. 
             Return a JSON array of objects with fields: category (class|knowledge), link, level (1-10), confidence (1-10), reason.
             Titles: ${JSON.stringify(batch.map(v => ({ title: v.title, link: v.link })))}`
 

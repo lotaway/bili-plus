@@ -23,10 +23,12 @@ const App: React.FC = () => {
   } | null>(null)
   const [modelList, setModelList] = useState<ModelInfo[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
+  const [studyBaseUrl, setStudyBaseUrl] = useState('http://localhost:5051')
 
   useEffect(() => {
     loadProviders()
     loadApiStatus()
+    loadStudySettings()
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area === 'local' && changes.apiStatus) {
         setApiStatus(changes.apiStatus.newValue)
@@ -100,6 +102,27 @@ const App: React.FC = () => {
       setModelList([])
     } finally {
       setIsLoadingModels(false)
+    }
+  }
+
+  const loadStudySettings = async () => {
+    try {
+      const result = await chrome.storage.local.get('studyAutomationBaseUrl')
+      if (result.studyAutomationBaseUrl) {
+        setStudyBaseUrl(result.studyAutomationBaseUrl)
+      }
+    } catch (error) {
+      console.error('加载Study Automation配置失败:', error)
+    }
+  }
+
+  const handleSaveStudySettings = async () => {
+    try {
+      await chrome.storage.local.set({ studyAutomationBaseUrl: studyBaseUrl })
+      showMessage('Study Automation配置已保存', 'success')
+    } catch (error) {
+      console.error('保存Study Automation配置失败:', error)
+      showMessage('保存配置失败', 'error')
     }
   }
 
@@ -386,6 +409,28 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+
+        <div className="study-config-section">
+          <h4>Study Automation 配置</h4>
+          <div className="form-group">
+            <label htmlFor="studyBaseUrl">Base URL</label>
+            <div className="input-group">
+              <input
+                type="text"
+                id="studyBaseUrl"
+                value={studyBaseUrl}
+                onChange={(e) => setStudyBaseUrl(e.target.value)}
+                placeholder="http://localhost:5051"
+              />
+              <button 
+                className="save-btn" 
+                onClick={handleSaveStudySettings}
+              >
+                保存配置
+              </button>
+            </div>
+          </div>
+        </div>
 
         <button id="openSidePanel" onClick={handleOpenSidePanel}>
           显示操作面板
