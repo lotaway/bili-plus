@@ -129,3 +129,25 @@ button:hover {
   color: #721c24;
   border: 1px solid #f5c6cb;
 }
+
+.study-config-section {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+}
+
+.study-config-section .input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.study-config-section .save-btn {
+  width: auto;
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+.study-config-section .input-group input {
+  flex: 1;
+  width: auto;
+  margin-bottom: 0;
+}
