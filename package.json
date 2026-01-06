@@ -3,7 +3,8 @@
   "version": "1.0.1",
   "description": "Bilibili Plus",
   "scripts": {
-    "build": "tsc && vite build && vite build -c vite.content.config.ts && vite build -c vite.inject.config.ts",
+    "build": "tsc && vite build",
+    "rebuild": "rm -rf dist && yarn build",
     "preview": "vite preview",
     "watch": "gulp"
   },

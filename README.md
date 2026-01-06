@@ -30,6 +30,7 @@ BILI PLUS 是一个增强 B 站体验的浏览器扩展，提供多种实用功�
 - 一键导出字幕文件（SRT/Markdown 格式）
 - AI 智能分析和总结功能
 - 实时截图和界面分析
+- 每日自动学习学习计划
 
 ## 项目结构
 
@@ -40,7 +41,7 @@ BILI PLUS 是一个增强 B 站体验的浏览器扩展，提供多种实用功�
 - `src/entry` - 入口文件，加载各个模块,vite需按照这些入口编译输出成多个文件
 - `src/entry/background` - 后台脚本，处理核心任务
 - `src/entry/content` - 内容脚本，连接页面与扩展
-- `src/entry/biliVideo` - 页面注入脚本，获取页面信息和执行页面操作
+- `src/entry/inject` - 页面注入脚本，获取页面信息和执行页面操作
 - `src/entry/popup` - 弹出页面，用于全局配置和设置用户喜好
 - `src/entry/sidepanel` - 侧边栏界面，主要功能操作区域和统一信息输出
 - `src/enums` - 各种状态、类型枚举
