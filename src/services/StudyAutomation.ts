@@ -95,34 +95,30 @@ export class StudyAutomation {
         }
 
         console.log(`[Study Automation] Submitted ${finalSelection.length} tasks.`)
-    } catch(error) {
-        console.error('[Study Automation] Error:', error)
-        throw error
     }
-}
 
-    private async extractVideosFromPage(): Promise < BiliVideoInfo[] > {
-    const cards = document.querySelectorAll('.bili-video-card')
+    private async extractVideosFromPage(): Promise<BiliVideoInfo[]> {
+        const cards = document.querySelectorAll('.bili-video-card')
         const results: BiliVideoInfo[] = []
         cards.forEach(card => {
-        const titleEl = card.querySelector('.bili-video-card__info--tit')
-        const linkEl = card.querySelector('a')
-        if (titleEl && linkEl) {
-            const title = titleEl.textContent?.trim() || ''
-            const link = linkEl.href
-            const bvidMatch = link.match(/BV[a-zA-Z0-9]+/)
-            if (bvidMatch) {
-                results.push({ title, link, bvid: bvidMatch[0] })
+            const titleEl = card.querySelector('.bili-video-card__info--tit')
+            const linkEl = card.querySelector('a')
+            if (titleEl && linkEl) {
+                const title = titleEl.textContent?.trim() || ''
+                const link = linkEl.href
+                const bvidMatch = link.match(/BV[a-zA-Z0-9]+/)
+                if (bvidMatch) {
+                    results.push({ title, link, bvid: bvidMatch[0] })
+                }
             }
-        }
-    })
+        })
         return results
-}
+    }
 
     private async clickChangeButton() {
-    const btn = document.querySelector('.roll-btn') as HTMLElement
-    if (btn) {
-        btn.click()
+        const btn = document.querySelector('.roll-btn') as HTMLElement
+        if (btn) {
+            btn.click()
+        }
     }
-}
 }
