@@ -281,9 +281,8 @@ export class LLMProviderManager {
     }
   }
 
-  async saveDocument(importDocumentData: any) {
-    console.log('保存文档:', importDocumentData)
-    return { success: true }
+  async saveDocument(...args: Parameters<InstanceType<typeof LLM_Runner>["saveDocument"]>) {
+    return this.llmRunner?.saveDocument(...args)
   }
 
   async getConfig(): Promise<LLMProvidersConfig> {
