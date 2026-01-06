@@ -4,8 +4,9 @@ import { StudyAutomation } from '../../services/StudyAutomation'
 export { }
 
 function main() {
-  console.debug('[Bilibili Plus] 首页content script已加载')
+  console.debug('Start home content.js')
   addListener()
+  console.debug('End home content.js')
 }
 
 function addListener() {
