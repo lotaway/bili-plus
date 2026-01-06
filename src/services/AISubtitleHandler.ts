@@ -92,7 +92,6 @@ ${text}`
           stream: true,
           onProgress: (chunk: string, metadata?: any) => {
             if (chunk) {
-              accumulatedContent += chunk
               currentAttemptContent += chunk
             }
             if (metadata?.finish_reason) {
@@ -111,6 +110,9 @@ ${text}`
       const data = result.data ?? { think: '', content: '' }
       if (data.think) {
         finalThink = data.think
+      }
+      if (data.content) {
+        accumulatedContent += data.content
       }
       if (receivedFinishReason === 'length' && attemptCount < maxAttempts) {
         console.log(`检测到finish_reason: "length"，尝试续传 (第${attemptCount}次)`)
