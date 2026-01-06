@@ -5,6 +5,7 @@ import { FileUtils } from '../utils/FileUtils'
 import { SubtitleFetcher } from './SubtitleFetcher'
 import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
 import { ModelInfo, VersionInfo } from '../types/llm-provider'
+import type { LLMProviderManager } from './LLMProviderManager'
 
 interface Config {
   aiProvider: string
@@ -472,10 +473,10 @@ export class LLM_Runner {
 }
 
 export class AISubtitleHandler {
-  private llmProvider: any
+  private llmProvider: LLMProviderManager
   isBusy = false
 
-  constructor(llmProvider: any) {
+  constructor(llmProvider: LLMProviderManager) {
     this.llmProvider = llmProvider
   }
 
@@ -536,7 +537,7 @@ ${text}`
         onProgress
       }
     )
-    if (result.error) {
+    if ('error' in result) {
       throw new Error(result.error)
     }
     return result.data ?? { think: '', content: '' }

@@ -45,27 +45,27 @@ const StudyAutomationPanel: React.FC = () => {
       }
 
       if (!tab.url?.includes('bilibili.com')) {
-         setStatus('请先前往 Bilibili 首页或视频页')
-         setLoading(false)
-         return
+        setStatus('请先前往 Bilibili 首页或视频页')
+        setLoading(false)
+        return
       }
 
-      chrome.tabs.sendMessage(tab.id, {
+      const preError = chrome.runtime.lastError
+      const response = await chrome.tabs.sendMessage(tab.id, {
         type: MessageType.START_STUDY_AUTOMATION
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          setError(`请先刷新 Bilibili 页面：${chrome.runtime.lastError.message}`)
-          setLoading(false)
-          return
-        }
-
-        if (response?.error) {
-          setError(response.error)
-        } else {
-          setStatus('自动化学习任务已提交到队列')
-        }
-        setLoading(false)
       })
+      if (chrome.runtime.lastError && preError !== chrome.runtime.lastError) {
+        setError(`请先刷新 Bilibili 页面：${chrome.runtime.lastError.message}`)
+        setLoading(false)
+        return
+      }
+
+      if (response?.error) {
+        setError(response.error)
+      } else {
+        setStatus('自动化学习任务已提交到队列')
+      }
+      setLoading(false)
     } catch (err: any) {
       setError(err.message)
       setLoading(false)

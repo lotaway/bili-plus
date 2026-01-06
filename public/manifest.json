@@ -28,7 +28,18 @@
                 "*://www.bilibili.com/list/watchlater?*"
             ],
             "js": [
-                "assets/content.js"
+                "assets/video.js"
+            ]
+        },
+        {
+            "matches": [
+                "https://www.bilibili.com/",
+                "http://www.bilibili.com/",
+                "https://www.bilibili.com/?*",
+                "http://www.bilibili.com/?*"
+            ],
+            "js": [
+                "assets/home.js"
             ]
         }
     ],

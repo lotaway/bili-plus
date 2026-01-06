@@ -13,7 +13,7 @@ import { BilibiliApi } from '../../services/BilibiliApi'
 import { DownloadType } from '../../enums/DownloadType'
 import { FFmpegUtils } from '../../utils/FFmpegUtils'
 
-class DownloadManager {
+class BackstageActivity {
   private readonly bilibiliApi = new BilibiliApi()
   private readonly subtitleFetcher = new SubtitleFetcher(this.bilibiliApi);
   private readonly llmProviderManager = new LLMProviderManager();
@@ -588,4 +588,4 @@ class DownloadManager {
   }
 }
 
-new DownloadManager().init()
+new BackstageActivity().init()
