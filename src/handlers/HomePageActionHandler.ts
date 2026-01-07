@@ -37,11 +37,15 @@ export class HomePageActionHandler {
     }
 
     async execute(action: string, params?: Record<string, any>): Promise<any> {
+        console.debug('[HomePageActionHandler] 执行action:', action, 'params:', params)
         const handler = this.actionHandlers.get(action)
         if (!handler) {
+            console.error('[HomePageActionHandler] 未找到handler for action:', action)
             throw new Error(`不支持的操作: ${action}`)
         }
-        return handler(params)
+        const result = await handler(params)
+        console.debug('[HomePageActionHandler] action执行结果:', result)
+        return result
     }
 
     private getHomePageInfo(): { url: string; title: string; ready: boolean } {

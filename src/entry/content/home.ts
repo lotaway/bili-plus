@@ -42,13 +42,15 @@ function handleChromeMessage(...args: ChromeMessageEvent): boolean {
 async function handleStartStudyAutomation(...args: ChromeMessageEvent) {
   const [message, sender, sendResponse] = args
 
-  console.log('[Study Automation] 收到启动请求')
+  console.info('[Study Automation] 收到启动请求', message)
 
   try {
+    isAutomationRunning = true
     const limitCount = message.payload?.limitCount || 10
+    console.info('[Study Automation] 开始运行自动化学习, limitCount:', limitCount)
     const result = await runStudyAutomation(limitCount)
 
-    console.log('[Study Automation] 自动化学习完成')
+    console.info('[Study Automation] 自动化学习完成', result)
     sendResponse({ message: '自动化学习任务已提交', ...result })
   } catch (err: any) {
     console.error('[Study Automation] 自动化学习失败:', err)
@@ -131,6 +133,8 @@ async function runStudyAutomation(limitCount: number) {
 async function sendHomePageAction(action: string, params?: Record<string, any>): Promise<any> {
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
+  console.debug('[Study Automation] 发送页面操作请求:', { action, params, requestId })
+
   window.postMessage({
     source: PageType.CONTENT_SCRIPT,
     type: RequestPageEventType.REQUEST_HOME_PAGE_ACTION,
@@ -139,10 +143,13 @@ async function sendHomePageAction(action: string, params?: Record<string, any>):
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
+      console.error('[Study Automation] 请求超时:', { action, requestId })
       reject(new Error('请求超时'))
     }, 30000)
 
     const responseHandler = (event: MessageEvent) => {
+      console.debug('[Study Automation] 收到消息:', event.data)
+
       if (
         event.source !== window ||
         event.data?.source !== PageType.HOME_PAGE_INJECT ||
@@ -156,6 +163,8 @@ async function sendHomePageAction(action: string, params?: Record<string, any>):
       window.removeEventListener('message', responseHandler)
 
       const payload = event.data.payload
+      console.info('[Study Automation] 页面操作响应:', payload)
+
       if (payload.success) {
         resolve(payload.data)
       } else {
