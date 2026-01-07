@@ -1,4 +1,5 @@
 import { InjectConfig } from '../config/inject.config'
+import Logger from '../utils/Logger'
 
 export interface HomePageActionPayload {
     action: string
@@ -37,14 +38,14 @@ export class HomePageActionHandler {
     }
 
     async execute(action: string, params?: Record<string, any>): Promise<any> {
-        console.debug('[HomePageActionHandler] 执行action:', action, 'params:', params)
+        Logger.D('[HomePageActionHandler] Executing action:', action, 'params:', params)
         const handler = this.actionHandlers.get(action)
         if (!handler) {
-            console.error('[HomePageActionHandler] 未找到handler for action:', action)
-            throw new Error(`不支持的操作: ${action}`)
+            Logger.E('[HomePageActionHandler] Handler not found for action:', action)
+            throw new Error(`Unsupported action: ${action}`)
         }
         const result = await handler(params)
-        console.debug('[HomePageActionHandler] action执行结果:', result)
+        Logger.D('[HomePageActionHandler] Action execution result:', result)
         return result
     }
 

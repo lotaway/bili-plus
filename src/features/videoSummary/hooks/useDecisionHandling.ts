@@ -1,6 +1,7 @@
 import { useDispatch } from 'react-redux'
 import { LLMProviderManager } from '../../../services/LLMProviderManager'
 import { appendMarkdownContent, setMessage } from '../../../store/slices/videoSummarySlice'
+import Logger from '../../../utils/Logger'
 
 export const useDecisionHandling = () => {
   const dispatch = useDispatch()
@@ -13,7 +14,7 @@ export const useDecisionHandling = () => {
       const llmProviderManager = new LLMProviderManager()
       await llmProviderManager.init()
       const currentConfig = await llmProviderManager.provider
-      
+
       if (!currentConfig) {
         throw new Error('没有可用的LLM provider配置')
       }
@@ -39,7 +40,7 @@ export const useDecisionHandling = () => {
 
       dispatch(setMessage('决策已提交，继续处理中...'))
     } catch (error: any) {
-      console.error('Decision submission error:', error)
+      Logger.E('Decision submission error:', error)
       dispatch(setMessage(`决策提交失败: ${error.message}`))
     }
   }

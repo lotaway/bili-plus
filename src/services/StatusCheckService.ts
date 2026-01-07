@@ -3,6 +3,7 @@
  * 使用LLMProviderManager进行API状态检查和模型列表缓存
  */
 
+import Logger from '../utils/Logger'
 import { LLMProviderManager } from './LLMProviderManager'
 
 export class StatusCheckService {
@@ -17,7 +18,7 @@ export class StatusCheckService {
       const views = chrome.extension.getViews?.({ type: 'popup' }) ?? ((chrome.extension as any).ViewType.POPUP === 'popup' ? new Array(1) : [])
       return views.length > 0
     } catch (error) {
-      console.error('检测popup状态失败:', error)
+      Logger.E('检测popup状态失败:', error)
       return false
     }
   }
@@ -30,7 +31,7 @@ export class StatusCheckService {
       }
       return false
     } catch (error) {
-      console.error('检测sidepanel状态失败:', error)
+      Logger.E('检测sidepanel状态失败:', error)
       return false
     }
   }
@@ -45,7 +46,7 @@ export class StatusCheckService {
     if (this.pollingCheckTimer !== null) {
       clearInterval(this.pollingCheckTimer)
       this.pollingCheckTimer = null
-      console.debug('停止状态检查定时器')
+      Logger.D('停止状态检查定时器')
     }
   }
 
@@ -57,7 +58,7 @@ export class StatusCheckService {
     if (shouldCheckApi) {
       if (!this.llmProviderManager.isApiStatusCheckRunning()) {
         this.llmProviderManager.initializeApiStatusCheck()
-        console.debug('启动API状态检查（popup或sidepanel已打开）')
+        Logger.D('启动API状态检查（popup或sidepanel已打开）')
 
         // API状态检查启动后，获取模型列表
         await this.fetchAndCacheModelList()
@@ -65,7 +66,7 @@ export class StatusCheckService {
     } else {
       if (this.llmProviderManager.isApiStatusCheckRunning()) {
         this.llmProviderManager.stopApiStatusCheck()
-        console.debug('停止API状态检查（popup和sidepanel都已关闭）')
+        Logger.D('停止API状态检查（popup和sidepanel都已关闭）')
       }
     }
   }
@@ -93,7 +94,7 @@ export class StatusCheckService {
         this._lastModelListFetchTime = now
       }
     } catch (error) {
-      console.error('后台获取模型列表失败:', error)
+      Logger.E('后台获取模型列表失败:', error)
     }
   }
 }

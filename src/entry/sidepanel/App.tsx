@@ -7,13 +7,14 @@ import Calculator from '../../features/calculator/calculator'
 import { VideoSummary } from '../../features/videoSummary/VideoSummary'
 import VideoDownload from '../../features/videoDownload/VideoDownload'
 import StudyAutomationPanel from '../../features/studyAutomation/StudyAutomationPanel'
+import Logger from '../../utils/Logger'
 
 const AppContent: React.FC = () => {
   useEffect(() => {
     const initializeApp = async () => {
       const savedState = await loadStateFromStorage()
       if (savedState) {
-        console.debug('App state initialized from storage')
+        Logger.D('App state initialized from storage')
       }
       startAutoSave()
     }

@@ -1,6 +1,7 @@
 import { BilibiliApi } from './BilibiliApi'
 import { VideoData, Page } from '../types/video'
 import { DownloadType } from '../enums/DownloadType'
+import Logger from '../utils/Logger'
 
 interface VideoInfo {
   isInit: boolean
@@ -81,7 +82,7 @@ export class SubtitleFetcher {
         await chrome.storage.local.remove(keysToRemove)
       }
     } catch (error) {
-      console.error('清理存储时出错:', error)
+      Logger.E('清理存储时出错:', error)
     }
   }
 

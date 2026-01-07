@@ -6,6 +6,7 @@ import { SubtitleFetcher } from './SubtitleFetcher'
 import { AIGenerationAnalyzer } from './AIGeneratioinAnalyzer'
 import { ModelInfo, VersionInfo } from '../types/llm-provider'
 import type { LLMProviderManager } from './LLMProviderManager'
+import Logger from '../utils/Logger'
 
 interface Config {
   aiProvider: string
@@ -105,7 +106,7 @@ export class LLM_Runner {
     try {
       const result = await this.checkApiStatusNow()
       if ('error' in result) {
-        console.error('API状态检查失败:', result.error)
+        Logger.E('API状态检查失败:', result.error)
       }
     } finally {
       this.scheduleApiCheck()
@@ -139,10 +140,10 @@ export class LLM_Runner {
           message: isApiOk ? 'API服务正常' : 'API服务异常'
         }
       })
-      console.log(`API状态检查: ${isApiOk ? '正常' : '异常'}`)
+      Logger.I(`API状态检查: ${isApiOk ? '正常' : '异常'}`)
       return { ok: isApiOk, message: isApiOk ? 'API服务正常' : 'API服务异常' }
     } catch (error) {
-      console.error('API状态检查失败:', error)
+      Logger.E('API状态检查失败:', error)
       await chrome.storage.local.set({
         apiStatus: {
           ok: false,
@@ -172,7 +173,7 @@ export class LLM_Runner {
     const versionData = await response.json() as VersionInfo
     this._versionInfo = versionData
     this._versionInfoFetched = true
-    console.log('版本信息获取成功:', versionData)
+    Logger.I('版本信息获取成功:', versionData)
   }
 
   async fetchModelList(): Promise<ModelInfo[]> {
@@ -197,7 +198,7 @@ export class LLM_Runner {
       this._modelListFetched = true
       return modelList
     } catch (error) {
-      console.error('获取模型列表失败:', error)
+      Logger.E('获取模型列表失败:', error)
       return []
     }
   }
@@ -220,7 +221,7 @@ export class LLM_Runner {
 
   static async fetchModelListForEndpoint(endpoint: string): Promise<ModelInfo[]> {
     if (!endpoint) {
-      console.error('Endpoint不能为空')
+      Logger.E('Endpoint不能为空')
       return []
     }
 
@@ -241,7 +242,7 @@ export class LLM_Runner {
       const modelList = await response.json() as ModelInfo[]
       return modelList
     } catch (error) {
-      console.error('获取模型列表失败:', error)
+      Logger.E('获取模型列表失败:', error)
       return []
     }
   }
@@ -357,7 +358,7 @@ export class LLM_Runner {
       const data = await response.json()
       return { data }
     } catch (error) {
-      console.error('文档存储失败:', error)
+      Logger.E('文档存储失败:', error)
       return { error: error instanceof Error ? error.message : '未知错误' }
     } finally {
       this.isBusy = false
@@ -392,7 +393,7 @@ export class LLM_Runner {
       const uploadData = await uploadResponse.json()
       return uploadData
     } catch (error) {
-      console.error('文件上传失败:', error)
+      Logger.E('文件上传失败:', error)
       return { error: error instanceof Error ? error.message : '未知错误' }
     }
   }
@@ -464,7 +465,7 @@ export class LLM_Runner {
       const data = new AIGenerationAnalyzer(fullResponse).analyze()
       return { data }
     } catch (error) {
-      console.error('截图分析失败:', error)
+      Logger.E('截图分析失败:', error)
       return { error: error instanceof Error ? error.message : '未知错误' }
     } finally {
       this.isBusy = false

@@ -3,6 +3,7 @@ import {
   LLMProvidersConfig,
   LLMProviderType,
 } from '../types/llm-provider'
+import Logger from '../utils/Logger'
 
 export const INIT_LLM_PROVIDERS_CONFIG: LLMProvidersConfig = {
   providers: [],
@@ -56,7 +57,7 @@ export async function migrateLegacyConfig(): Promise<LLMProvidersConfig> {
 
     return newConfig
   } catch (error) {
-    console.error('迁移旧配置失败:', error)
+    Logger.E('迁移旧配置失败:', error)
     return INIT_LLM_PROVIDERS_CONFIG
   }
 }
@@ -71,7 +72,7 @@ export async function getLLMProvidersConfig(): Promise<LLMProvidersConfig> {
 
     return await migrateLegacyConfig()
   } catch (error) {
-    console.error('获取LLM Providers配置失败:', error)
+    Logger.E('获取LLM Providers配置失败:', error)
     return INIT_LLM_PROVIDERS_CONFIG
   }
 }
@@ -85,7 +86,7 @@ export async function saveLLMProvidersConfig(config: LLMProvidersConfig): Promis
       },
     })
   } catch (error) {
-    console.error('保存LLM Providers配置失败:', error)
+    Logger.E('保存LLM Providers配置失败:', error)
     throw error
   }
 }

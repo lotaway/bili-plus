@@ -5,6 +5,7 @@ import { BilibiliApi } from '../../services/BilibiliApi'
 import { DownloadUtils } from '../../utils/DownloadUtils'
 import { DownloadType } from '../../enums/DownloadType'
 import { FFmpegUtils } from '../../utils/FFmpegUtils'
+import Logger from '../../utils/Logger'
 
 let isWindowActivate = true
 
@@ -13,6 +14,7 @@ export { }
 class VideoPageInjectActivity {
   private ffmpegUtils?: FFmpegUtils
 
+  @Logger.Mark("video inject.js")
   init() {
     this.syncVideoInfo()
     const timer = setInterval(() => {
@@ -163,14 +165,13 @@ class VideoPageInjectActivity {
     return this.ffmpegUtils
   }
 
+  @Logger.Mark()
   async mergeVideoAudioWithFFmpeg(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
     try {
-      console.debug('开始使用FFmpeg合并视频和音频...')
       const mergedBlob = await this.initFFmpeg().mergeVideoAudio(videoBlob, audioBlob)
-      console.debug('FFmpeg合并完成')
       return mergedBlob
     } catch (error) {
-      console.error('FFmpeg合并失败:', error)
+      Logger.E('FFmpeg合并失败:', error)
       throw new Error(`视频合并失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
@@ -179,7 +180,7 @@ class VideoPageInjectActivity {
     if (needCheck && !isWindowActivate) return
     const match: VideoData = (window as any).__INITIAL_STATE__?.videoData
     if (!match) {
-      console.error('No video data found in window.__INITIAL_STATE__')
+      Logger.E('No video data found in window.__INITIAL_STATE__')
       return
     }
     let p = Number(
@@ -195,6 +196,4 @@ class VideoPageInjectActivity {
 
 }
 
-console.debug('Start video inject.js')
 new VideoPageInjectActivity().init()
-console.debug('End video inject.js')

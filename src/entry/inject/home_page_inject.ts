@@ -3,6 +3,7 @@ import { RequestPageEventType } from '../../enums/PageEventType'
 import { createHomeButtonInjector } from '../../utils/inject/ButtonInjector'
 import { PageInfoSyncManager, HomePageInfo } from '../../utils/inject/PageInfoSyncManager'
 import { createHomePageActionHandler, HomePageActionPayload } from '../../handlers/HomePageActionHandler'
+import Logger from '../../utils/Logger'
 
 class HomePageInjectActivity {
     private buttonInjector = createHomeButtonInjector()
@@ -34,38 +35,53 @@ class HomePageInjectActivity {
         return handler() as HomePageInfo
     }
 
+    @Logger.Mark("HomePageInject handleWindowMessage")
     async handleWindowMessage(event: MessageEvent): Promise<void> {
-        console.debug('[HomePageInject] 收到消息:', event.data)
+        if (!this.isValidMessage(event)) return
 
+        const payload = this.extractPayload(event)
+        Logger.I('[HomePageInject] Processing action:', payload.action, 'requestId:', payload.responseId)
+
+        try {
+            const result = await this.actionHandler.execute(payload.action, payload.params)
+            this.sendActionResponse(payload.responseId, true, result)
+        } catch (error) {
+            this.handleActionError(payload.responseId, error)
+        }
+    }
+
+    private isValidMessage(event: MessageEvent): boolean {
         if (event.source !== window) {
-            console.debug('[HomePageInject] 消息来源不是window，忽略')
-            return
+            Logger.D('[HomePageInject] Message source is not window, ignoring')
+            return false
         }
 
         if (event.data?.type !== RequestPageEventType.REQUEST_HOME_PAGE_ACTION) {
-            console.debug('[HomePageInject] 消息类型不是REQUEST_HOME_PAGE_ACTION，忽略')
-            return
+            Logger.D('[HomePageInject] Message type is not REQUEST_HOME_PAGE_ACTION, ignoring')
+            return false
         }
 
         if (event.data?.source !== PageType.CONTENT_SCRIPT) {
-            console.debug('[HomePageInject] 消息来源不是CONTENT_SCRIPT，忽略')
-            return
+            Logger.D('[HomePageInject] Message source is not CONTENT_SCRIPT, ignoring')
+            return false
         }
 
+        return true
+    }
+
+    private extractPayload(event: MessageEvent): { action: string; params?: any; responseId: string } {
         const { action, params, requestId } = event.data.payload as HomePageActionPayload
-        const responseId = requestId || `auto-${Date.now()}`
-
-        console.info('[HomePageInject] 处理action:', action, 'requestId:', responseId)
-
-        try {
-            const result = await this.actionHandler.execute(action, params)
-            console.info('[HomePageInject] action执行成功，发送响应')
-            this.sendActionResponse(responseId, true, result)
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error ?? '操作失败')
-            console.error('[HomePageInject] action执行失败:', errorMessage)
-            this.sendActionResponse(responseId, false, undefined, errorMessage)
+        return {
+            action,
+            params,
+            responseId: requestId || `auto-${Date.now()}`
         }
+    }
+
+    private handleActionError(responseId: string, error: any): void {
+        const errorMessage = error instanceof Error ? error.message : String(error ?? 'Operation failed')
+        Logger.E('[HomePageInject] Action execution failed:', errorMessage)
+        this.sendActionResponse(responseId, false, undefined, errorMessage)
     }
 
     private sendActionResponse(
@@ -82,7 +98,7 @@ class HomePageInjectActivity {
     }
 }
 
-console.debug('Start home inject.js')
+Logger.D('Start home inject.js')
 new HomePageInjectActivity().init()
-console.debug('End home inject.js')
+Logger.D('End home inject.js')
 

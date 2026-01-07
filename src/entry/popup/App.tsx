@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { LLMProviderManager } from '../../services/LLMProviderManager'
 import { LLMProviderConfig } from '../../types/llm-provider'
+import Logger from '../../utils/Logger'
 
 interface ModelInfo {
   name: string
@@ -49,7 +50,7 @@ const App: React.FC = () => {
         setApiStatus(result.apiStatus)
       }
     } catch (error) {
-      console.error('加载API状态失败:', error)
+      Logger.E('加载API状态失败:', error)
     }
   }
 
@@ -61,7 +62,7 @@ const App: React.FC = () => {
       setProviders(config.providers || [])
       setCurrentProviderId(config.selectedProviderId || '')
     } catch (error) {
-      console.error('加载provider配置失败:', error)
+      Logger.E('加载provider配置失败:', error)
       setProviders([])
       setCurrentProviderId('')
     }
@@ -80,7 +81,7 @@ const App: React.FC = () => {
         const CACHE_MAX_AGE = 10 * 60 * 1000
         if (cacheAge < CACHE_MAX_AGE) {
           setModelList(cachedModelList.modelList.models)
-          console.log('使用缓存的模型列表:', cachedModelList.modelList.models.length, '个模型')
+          Logger.I('使用缓存的模型列表:', cachedModelList.modelList.models.length, '个模型')
           return
         }
       }
@@ -98,7 +99,7 @@ const App: React.FC = () => {
         }
       })
     } catch (error) {
-      console.error('加载模型列表失败:', error)
+      Logger.E('加载模型列表失败:', error)
       setModelList([])
     } finally {
       setIsLoadingModels(false)
@@ -112,7 +113,7 @@ const App: React.FC = () => {
         setStudyBaseUrl(result.studyAutomationBaseUrl)
       }
     } catch (error) {
-      console.error('加载Study Automation配置失败:', error)
+      Logger.E('加载Study Automation配置失败:', error)
     }
   }
 
@@ -121,7 +122,7 @@ const App: React.FC = () => {
       await chrome.storage.local.set({ studyAutomationBaseUrl: studyBaseUrl })
       showMessage('Study Automation配置已保存', 'success')
     } catch (error) {
-      console.error('保存Study Automation配置失败:', error)
+      Logger.E('保存Study Automation配置失败:', error)
       showMessage('保存配置失败', 'error')
     }
   }
@@ -219,7 +220,7 @@ const App: React.FC = () => {
       setProviders(providersList)
       setCurrentProviderId(currentId)
     } catch (error) {
-      console.error('保存provider配置失败:', error)
+      Logger.E('保存provider配置失败:', error)
       showMessage('保存配置失败', 'error')
     }
   }
@@ -231,7 +232,7 @@ const App: React.FC = () => {
         await chrome.sidePanel.open({ windowId: window.id })
       }
     } catch (error) {
-      console.error('Failed to open side panel:', error)
+      Logger.E('Failed to open side panel:', error)
       showMessage('无法打开侧边栏', 'error')
     }
   }
@@ -244,7 +245,7 @@ const App: React.FC = () => {
   }
 
   const handleCleanupStorage = () => {
-    console.log("Cleanup storage clicked")
+    Logger.I("Cleanup storage clicked")
   }
 
   const currentProvider = providers.find(p => p.id === currentProviderId)
@@ -422,8 +423,8 @@ const App: React.FC = () => {
                 onChange={(e) => setStudyBaseUrl(e.target.value)}
                 placeholder="http://localhost:5051"
               />
-              <button 
-                className="save-btn" 
+              <button
+                className="save-btn"
                 onClick={handleSaveStudySettings}
               >
                 保存配置

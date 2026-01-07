@@ -1,11 +1,12 @@
 import { CompletionData } from "../types/CompletionData"
+import Logger from "./Logger"
 
 
 export class StreamUtils {
   async readStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
     onProgress: (content: string, metadata: any) => void = (c, m) =>
-      console.debug('Content:', c, 'Metadata:', m),
+      Logger.D('Content:', c, 'Metadata:', m),
     encoding: string = 'utf-8'
   ): Promise<string> {
     const decoder = new TextDecoder(encoding)
@@ -48,7 +49,7 @@ export class StreamUtils {
             onProgress?.(content, metadata)
           }
         } catch (e) {
-          console.error('Error parsing stream data:', e)
+          Logger.E('Error parsing stream data:', e)
         }
       }
     }

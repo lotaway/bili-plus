@@ -12,6 +12,7 @@ import { VideoData } from '../../types/video'
 import { BilibiliApi } from '../../services/BilibiliApi'
 import { DownloadType } from '../../enums/DownloadType'
 import { FFmpegUtils } from '../../utils/FFmpegUtils'
+import Logger from '../../utils/Logger'
 
 class BackstageActivity {
   private readonly bilibiliApi = new BilibiliApi()
@@ -50,12 +51,12 @@ class BackstageActivity {
     })
   }
 
+  @Logger.Mark()
   onDownloadChanged(args: chrome.downloads.DownloadDelta) {
-    // console.debug(`Download changed: ${JSON.stringify(args)}`)
   }
 
+  @Logger.Mark()
   onDownloadCreated(args: chrome.downloads.DownloadItem) {
-    // console.debug(`Download created: ${JSON.stringify(args)}`)
   }
 
   async handleFetchSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
@@ -75,7 +76,7 @@ class BackstageActivity {
         })
       })
       .catch((error) => {
-        console.error(error)
+        Logger.E('Failed to fetch subtitle:', error)
         sendResponse({
           error: error instanceof Error ? error.message : JSON.stringify(error),
         })
@@ -127,7 +128,7 @@ class BackstageActivity {
         sendResponse({ done: true })
       })
       .catch((error) => {
-        console.error(error)
+        Logger.E('Failed to start assistant:', error)
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
             type: EVENT_TYPE,
@@ -166,7 +167,7 @@ class BackstageActivity {
   async handleDownloadVideo(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
     const { bvid, cid, downloadType = DownloadType.VIDEO_ONLY, useChromeAPI = false } = message.payload
     if (!bvid || !cid) {
-      sendResponse({ error: '缺少BVID或CID参数' })
+      sendResponse({ error: 'Missing BVID or CID parameter' })
       return
     }
 
@@ -239,7 +240,7 @@ class BackstageActivity {
               this.downloadUtils.saveBlob(mergedBlob, `${title}.mp4`)
             }
           } catch (mergeError) {
-            console.error('合并失败，回退到分别下载:', mergeError)
+            Logger.E('Merge failed, falling back to separate downloads:', mergeError)
             if (useChromeAPI) {
               await Promise.all([
                 this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`, createProgressCallback('video')),
@@ -262,7 +263,7 @@ class BackstageActivity {
           break
 
         default:
-          throw new Error(`不支持的下载类型: ${downloadType}`)
+          throw new Error(`Unsupported download type: ${downloadType}`)
       }
 
       sendResponse({ success: true, message: '下载完成' })
@@ -273,13 +274,13 @@ class BackstageActivity {
 
   private async mergeVideoAudioWithFFmpeg(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
     try {
-      console.log('开始使用FFmpeg合并视频和音频...')
+      Logger.I('Starting FFmpeg video and audio merge...')
       const mergedBlob = await this.ffmpegUtils.mergeVideoAudio(videoBlob, audioBlob)
-      console.log('FFmpeg合并完成')
+      Logger.I('FFmpeg merge completed')
       return mergedBlob
     } catch (error) {
-      console.error('FFmpeg合并失败:', error)
-      throw new Error(`视频合并失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      Logger.E('FFmpeg merge failed:', error)
+      throw new Error(`Video merge failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -326,7 +327,7 @@ class BackstageActivity {
         })
       })
       .catch((error) => {
-        console.error(error)
+        Logger.E('Failed to fetch subtitle:', error)
         sendResponse({
           error:
             error instanceof Error ? error.message : JSON.stringify(error),
@@ -379,9 +380,9 @@ class BackstageActivity {
             content: summaryResult.data.content,
           })
             .then(() =>
-              console.debug('总结内容已保存到数据库'))
+              Logger.D('总结内容已保存到数据库'))
             .catch(saveError => {
-              console.error('保存总结内容失败:', saveError)
+              Logger.E('保存总结内容失败:', saveError)
             })
 
         if (!sender.id) {
@@ -400,7 +401,7 @@ class BackstageActivity {
       })
       .then(() => sendResponse({ done: true }))
       .catch((error) => {
-        console.error(error)
+        Logger.E('Failed to summarize subtitle:', error)
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
             type: EVENT_TYPE,
@@ -452,16 +453,16 @@ class BackstageActivity {
           throw new Error(analysisResult.error)
         }
         // this.llmRunner.saveDocument({
-        //   title: '界面截图分析',
+        //   title: 'Screenshot Analysis',
         //   bvid: 'screenshot',
         //   cid: Date.now(),
         //   source: 'screenshot_analysis',
         //   content: analysisResult.data.content,
         // })
         //   .then(() =>
-        //     console.log('截图分析内容已保存到数据库'))
+        //     Logger.I('Screenshot analysis content saved to database'))
         //   .catch(saveError => {
-        //     console.error('保存截图分析内容失败:', saveError)
+        //     Logger.E('Failed to save screenshot analysis content:', saveError)
         //   })
 
         if (sender.id) {
@@ -477,7 +478,7 @@ class BackstageActivity {
         sendResponse({ done: true })
       })
       .catch((error) => {
-        console.error(error)
+        Logger.E('Failed to summarize screenshot:', error)
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
             type: EVENT_TYPE,
@@ -520,7 +521,7 @@ class BackstageActivity {
         sendResponse({ done: true })
       })
       .catch((error) => {
-        console.error(error)
+        Logger.E('Failed to start assistant:', error)
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
             type: EVENT_TYPE,
@@ -567,7 +568,7 @@ class BackstageActivity {
   private handleRequestDownloadVideo(message: any, sendResponse: (response?: any) => void): boolean | void {
     const { bvid, cid } = message.payload
     if (!bvid || !cid) {
-      sendResponse({ error: '缺少BVID或CID参数' })
+      sendResponse({ error: 'Missing BVID or CID parameter' })
       return true
     }
     this.bilibiliApi.fetchPlayUrls(bvid, parseInt(cid))

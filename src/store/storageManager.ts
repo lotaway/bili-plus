@@ -1,3 +1,4 @@
+import Logger from '../utils/Logger'
 import { store } from './store'
 import { RootState } from './store'
 
@@ -9,7 +10,7 @@ export const saveStateToStorage = async () => {
     const serializedState = JSON.stringify(state)
     await chrome.storage.local.set({ [STORAGE_KEY]: serializedState })
   } catch (error) {
-    console.error('Failed to save state to storage:', error)
+    Logger.E('Failed to save state to storage:', error)
   }
 }
 
@@ -18,11 +19,11 @@ export const loadStateFromStorage = async (): Promise<Partial<RootState> | null>
     const result = await chrome.storage.local.get([STORAGE_KEY])
     if (result[STORAGE_KEY]) {
       const state = JSON.parse(result[STORAGE_KEY])
-      console.debug('State loaded from storage')
+      Logger.D('State loaded from storage')
       return state
     }
   } catch (error) {
-    console.error('Failed to load state from storage:', error)
+    Logger.E('Failed to load state from storage:', error)
   }
   return null
 }

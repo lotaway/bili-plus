@@ -1,3 +1,4 @@
+import Logger from '../utils/Logger'
 import { LLMProviderManager } from './LLMProviderManager'
 
 export interface BiliVideoInfo {
@@ -15,7 +16,7 @@ export class StudyAutomation {
     }
 
     async startAutomation() {
-        console.log('[Study Automation] Starting...')
+        Logger.I('[Study Automation] Starting...')
 
         const storageResult = await chrome.storage.local.get('studyAutomationBaseUrl')
         if (storageResult.studyAutomationBaseUrl) {
@@ -68,7 +69,7 @@ export class StudyAutomation {
                     studyList.push(...parsed.filter((item: any) => item.category === 'class' || item.category === 'knowledge'))
                 }
             } catch (e) {
-                console.error('Failed to parse LLM response', e)
+                Logger.E('Failed to parse LLM response', e)
             }
 
             retryCount++
@@ -90,11 +91,11 @@ export class StudyAutomation {
             })
 
             if (!response.ok) {
-                console.error(`Failed to submit study request for ${item.link}: ${response.status}`)
+                Logger.E(`Failed to submit study request for ${item.link}: ${response.status}`)
             }
         }
 
-        console.log(`[Study Automation] Submitted ${finalSelection.length} tasks.`)
+        Logger.I(`[Study Automation] Submitted ${finalSelection.length} tasks.`)
     }
 
     private async extractVideosFromPage(): Promise<BiliVideoInfo[]> {

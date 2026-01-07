@@ -4,6 +4,7 @@ import {
   ModelInfo,
   VersionInfo,
 } from '../types/llm-provider'
+import Logger from '../utils/Logger'
 import {
   getLLMProvidersConfig,
   getSelectedProvider,
@@ -51,7 +52,7 @@ export class LLMProviderManager {
       await this.syncCurrentProvider()
       return { isOk: true }
     } catch (error) {
-      console.error('LLMProviderManager初始化失败:', error)
+      Logger.E('LLMProviderManager初始化失败:', error)
       return {
         isOk: false,
         error: error instanceof Error ? error : new Error('初始化失败')
@@ -65,7 +66,7 @@ export class LLMProviderManager {
     await this.updateLLMRunner()
 
     if (provider) {
-      console.log(`当前选中的LLM provider: ${provider.name} (${provider.id})`)
+      Logger.I(`当前选中的LLM provider: ${provider.name} (${provider.id})`)
     } else {
       console.warn('没有可用的LLM provider，请先配置')
     }
@@ -92,7 +93,7 @@ export class LLMProviderManager {
       await chrome.storage.sync.set(runnerConfig)
       await this.llmRunner.syncConfig()
     } catch (error) {
-      console.error('更新LLM Runner配置失败:', error)
+      Logger.E('更新LLM Runner配置失败:', error)
     }
   }
 
@@ -143,7 +144,7 @@ export class LLMProviderManager {
       const result = await this.llmRunner.checkApiStatusNow()
 
       if ('error' in result) {
-        console.error(`API状态检查失败 (${this.currentProvider.name}):`, result.error)
+        Logger.E(`API状态检查失败 (${this.currentProvider.name}):`, result.error)
         await chrome.storage.local.set({
           apiStatus: {
             ok: false,
@@ -152,7 +153,7 @@ export class LLMProviderManager {
           }
         })
       } else {
-        console.log(`API状态检查 (${this.currentProvider.name}): ${result.ok ? '正常' : '异常'}`)
+        Logger.I(`API状态检查 (${this.currentProvider.name}): ${result.ok ? '正常' : '异常'}`)
         await chrome.storage.local.set({
           apiStatus: {
             ok: result.ok,
@@ -162,7 +163,7 @@ export class LLMProviderManager {
         })
       }
     } catch (error) {
-      console.error(`API状态检查失败 (${this.currentProvider?.name || '未知'}):`, error)
+      Logger.E(`API状态检查失败 (${this.currentProvider?.name || '未知'}):`, error)
       await chrome.storage.local.set({
         apiStatus: {
           ok: false,
@@ -186,7 +187,7 @@ export class LLMProviderManager {
       this._modelListFetched = true
       return modelList
     } catch (error) {
-      console.error('获取模型列表失败:', error)
+      Logger.E('获取模型列表失败:', error)
       return []
     }
   }
@@ -229,7 +230,7 @@ export class LLMProviderManager {
       try {
         await this.syncCurrentProvider()
       } catch (error) {
-        console.error('初始化LLMProviderManager失败:', error)
+        Logger.E('初始化LLMProviderManager失败:', error)
       }
     }
 
@@ -261,7 +262,7 @@ export class LLMProviderManager {
       try {
         await this.syncCurrentProvider()
       } catch (error) {
-        console.error('初始化LLMProviderManager失败:', error)
+        Logger.E('初始化LLMProviderManager失败:', error)
       }
     }
 
@@ -293,7 +294,7 @@ export class LLMProviderManager {
     if (providerId && this.currentProvider?.id !== providerId) {
       const success = await this.switchProvider(providerId)
       if (!success) {
-        console.error(`无法切换到provider: ${providerId}`)
+        Logger.E(`无法切换到provider: ${providerId}`)
         return []
       }
     }
@@ -306,7 +307,7 @@ export class LLMProviderManager {
 
   async fetchModelListForProvider(provider: LLMProviderConfig): Promise<ModelInfo[]> {
     if (!provider.endpoint) {
-      console.error('Provider配置不完整，无法获取模型列表')
+      Logger.E('Provider配置不完整，无法获取模型列表')
       return []
     }
     return await LLM_Runner.fetchModelListForEndpoint(provider.endpoint)
@@ -325,7 +326,7 @@ export class LLMProviderManager {
       await this.syncCurrentProvider()
       return true
     } catch (error) {
-      console.error('保存配置失败:', error)
+      Logger.E('保存配置失败:', error)
       return false
     }
   }

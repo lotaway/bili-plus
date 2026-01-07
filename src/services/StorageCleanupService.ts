@@ -1,16 +1,18 @@
+import Logger from "../utils/Logger"
+
 export class StorageCleanupService {
   async initializeStorageCleanup(): Promise<void> {
     try {
       const syncBytes = await new Promise<number>((resolve) => {
         chrome.storage.sync.getBytesInUse(null, resolve)
       })
-      console.log('Sync storage usage:', syncBytes, 'bytes')
+      Logger.I('Sync storage usage:', syncBytes, 'bytes')
 
       if (syncBytes > 90000) {
         await this.cleanupSyncStorage()
       }
     } catch (error) {
-      console.error('Storage cleanup initialization failed:', error)
+      Logger.E('Storage cleanup initialization failed:', error)
     }
   }
 
@@ -29,10 +31,10 @@ export class StorageCleanupService {
 
       if (keysToRemove.length > 0) {
         await chrome.storage.sync.remove(keysToRemove)
-        console.log(`清理了 ${keysToRemove.length} 个过期的sync存储项`)
+        Logger.I(`清理了 ${keysToRemove.length} 个过期的sync存储项`)
       }
     } catch (error) {
-      console.error('清理sync存储时出错:', error)
+      Logger.E('清理sync存储时出错:', error)
     }
   }
 }

@@ -3,6 +3,7 @@
  * 使用LLMProviderManager运行AI Agent
  */
 
+import Logger from '../utils/Logger'
 import { StreamUtils } from '../utils/streamUtils'
 import { LLMProviderManager } from './LLMProviderManager'
 
@@ -76,7 +77,7 @@ export class AIAgentRunner {
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.log('AI Agent 已停止')
+        Logger.I('AI Agent 已停止')
         return { error: 'AI Agent 已停止' }
       }
       throw error
@@ -89,7 +90,7 @@ export class AIAgentRunner {
   async stopAgent() {
     if (this.isBusy && this.#abortController) {
       this.#abortController.abort()
-      console.log('正在停止 AI Agent...')
+      Logger.I('正在停止 AI Agent...')
       return true
     }
     return false

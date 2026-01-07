@@ -5,6 +5,7 @@
 
 import { SubtitleFetcher } from './SubtitleFetcher'
 import { LLMProviderManager } from './LLMProviderManager'
+import Logger from '../utils/Logger'
 
 export class AISubtitleHandler {
   private llmProviderManager: LLMProviderManager
@@ -115,17 +116,17 @@ ${text}`
         accumulatedContent += data.content
       }
       if (receivedFinishReason === 'length' && attemptCount < maxAttempts) {
-        console.log(`检测到finish_reason: "length"，尝试续传 (第${attemptCount}次)`)
+        Logger.I(`检测到finish_reason: "length"，尝试续传 (第${attemptCount}次)`)
         continue
       } else {
-        console.log(`生成完成，finish_reason: ${receivedFinishReason || '正常结束'}`)
+        Logger.I(`生成完成，finish_reason: ${receivedFinishReason || '正常结束'}`)
         return {
           think: finalThink,
           content: accumulatedContent,
         }
       }
     }
-    console.log(`达到最大续传尝试次数 (${maxAttempts})，返回当前内容`)
+    Logger.I(`达到最大续传尝试次数 (${maxAttempts})，返回当前内容`)
     return {
       think: finalThink,
       content: accumulatedContent,

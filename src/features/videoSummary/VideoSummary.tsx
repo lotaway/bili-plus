@@ -36,6 +36,7 @@ import { DecisionPanel } from '../../components/DecisionPanel'
 import { MessageType } from '../../enums/MessageType'
 import { DownloadType } from '../../enums/DownloadType'
 import { FileUtils } from '../../utils/FileUtils'
+import Logger from '../../utils/Logger'
 
 export const VideoSummary = () => {
   const dispatch = useDispatch()
@@ -112,7 +113,7 @@ export const VideoSummary = () => {
         return
       }
     } catch (error) {
-      console.error('截图失败:', error)
+      Logger.E('截图失败:', error)
       setMessageWithScrollReset('截图失败，请重试')
     }
   }
@@ -136,7 +137,7 @@ export const VideoSummary = () => {
         payload: { message: input.trim() },
       })
     } catch (error) {
-      console.error('启动AI智能体失败:', error)
+      Logger.E('启动AI智能体失败:', error)
       setMessageWithScrollReset('启动AI智能体失败，请重试')
       dispatch(setAssistantRunning(false))
     }
@@ -149,7 +150,7 @@ export const VideoSummary = () => {
     try {
       await chrome.runtime.sendMessage({ type: MessageType.REQUEST_STOP_ASSISTANT })
     } catch (error) {
-      console.error('停止AI智能体失败:', error)
+      Logger.E('停止AI智能体失败:', error)
     } finally {
       dispatch(setAssistantRunning(false))
       setMessageWithScrollReset('AI智能体已停止')

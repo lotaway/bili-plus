@@ -1,5 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL } from '@ffmpeg/util'
+import Logger from './Logger'
 
 export class FFmpegUtils {
   private ffmpeg: FFmpeg
@@ -14,7 +15,7 @@ export class FFmpegUtils {
 
     const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd'
     this.ffmpeg.on('log', ({ message }) => {
-      console.debug('[FFmpeg]', message)
+      Logger.D('[FFmpeg]', message)
     })
     try {
       await this.ffmpeg.load({
@@ -22,9 +23,9 @@ export class FFmpegUtils {
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       })
       this.loaded = true
-      console.debug('FFmpeg loaded successfully')
+      Logger.D('FFmpeg loaded successfully')
     } catch (error) {
-      console.error('Failed to load FFmpeg:', error)
+      Logger.E('Failed to load FFmpeg:', error)
       throw error
     }
   }
@@ -53,13 +54,13 @@ export class FFmpegUtils {
       const dataArray = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string)
       return new Blob([dataArray as any], { type: 'video/mp4' })
     } catch (error) {
-      console.error('FFmpeg merge failed:', error)
+      Logger.E('FFmpeg merge failed:', error)
       try {
         await this.ffmpeg.deleteFile('input_video.mp4')
         await this.ffmpeg.deleteFile('input_audio.m4a')
         await this.ffmpeg.deleteFile('output.mp4')
       } catch (cleanupError) {
-        console.error('Failed to cleanup FFmpeg files:', cleanupError)
+        Logger.E('Failed to cleanup FFmpeg files:', cleanupError)
       }
 
       throw error
@@ -90,7 +91,7 @@ export class FFmpegUtils {
       const dataArray = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string)
       return new Blob([dataArray as any], { type: 'audio/mp4' })
     } catch (error) {
-      console.error('FFmpeg audio extraction failed:', error)
+      Logger.E('FFmpeg audio extraction failed:', error)
       throw error
     }
   }
@@ -118,7 +119,7 @@ export class FFmpegUtils {
       const dataArray = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string)
       return new Blob([dataArray as any], { type: 'video/mp4' })
     } catch (error) {
-      console.error('FFmpeg conversion failed:', error)
+      Logger.E('FFmpeg conversion failed:', error)
       throw error
     }
   }

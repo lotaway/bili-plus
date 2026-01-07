@@ -15,6 +15,7 @@ import {
   setAssistantRunning,
 } from '../../../store/slices/videoSummarySlice'
 import { AIGenerationAnalyzer } from '../../../services/AIGeneratioinAnalyzer'
+import Logger from '../../../utils/Logger'
 
 export const useMessageHandling = () => {
   const dispatch = useDispatch()
@@ -74,7 +75,7 @@ export const useMessageHandling = () => {
         return
       }
       if (data.done) {
-        console.debug("Stream ended")
+        Logger.D("Stream ended")
         if (!data.content || data.content.trim() === '') {
           dispatch(setMessage('无内容'))
           dispatch(setAssistantRunning(false))
@@ -101,7 +102,7 @@ export const useMessageHandling = () => {
         return
       }
       if (data.done) {
-        console.debug("Stream ended")
+        Logger.D("Stream ended")
         if (data.content && aiAnalyzer) {
           aiAnalyzer.reset()
           aiAnalyzer.inputStream(data.content, true)
