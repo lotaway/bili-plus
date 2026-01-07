@@ -3,6 +3,8 @@ import { MessageType } from '../../enums/MessageType'
 import { RequestPageEventType } from '../../enums/PageEventType'
 import { PageType } from '../../enums/PageType'
 
+let isAutomationRunning = false
+
 export { }
 
 function main() {
@@ -28,6 +30,9 @@ function handleChromeMessage(...args: ChromeMessageEvent): boolean {
   switch (message.type) {
     case MessageType.START_STUDY_AUTOMATION:
       handleStartStudyAutomation(...args)
+      return true
+    case MessageType.STOP_STUDY_AUTOMATION:
+      handleStopStudyAutomation(...args)
       return true
   }
 
@@ -56,12 +61,31 @@ async function handleStartStudyAutomation(...args: ChromeMessageEvent) {
   return true
 }
 
+async function handleStopStudyAutomation(...args: ChromeMessageEvent) {
+  const [message, sender, sendResponse] = args
+
+  console.log('[Study Automation] 收到停止请求')
+
+  try {
+    isAutomationRunning = false
+    sendResponse({ message: '自动化学习已停止' })
+  } catch (err: any) {
+    console.error('[Study Automation] 停止自动化学习失败:', err)
+    sendResponse({
+      error: err instanceof Error ? err.message : String(err),
+      success: false
+    })
+  }
+
+  return true
+}
+
 async function runStudyAutomation(limitCount: number) {
   let studyList: any[] = []
   let retryCount = 0
   const MAX_RETRIES = limitCount * 2
 
-  while (studyList.length < limitCount && retryCount < MAX_RETRIES) {
+  while (studyList.length < limitCount && retryCount < MAX_RETRIES && isAutomationRunning) {
     const batch = await sendHomePageAction('extractVideosFromPage')
 
     if (!batch.success || !batch.data || batch.data.length === 0) {

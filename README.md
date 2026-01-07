@@ -52,8 +52,6 @@ BILI PLUS 是一个增强 B 站体验的浏览器扩展，提供多种实用功�
 - `src/types` - 类型定义文件
 - `src/utils` - 通用工具函数
 
-## 待实现功能
+## 代码规范
 
-- 在视频页面直接显示下载按钮
-- 支持视频和音频下载功能
-- 更多 AI 增强功能
+代码需遵循[CODE_PRICEPLES](./CODE_PINCEPLES/CODE_PRICEPLES)文件记载的规范准则
