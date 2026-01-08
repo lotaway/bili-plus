@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useDispatch } from 'react-redux'
 import { ChromeMessage } from '../../../types/chrome'
 import { MessageType } from '../../../enums/MessageType'
@@ -72,6 +72,7 @@ export const useMessageHandling = () => {
     const handleSummarizeResponseStream = (data: SummarizeResponse) => {
       if ("error" in data) {
         dispatch(setMessage(data.error))
+        dispatch(setAssistantRunning(false))
         return
       }
       if (data.done) {
@@ -82,7 +83,7 @@ export const useMessageHandling = () => {
           return
         }
         aiAnalyzer.reset()
-        dispatch(setAssistantRunning(false)) // 添加这行来重置运行状态
+        dispatch(setAssistantRunning(false))
       }
       data.content && aiAnalyzer.inputStream(data.content, data.done)
     }
@@ -90,13 +91,14 @@ export const useMessageHandling = () => {
     const handleAssistantResponseStream = (data: AgentResponse) => {
       if ("error" in data) {
         dispatch(setMessage(data.error))
+        dispatch(setAssistantRunning(false))
         return
       }
       if (data.status === AgentRuntimeStatus.WAITING_HUMAN) {
         const message = data.history[data.history.length - 1]
         dispatch(setDecisionData({
           ...data,
-          ...message.data.metadata,
+          ...message?.data.metadata,
           reason: message?.data.prompt ?? data.status,
         }))
         return
@@ -107,7 +109,7 @@ export const useMessageHandling = () => {
           aiAnalyzer.reset()
           aiAnalyzer.inputStream(data.content, true)
         }
-        dispatch(setAssistantRunning(false)) // 添加这行来重置运行状态
+        dispatch(setAssistantRunning(false))
         return
       }
       if (data.content && aiAnalyzer) {

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useMessageHandling } from './hooks/useMessageHandling'
 import { useScrollManagement } from './hooks/useScrollManagement'
@@ -51,12 +51,13 @@ export const VideoSummary = () => {
 
   const resultContainerRef = useRef<HTMLDivElement>(null)
   const thinkingContainerRef = useRef<HTMLDivElement>(null)
-  const setMessageWithScrollReset = (msg: string) => {
+  const { clearAnaylazeContent } = useMessageHandling()
+  const setMessageWithScrollReset = useCallback((msg: string) => {
     dispatch(setMessage(msg))
     dispatch(setHasUserScrolled(false))
-  }
+  }, [dispatch])
 
-  const handleExtract = async (mode: DownloadType) => {
+  const handleExtract = useCallback(async (mode: DownloadType) => {
     setMessageWithScrollReset('正在提取字幕...')
     const res = await chrome.runtime.sendMessage({
       type: MessageType.REQUEST_FETCH_SUBTITLE,
@@ -82,18 +83,27 @@ export const VideoSummary = () => {
       }
     }
     setMessageWithScrollReset(`字幕提取完成:${downloadId}`)
-  }
+  }, [setMessageWithScrollReset])
 
-  const handleRequestSubtitleSummarize = async () => {
+  const handleRequestSubtitleSummarize = useCallback(async () => {
     dispatch(clearOutput())
+    dispatch(setAssistantRunning(true))
     clearAnaylazeContent()
     setMessageWithScrollReset('正在使用AI处理字幕...')
-    const res = await chrome.runtime.sendMessage({ type: MessageType.REQUEST_SUMMARIZE_SUBTITLE })
-    if (res?.error) {
-      setMessageWithScrollReset(res.error)
-      return
+
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MessageType.REQUEST_SUMMARIZE_SUBTITLE })
+      if (res?.error) {
+        setMessageWithScrollReset(res.error)
+        dispatch(setAssistantRunning(false))
+        return
+      }
+    } catch (error) {
+      Logger.E('请求字幕总结失败:', error)
+      setMessageWithScrollReset('请求失败，请重试')
+      dispatch(setAssistantRunning(false))
     }
-  }
+  }, [dispatch, setMessageWithScrollReset, clearAnaylazeContent])
 
   const handleRequestScreenshotSummarize = async () => {
     dispatch(clearOutput())
@@ -176,9 +186,6 @@ export const VideoSummary = () => {
       saveAs: false,
     })
   }
-
-  const { clearAnaylazeContent } = useMessageHandling()
-  // const clearAnaylazeContent = () => {}
 
   useScrollManagement(resultContainerRef, thinkingContainerRef)
 
