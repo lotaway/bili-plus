@@ -2,12 +2,12 @@ import { PageType } from '../../enums/PageType'
 import { RequestPageEventType } from '../../enums/PageEventType'
 import { createHomeButtonInjector } from '../../utils/inject/ButtonInjector'
 import { PageInfoSyncManager, HomePageInfo } from '../../utils/inject/PageInfoSyncManager'
-import { createHomePageActionHandler, HomePageActionPayload } from '../../handlers/HomePageActionHandler'
+import { createStudyAutomationService, HomePageActionPayload } from '../../services/StudyAutomation'
 import Logger from '../../utils/Logger'
 
 class HomePageInjectActivity {
     private buttonInjector = createHomeButtonInjector()
-    private actionHandler = createHomePageActionHandler()
+    private actionHandler = createStudyAutomationService()
     private syncManager: PageInfoSyncManager
 
     constructor() {

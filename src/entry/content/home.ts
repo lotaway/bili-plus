@@ -52,9 +52,11 @@ class HomeContentActivity {
       const result = await this.runStudyAutomation(limitCount)
 
       Logger.I('[Study Automation] Automation learning completed', result)
+      this.isAutomationRunning = false
       sendResponse({ message: 'Automation learning task submitted', ...result })
     } catch (err: any) {
       Logger.E('[Study Automation] Automation learning failed:', err)
+      this.isAutomationRunning = false
       sendResponse({
         error: err instanceof Error ? err.message : String(err),
         success: false
@@ -89,39 +91,105 @@ class HomeContentActivity {
     const MAX_RETRIES = limitCount * 2
 
     while (studyList.length < limitCount && retryCount < MAX_RETRIES && this.isAutomationRunning) {
-      const batch = await this.sendHomePageAction('extractVideosFromPage')
+      try {
+        const videos = await this.sendHomePageAction('extractVideosFromPage')
 
-      if (!batch.success || !batch.data || batch.data.length === 0) {
-        await this.sendHomePageAction('clickChangeButton')
-        await new Promise(r => setTimeout(r, 3000))
+        if (!videos || !Array.isArray(videos) || videos.length === 0) {
+          Logger.I(`[Study Automation] No videos found, retry ${retryCount + 1}/${MAX_RETRIES}`)
+          await this.sendHomePageAction('clickChangeButton').catch(err => {
+            Logger.E('[Study Automation] Failed to click change button:', err)
+          })
+          await new Promise(r => setTimeout(r, 3000))
+          retryCount++
+          continue
+        }
+
+        Logger.I(`[Study Automation] Extracted ${videos.length} videos, retry ${retryCount + 1}/${MAX_RETRIES}`)
+
+        const blackList = ['番剧', '动漫', '游戏', '开箱', '日常', 'vlog', '记录', '娱乐']
+        const filteredVideos = videos.filter((v: any) => {
+          const title = (v.title || '').toLowerCase()
+          if (title.length < 5) return false
+          if (blackList.some(kw => title.includes(kw))) return false
+          return true
+        })
+
+        Logger.I(`[Study Automation] Filtered ${filteredVideos.length} videos after blacklist filter`)
+
+        if (filteredVideos.length === 0) {
+          Logger.I(`[Study Automation] No videos passed blacklist filter, retry ${retryCount + 1}/${MAX_RETRIES}`)
+          await this.sendHomePageAction('clickChangeButton').catch(err => {
+            Logger.E('[Study Automation] Failed to click change button:', err)
+          })
+          await new Promise(r => setTimeout(r, 3000))
+          retryCount++
+          continue
+        }
+
+        const videoAnalysis = await this.analyzeVideosWithLLM(filteredVideos)
+        const categorizedVideos = (videoAnalysis || []).filter((item: any) =>
+          item.category === 'class' || item.category === 'knowledge'
+        )
+
+        Logger.I(`[Study Automation] LLM categorized ${categorizedVideos.length} videos as class/knowledge`)
+
+        if (categorizedVideos.length > 0) {
+          studyList.push(...categorizedVideos)
+          Logger.I(`[Study Automation] Study list now has ${studyList.length}/${limitCount} videos`)
+        } else {
+          Logger.I(`[Study Automation] No videos categorized as class/knowledge, retry ${retryCount + 1}/${MAX_RETRIES}`)
+        }
+
         retryCount++
-        continue
+      } catch (err: any) {
+        Logger.E('[Study Automation] Error in automation loop:', err)
+        retryCount++
+        if (retryCount >= MAX_RETRIES) {
+          Logger.E('[Study Automation] Max retries reached')
+          break
+        }
+        await new Promise(r => setTimeout(r, 3000))
       }
+    }
 
-      const blackList = ['番剧', '动漫', '游戏', '开箱', '日常', 'vlog', '记录', '娱乐']
-      const filteredVideos = batch.data.filter((v: any) => {
-        const title = v.title.toLowerCase()
-        if (title.length < 5) return false
-        if (blackList.some(kw => title.includes(kw))) return false
-        return true
-      })
+    if (!this.isAutomationRunning) {
+      Logger.I('[Study Automation] Automation stopped by user')
+      return {
+        success: false,
+        submittedCount: 0,
+        tasks: [],
+        message: 'Automation stopped by user'
+      }
+    }
 
-      const videoAnalysis = await this.analyzeVideosWithLLM(filteredVideos)
-      const categorizedVideos = videoAnalysis.filter((item: any) =>
-        item.category === 'class' || item.category === 'knowledge'
-      )
-
-      studyList.push(...categorizedVideos)
-      retryCount++
+    if (studyList.length === 0) {
+      Logger.E('[Study Automation] No videos found after all retries')
+      return {
+        success: false,
+        submittedCount: 0,
+        tasks: [],
+        message: 'No suitable videos found'
+      }
     }
 
     studyList.sort((a: any, b: any) => (b.level + b.confidence) - (a.level + a.confidence))
     const finalSelection = studyList.slice(0, limitCount)
 
+    Logger.I(`[Study Automation] Final selection: ${finalSelection.length} videos`)
+
     const submittedTasks = []
     for (const item of finalSelection) {
-      const studyRequest = await this.submitStudyRequest(item.link)
-      submittedTasks.push({ link: item.link, submitted: studyRequest.success })
+      if (!this.isAutomationRunning) {
+        Logger.I('[Study Automation] Automation stopped during submission')
+        break
+      }
+      try {
+        const studyRequest = await this.submitStudyRequest(item.link)
+        submittedTasks.push({ link: item.link, submitted: studyRequest.success })
+      } catch (err: any) {
+        Logger.E('[Study Automation] Failed to submit study request:', err)
+        submittedTasks.push({ link: item.link, submitted: false })
+      }
     }
 
     return {
@@ -178,21 +246,47 @@ class HomeContentActivity {
   }
 
   async analyzeVideosWithLLM(videos: Array<{ title: string; link: string }>) {
+    if (!videos || videos.length === 0) {
+      Logger.I('[Study Automation] No videos to analyze')
+      return []
+    }
+
     const prompt = `Please analyze these Bilibili video titles and determine which ones are "tutorials" or "knowledge-based" about real world.
     Return a JSON array of objects with fields: category (class|knowledge), link, level (1-10), confidence (1-10), reason.
     Titles: ${JSON.stringify(videos.map(v => ({ title: v.title, link: v.link })))}`
 
     try {
+      Logger.I(`[Study Automation] Calling LLM to analyze ${videos.length} videos`)
       const result = await this.callLLMService(prompt)
       const content = result?.choices?.[0]?.message?.content || ''
-      const jsonStr = content.match(/\[.*\]/s)?.[0]
-      if (jsonStr) {
-        return JSON.parse(jsonStr)
+
+      if (!content) {
+        Logger.E('[Study Automation] LLM returned empty content')
+        return []
       }
-    } catch (e) {
-      Logger.E('Failed to parse LLM response', e)
+
+      Logger.D('[Study Automation] LLM response content length:', content.length)
+      const jsonStr = content.match(/\[[\s\S]*\]/)?.[0]
+
+      if (!jsonStr) {
+        Logger.E('[Study Automation] No JSON array found in LLM response')
+        Logger.D('[Study Automation] LLM response:', content.substring(0, 500))
+        return []
+      }
+
+      const parsed = JSON.parse(jsonStr)
+      if (!Array.isArray(parsed)) {
+        Logger.E('[Study Automation] LLM response is not an array:', typeof parsed)
+        return []
+      }
+
+      Logger.I(`[Study Automation] LLM analyzed ${parsed.length} videos`)
+      return parsed
+    } catch (e: any) {
+      Logger.E('[Study Automation] Failed to analyze videos with LLM:', e)
+      Logger.E('[Study Automation] Error details:', e.message, e.stack)
+      return []
     }
-    return []
   }
 
   async callLLMService(prompt: string): Promise<any> {

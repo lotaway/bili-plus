@@ -105,9 +105,14 @@ const StudyAutomationPanel: React.FC = () => {
 
       if (response?.error) {
         setError(response.error)
+        setIsRunning(false)
+      } else if (response?.success === false) {
+        setError(response.message || '自动化学习失败')
+        setIsRunning(false)
       } else {
-        setStatus('自动化学习任务已提交到队列')
-        setIsRunning(true)
+        const submittedCount = response?.submittedCount || 0
+        setStatus(`自动化学习完成，已提交 ${submittedCount} 个视频到学习队列`)
+        setIsRunning(false)
       }
       setLoading(false)
     } catch (err: any) {
@@ -121,7 +126,7 @@ const StudyAutomationPanel: React.FC = () => {
       <h3>自动学习机</h3>
       <p>自动扫描 B 站首页推荐，并筛选高质量知识视频加入学习队列。</p>
       <Button onClick={handleButtonClick} disabled={loading}>
-        {loading ? (isRunning ? '停止中...' : '启动中...') : (isRunning ? '停止自动扫描' : '开始自动扫描')}
+        {isRunning ? (loading ? '停止中...' : '停止自动扫描') : (loading ? '启动中...' : '开始自动扫描')}
       </Button>
       {status && <StatusText>{status}</StatusText>}
       {error && <StatusText error>{error}</StatusText>}
