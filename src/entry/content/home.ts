@@ -1,295 +1,69 @@
-
 import { MessageType } from '../../enums/MessageType'
 import { RequestPageEventType } from '../../enums/PageEventType'
 import { PageType } from '../../enums/PageType'
 import Logger from '../../utils/Logger'
+import { PageActionService } from '../../features/studyAutomation/PageActionService'
+import { LLMAnalyzer } from '../../features/studyAutomation/LLMAnalyzer'
+import { StudyTaskSubmitter } from '../../features/studyAutomation/StudyTaskSubmitter'
+import { StudyAutomationOrchestrator } from '../../features/studyAutomation/StudyAutomationOrchestrator'
+import { MessageHandlerStrategy } from '../../features/studyAutomation/MessageHandlerStrategy'
+import { LLMResponse } from '../../features/studyAutomation/types'
 
 export { }
 
-type ChromeMessageEvent = [message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void]
+type ChromeMessageEvent = [
+  message: any,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: any) => void
+]
 
 class HomeContentActivity {
-  private isAutomationRunning = false
+  private messageHandlerStrategy: MessageHandlerStrategy
+  private orchestrator: StudyAutomationOrchestrator
+
+  constructor() {
+    this.orchestrator = this.createOrchestrator()
+    this.messageHandlerStrategy = new MessageHandlerStrategy(this.orchestrator)
+  }
 
   @Logger.Mark("HomeContentActivity init")
-  init() {
+  init(): void {
     this.addListener()
     this.injectScript()
   }
 
-  addListener() {
+  private createOrchestrator(): StudyAutomationOrchestrator {
+    const pageActionService = new PageActionService()
+    const llmAnalyzer = new LLMAnalyzer(this.callLLMService.bind(this))
+    const taskSubmitter = new StudyTaskSubmitter(
+      this.submitStudyRequest.bind(this),
+      () => this.orchestrator?.isAutomationRunning() ?? false
+    )
+
+    return new StudyAutomationOrchestrator(
+      pageActionService,
+      llmAnalyzer,
+      taskSubmitter
+    )
+  }
+
+  private addListener(): void {
+    this.registerContentScript()
+    chrome.runtime.onMessage.addListener(this.handleChromeMessage.bind(this))
+    window.addEventListener('message', this.handleWindowMessage.bind(this))
+  }
+
+  private registerContentScript(): void {
     chrome.runtime.sendMessage({
       type: MessageType.REGISTER_CONTENT_JS,
     }).catch(err => Logger.E(err))
-    chrome.runtime.onMessage.addListener(this.handleChromeMessage.bind(this))
-    window.addEventListener('message', this.handlerWindowMessage.bind(this))
   }
 
-  handleChromeMessage(...args: ChromeMessageEvent): boolean {
-    const [message, sender, sendResponse] = args
-
-    switch (message.type) {
-      case MessageType.START_STUDY_AUTOMATION:
-        this.handleStartStudyAutomation(...args)
-        return true
-      case MessageType.STOP_STUDY_AUTOMATION:
-        this.handleStopStudyAutomation(...args)
-        return true
-    }
-
-    return false
+  private async handleChromeMessage(...args: ChromeMessageEvent): Promise<boolean> {
+    return await this.messageHandlerStrategy.handle(...args)
   }
 
-  async handleStartStudyAutomation(...args: ChromeMessageEvent) {
-    const [message, sender, sendResponse] = args
-
-    Logger.I('[Study Automation] Received start request', message)
-
-    try {
-      this.isAutomationRunning = true
-      const limitCount = message.payload?.limitCount || 10
-      Logger.I('[Study Automation] Starting automation learning, limitCount:', limitCount)
-      const result = await this.runStudyAutomation(limitCount)
-
-      Logger.I('[Study Automation] Automation learning completed', result)
-      this.isAutomationRunning = false
-      sendResponse({ message: 'Automation learning task submitted', ...result })
-    } catch (err: any) {
-      Logger.E('[Study Automation] Automation learning failed:', err)
-      this.isAutomationRunning = false
-      sendResponse({
-        error: err instanceof Error ? err.message : String(err),
-        success: false
-      })
-    }
-
-    return true
-  }
-
-  async handleStopStudyAutomation(...args: ChromeMessageEvent) {
-    const [message, sender, sendResponse] = args
-
-    Logger.I('[Study Automation] Received stop request')
-
-    try {
-      this.isAutomationRunning = false
-      sendResponse({ message: 'Automation learning stopped' })
-    } catch (err: any) {
-      Logger.E('[Study Automation] Failed to stop automation learning:', err)
-      sendResponse({
-        error: err instanceof Error ? err.message : String(err),
-        success: false
-      })
-    }
-
-    return true
-  }
-
-  async runStudyAutomation(limitCount: number) {
-    let studyList: any[] = []
-    let retryCount = 0
-    const MAX_RETRIES = limitCount * 2
-
-    while (studyList.length < limitCount && retryCount < MAX_RETRIES && this.isAutomationRunning) {
-      try {
-        const videos = await this.sendHomePageAction('extractVideosFromPage')
-
-        if (!videos || !Array.isArray(videos) || videos.length === 0) {
-          Logger.I(`[Study Automation] No videos found, retry ${retryCount + 1}/${MAX_RETRIES}`)
-          await this.sendHomePageAction('clickChangeButton').catch(err => {
-            Logger.E('[Study Automation] Failed to click change button:', err)
-          })
-          await new Promise(r => setTimeout(r, 3000))
-          retryCount++
-          continue
-        }
-
-        Logger.I(`[Study Automation] Extracted ${videos.length} videos, retry ${retryCount + 1}/${MAX_RETRIES}`)
-
-        const blackList = ['番剧', '动漫', '游戏', '开箱', '日常', 'vlog', '记录', '娱乐']
-        const filteredVideos = videos.filter((v: any) => {
-          const title = (v.title || '').toLowerCase()
-          if (title.length < 5) return false
-          if (blackList.some(kw => title.includes(kw))) return false
-          return true
-        })
-
-        Logger.I(`[Study Automation] Filtered ${filteredVideos.length} videos after blacklist filter`)
-
-        if (filteredVideos.length === 0) {
-          Logger.I(`[Study Automation] No videos passed blacklist filter, retry ${retryCount + 1}/${MAX_RETRIES}`)
-          await this.sendHomePageAction('clickChangeButton').catch(err => {
-            Logger.E('[Study Automation] Failed to click change button:', err)
-          })
-          await new Promise(r => setTimeout(r, 3000))
-          retryCount++
-          continue
-        }
-
-        const videoAnalysis = await this.analyzeVideosWithLLM(filteredVideos)
-        const categorizedVideos = (videoAnalysis || []).filter((item: any) =>
-          item.category === 'class' || item.category === 'knowledge'
-        )
-
-        Logger.I(`[Study Automation] LLM categorized ${categorizedVideos.length} videos as class/knowledge`)
-
-        if (categorizedVideos.length > 0) {
-          studyList.push(...categorizedVideos)
-          Logger.I(`[Study Automation] Study list now has ${studyList.length}/${limitCount} videos`)
-        } else {
-          Logger.I(`[Study Automation] No videos categorized as class/knowledge, retry ${retryCount + 1}/${MAX_RETRIES}`)
-        }
-
-        retryCount++
-      } catch (err: any) {
-        Logger.E('[Study Automation] Error in automation loop:', err)
-        retryCount++
-        if (retryCount >= MAX_RETRIES) {
-          Logger.E('[Study Automation] Max retries reached')
-          break
-        }
-        await new Promise(r => setTimeout(r, 3000))
-      }
-    }
-
-    if (!this.isAutomationRunning) {
-      Logger.I('[Study Automation] Automation stopped by user')
-      return {
-        success: false,
-        submittedCount: 0,
-        tasks: [],
-        message: 'Automation stopped by user'
-      }
-    }
-
-    if (studyList.length === 0) {
-      Logger.E('[Study Automation] No videos found after all retries')
-      return {
-        success: false,
-        submittedCount: 0,
-        tasks: [],
-        message: 'No suitable videos found'
-      }
-    }
-
-    studyList.sort((a: any, b: any) => (b.level + b.confidence) - (a.level + a.confidence))
-    const finalSelection = studyList.slice(0, limitCount)
-
-    Logger.I(`[Study Automation] Final selection: ${finalSelection.length} videos`)
-
-    const submittedTasks = []
-    for (const item of finalSelection) {
-      if (!this.isAutomationRunning) {
-        Logger.I('[Study Automation] Automation stopped during submission')
-        break
-      }
-      try {
-        const studyRequest = await this.submitStudyRequest(item.link)
-        submittedTasks.push({ link: item.link, submitted: studyRequest.success })
-      } catch (err: any) {
-        Logger.E('[Study Automation] Failed to submit study request:', err)
-        submittedTasks.push({ link: item.link, submitted: false })
-      }
-    }
-
-    return {
-      success: true,
-      submittedCount: finalSelection.length,
-      tasks: submittedTasks
-    }
-  }
-
-  async sendHomePageAction(action: string, params?: Record<string, any>): Promise<any> {
-    const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-    Logger.D('[Study Automation] Sending page action request:', { action, params, requestId })
-
-    window.postMessage({
-      source: PageType.CONTENT_SCRIPT,
-      type: RequestPageEventType.REQUEST_HOME_PAGE_ACTION,
-      payload: { action, params, requestId }
-    }, '*')
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        Logger.E('[Study Automation] Request timeout:', { action, requestId })
-        reject(new Error('Request timeout'))
-      }, 30000)
-
-      const responseHandler = (event: MessageEvent) => {
-        Logger.D('[Study Automation] Received message:', event.data)
-
-        if (
-          event.source !== window ||
-          event.data?.source !== PageType.HOME_PAGE_INJECT ||
-          event.data?.type !== RequestPageEventType.REQUEST_HOME_PAGE_ACTION ||
-          event.data?.payload?.requestId !== requestId
-        ) {
-          return
-        }
-
-        clearTimeout(timeout)
-        window.removeEventListener('message', responseHandler)
-
-        const payload = event.data.payload
-        Logger.I('[Study Automation] Page action response:', payload)
-
-        if (payload.success) {
-          resolve(payload.data)
-        } else {
-          reject(new Error(payload.error || 'Operation failed'))
-        }
-      }
-
-      window.addEventListener('message', responseHandler)
-    })
-  }
-
-  async analyzeVideosWithLLM(videos: Array<{ title: string; link: string }>) {
-    if (!videos || videos.length === 0) {
-      Logger.I('[Study Automation] No videos to analyze')
-      return []
-    }
-
-    const prompt = `Please analyze these Bilibili video titles and determine which ones are "tutorials" or "knowledge-based" about real world.
-    Return a JSON array of objects with fields: category (class|knowledge), link, level (1-10), confidence (1-10), reason.
-    Titles: ${JSON.stringify(videos.map(v => ({ title: v.title, link: v.link })))}`
-
-    try {
-      Logger.I(`[Study Automation] Calling LLM to analyze ${videos.length} videos`)
-      const result = await this.callLLMService(prompt)
-      const content = result?.choices?.[0]?.message?.content || ''
-
-      if (!content) {
-        Logger.E('[Study Automation] LLM returned empty content')
-        return []
-      }
-
-      Logger.D('[Study Automation] LLM response content length:', content.length)
-      const jsonStr = content.match(/\[[\s\S]*\]/)?.[0]
-
-      if (!jsonStr) {
-        Logger.E('[Study Automation] No JSON array found in LLM response')
-        Logger.D('[Study Automation] LLM response:', content.substring(0, 500))
-        return []
-      }
-
-      const parsed = JSON.parse(jsonStr)
-      if (!Array.isArray(parsed)) {
-        Logger.E('[Study Automation] LLM response is not an array:', typeof parsed)
-        return []
-      }
-
-      Logger.I(`[Study Automation] LLM analyzed ${parsed.length} videos`)
-      return parsed
-    } catch (e: any) {
-      Logger.E('[Study Automation] Failed to analyze videos with LLM:', e)
-      Logger.E('[Study Automation] Error details:', e.message, e.stack)
-      return []
-    }
-  }
-
-  async callLLMService(prompt: string): Promise<any> {
+  private async callLLMService(prompt: string): Promise<LLMResponse> {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({
         type: MessageType.REQUEST_SUMMARIZE_SUBTITLE,
@@ -304,8 +78,8 @@ class HomeContentActivity {
     })
   }
 
-  async submitStudyRequest(link: string) {
-    return new Promise<{ success: boolean }>((resolve) => {
+  private async submitStudyRequest(link: string): Promise<{ success: boolean }> {
+    return new Promise((resolve) => {
       chrome.runtime.sendMessage({
         type: MessageType.REQUEST_SUMMARIZE_SUBTITLE,
         payload: {
@@ -324,57 +98,76 @@ class HomeContentActivity {
     })
   }
 
-  isBilibiliHomepage(): boolean {
+  private isBilibiliHomepage(): boolean {
     const url = window.location.href
-    return url === 'https://www.bilibili.com/' ||
-      url === 'http://www.bilibili.com/' ||
-      url.startsWith('https://www.bilibili.com/?') ||
-      url.startsWith('http://www.bilibili.com/?')
+    const validPrefixes = [
+      'https://www.bilibili.com/',
+      'http://www.bilibili.com/',
+      'https://www.bilibili.com/?',
+      'http://www.bilibili.com/?'
+    ]
+    return validPrefixes.some(prefix => url === prefix || url.startsWith(prefix))
   }
 
-  async handlerWindowMessage(event: MessageEvent) {
-    if (
-      event.source !== window ||
-      event.data?.source !== PageType.HOME_PAGE_INJECT
-    ) {
+  private async handleWindowMessage(event: MessageEvent): Promise<void> {
+    if (!this.isValidWindowMessage(event)) {
       return
     }
 
     switch (event.data.type) {
       case RequestPageEventType.HOME_INFO_INIT:
-        await chrome.runtime.sendMessage({
-          type: MessageType.HOME_INFO_UPDATE,
-          payload: event.data.payload,
-        })
+        await this.handleHomeInfoInit(event.data.payload)
         break
       case RequestPageEventType.REQUEST_OPEN_SIDE_PANEL:
-        chrome.runtime.sendMessage({
-          type: MessageType.OPEN_SIDE_PANEL,
-        })
-        break
-      default:
+        this.handleOpenSidePanel()
         break
     }
   }
 
-  injectScript() {
-    const ID = "home_page_inject"
-    const origin = document.getElementById(ID)
-    if (origin) {
-      document.removeChild(origin)
+  private isValidWindowMessage(event: MessageEvent): boolean {
+    return (
+      event.source === window &&
+      event.data?.source === PageType.HOME_PAGE_INJECT
+    )
+  }
+
+  private async handleHomeInfoInit(payload: any): Promise<void> {
+    await chrome.runtime.sendMessage({
+      type: MessageType.HOME_INFO_UPDATE,
+      payload,
+    })
+  }
+
+  private handleOpenSidePanel(): void {
+    chrome.runtime.sendMessage({
+      type: MessageType.OPEN_SIDE_PANEL,
+    })
+  }
+
+  private injectScript(): void {
+    const scriptId = "home_page_inject"
+    this.removeExistingScript(scriptId)
+    this.insertScript(scriptId)
+  }
+
+  private removeExistingScript(scriptId: string): void {
+    const existingScript = document.getElementById(scriptId)
+    if (existingScript) {
+      existingScript.remove()
     }
+  }
+
+  private insertScript(scriptId: string): void {
     const script = document.createElement('script')
-    script.id = ID
-    const url = chrome.runtime.getURL('assets/home_page_inject.js')
-    script.src = url
+    script.id = scriptId
+    script.src = chrome.runtime.getURL('assets/home_page_inject.js')
     document.documentElement.appendChild(script)
   }
 }
 
 const activity = new HomeContentActivity()
-if (activity.isBilibiliHomepage()) {
+if (activity['isBilibiliHomepage']()) {
   activity.init()
 } else {
   Logger.D('[Bilibili Plus] Not homepage, skipping execution')
 }
-
