@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import styled from 'styled-components'
 import { MessageType } from '../../enums/MessageType'
 
@@ -34,6 +34,31 @@ const StudyAutomationPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [isRunning, setIsRunning] = useState(false)
 
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === MessageType.STUDY_AUTOMATION_RESPONSE) {
+        const { error: responseError, submittedCount, message: responseMessage } = message.data || {}
+
+        if (responseError) {
+          setError(responseError)
+          setIsRunning(false)
+        } else if (submittedCount !== undefined) {
+          setStatus(`自动化学习完成，已提交 ${submittedCount} 个视频到学习队列`)
+          setIsRunning(false)
+        } else if (responseMessage) {
+          setStatus(responseMessage)
+          setIsRunning(false)
+        }
+        setLoading(false)
+      }
+    }
+
+    chrome.runtime.onMessage.addListener(handleMessage)
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage)
+    }
+  }, [])
+
   const stopAutomation = async () => {
     setLoading(true)
     setStatus('正在停止自动化学习机...')
@@ -68,17 +93,16 @@ const StudyAutomationPanel: React.FC = () => {
     }
   }
 
-  const handleButtonClick = async () => {
+  const handleButtonClick = useCallback(async () => {
     if (isRunning) {
       await stopAutomation()
     } else {
       await startAutomation()
     }
-  }
+  }, [isRunning])
 
   const startAutomation = async () => {
     setLoading(true)
-    setStatus('正在启动自动化学习机...')
     setError(null)
 
     try {
@@ -94,7 +118,7 @@ const StudyAutomationPanel: React.FC = () => {
       }
 
       const preError = chrome.runtime.lastError
-      const response = await chrome.tabs.sendMessage(tab.id, {
+      await chrome.tabs.sendMessage(tab.id, {
         type: MessageType.START_STUDY_AUTOMATION
       })
       if (chrome.runtime.lastError && preError !== chrome.runtime.lastError) {
@@ -103,17 +127,8 @@ const StudyAutomationPanel: React.FC = () => {
         return
       }
 
-      if (response?.error) {
-        setError(response.error)
-        setIsRunning(false)
-      } else if (response?.success === false) {
-        setError(response.message || '自动化学习失败')
-        setIsRunning(false)
-      } else {
-        const submittedCount = response?.submittedCount || 0
-        setStatus(`自动化学习完成，已提交 ${submittedCount} 个视频到学习队列`)
-        setIsRunning(false)
-      }
+      setStatus('已提交到学习队列，请稍候...')
+      setIsRunning(true)
       setLoading(false)
     } catch (err: any) {
       setError(err.message)
@@ -135,3 +150,4 @@ const StudyAutomationPanel: React.FC = () => {
 }
 
 export default StudyAutomationPanel
+
