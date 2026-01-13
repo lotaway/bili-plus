@@ -110,7 +110,7 @@ const StudyAutomationPanel: React.FC = () => {
         setError(response.message || '自动化学习失败')
         setIsRunning(false)
       } else {
-        const submittedCount = response?.submittedCount || 0
+        const submittedCount = response?.submittedCount ?? -1
         setStatus(`自动化学习完成，已提交 ${submittedCount} 个视频到学习队列`)
         setIsRunning(false)
       }
