@@ -23,8 +23,9 @@ Bilibili Plus 是一个基于 Manifest V3 的 Chrome 浏览器扩展，用于增
 1. **字幕提取** - 自动提取视频字幕并支持 SRT/Markdown 格式导出
 2. **AI 字幕总结** - 使用 AI 模型对字幕内容进行智能分析和总结
 3. **截图分析** - 截取当前页面并使用 AI 分析界面内容
-4. **AI 智能助手** - 与 AI 进行对话获取视频相关帮助
+4. **AI 智能助手** - 与 AI 进行对话获取视频相关帮助（支持 Streaming 流式响应）
 5. **学习计划** - 每日自动学习计划功能
+6. **侧边栏状态同步** - 确保插件在不同页面间保持状态一致性
 
 ## 测试技术方案
 
@@ -132,6 +133,7 @@ bili-plus-e2e/
 - [ ] AI 服务模拟 (`ai-mock.ts`)
   - 函数：`mockAISummaryResponse()` - Mock AI 总结响应
   - 函数：`mockAIChatResponse()` - Mock AI 对话响应
+  - 函数：`mockAIStreamingResponse()` - Mock AI 流式（SSE）响应
   - 函数：`mockScreenshotAnalysis()` - Mock 截图分析响应
 
 ### 阶段 4：页面对象开发
@@ -193,8 +195,8 @@ bili-plus-e2e/
 
 - [ ] AI 总结测试 (`ai-summary.spec.ts`)
   - 测试：点击总结按钮触发请求
-  - 测试：AI 总结正常生成
-  - 测试：总结内容显示正确
+  - 测试：AI 总结正常生成（包含流式进度验证）
+  - 测试：总结内容并在 Side Panel 中实时正确显示
   - 测试：处理字幕过长情况
   - 测试：处理 API 错误情况
   - 测试：处理网络超时情况
