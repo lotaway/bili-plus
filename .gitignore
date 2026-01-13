@@ -11,3 +11,5 @@ package-lock.json
 .vscode
 .idea
 .vs
+
+test-results
