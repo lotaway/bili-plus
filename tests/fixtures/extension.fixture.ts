@@ -1,11 +1,11 @@
-import { test as base, chromium, type BrowserContext } from '@playwright/test';
+import { test as base, chromium, Page, type BrowserContext } from '@playwright/test';
 import path from 'path';
 
 export type ExtensionFixtures = {
     context: BrowserContext;
     extensionId: string;
-    popupPage: any;
-    sidepanelPage: any;
+    popupPage: Page;
+    sidepanelPage: Page;
 };
 
 export const test = base.extend<ExtensionFixtures>({
@@ -31,18 +31,14 @@ export const test = base.extend<ExtensionFixtures>({
         await use(extensionId);
     },
 
-    popupPage: async ({ context, extensionId }: { context: BrowserContext; extensionId: string }, use: (r: any) => Promise<void>) => {
-        const page = await context.newPage();
-        await page.goto(`chrome-extension://${extensionId}/src/entry/popup/index.html`);
+    popupPage: async ({ context }, use: (r: Page) => Promise<void>) => {
+        const page = await context.waitForEvent('page', p => p.url().includes('popup'));
         await use(page);
-        await page.close();
     },
 
-    sidepanelPage: async ({ context, extensionId }: { context: BrowserContext; extensionId: string }, use: (r: any) => Promise<void>) => {
-        const page = await context.newPage();
-        await page.goto(`chrome-extension://${extensionId}/src/entry/sidepanel/index.html`);
+    sidepanelPage: async ({ context }, use: (r: Page) => Promise<void>) => {
+        const page = await context.waitForEvent('page', p => p.url().includes('sidepanel'));
         await use(page);
-        await page.close();
     },
 });
 

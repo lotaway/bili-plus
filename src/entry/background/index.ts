@@ -352,6 +352,7 @@ class BackstageActivity {
     const bvid = this.subtitleFetcher.bvid
     const cid = this.subtitleFetcher.cid
     const EVENT_TYPE = MessageType.SUMMARIZE_SUBTITLE_RESPONSE_STREAM
+
     this.aiSubtitleHandler
       .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
         if (!sender.id) {

@@ -26,9 +26,18 @@ export class LLMAnalyzer {
 
     private buildAnalysisPrompt(videos: Video[]): string {
         const videoData = videos.map(v => ({ title: v.title, link: v.link }))
-        return `Please analyze these Bilibili video titles and determine which ones are "tutorials" or "knowledge-based" about real world.
-    Return a JSON array of objects with fields: category (class|knowledge), link, level (1-10), confidence (1-10), reason.
-    Titles: ${JSON.stringify(videoData)}`
+        return `你是一个知识挖掘专家，专门从 B 站首页推荐中筛选出高质量的“教程”、“实战”、“原理科普”或“技术分享”类视频。
+    
+    任务要求：
+    1. 分析提供的视频标题，判断其是否属于“正式课程/讲座(class)”或“深度知识/科普(knowledge)”类型。
+    2. 排除掉纯娱乐、生活 VLOG、纯新闻报道、标题党、以及碎片化的短视频。
+    3. 必须严格按照 JSON 数组格式返回，不要包含任何解释文字。
+    
+    返回格式示例：
+    [{"category": "class", "link": "...", "level": 8, "confidence": 9, "reason": "这是一篇关于 React 源码的深度分析"}]
+    
+    待分析视频数据：
+    ${JSON.stringify(videoData)}`
     }
 
     private parseResponse(result: LLMResponse): VideoAnalysis[] {

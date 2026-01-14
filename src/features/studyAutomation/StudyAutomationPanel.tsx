@@ -59,6 +59,7 @@ const StudyAutomationPanel: React.FC = () => {
     }
   }, [])
 
+
   const stopAutomation = async () => {
     setLoading(true)
     setStatus('正在停止自动化学习机...')
@@ -111,8 +112,13 @@ const StudyAutomationPanel: React.FC = () => {
         throw new Error('未找到活动标签页')
       }
 
-      if (!tab.url?.includes('bilibili.com')) {
-        setStatus('请先前往 Bilibili 首页或视频页')
+      const isHomepage = tab.url === 'https://www.bilibili.com/' || 
+                        tab.url === 'http://www.bilibili.com/' || 
+                        tab.url?.startsWith('https://www.bilibili.com/?') ||
+                        tab.url?.startsWith('http://www.bilibili.com/?');
+
+      if (!isHomepage) {
+        setStatus('自动学习机目前仅支持在 Bilibili 首页运行，请先切换到首页。')
         setLoading(false)
         return
       }
