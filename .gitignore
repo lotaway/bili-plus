@@ -4,9 +4,6 @@ node_modules/
 .DS_Store
 /dist
 
-yarn.lock
-package-lock.json
-
 # ide
 .vscode
 .idea
