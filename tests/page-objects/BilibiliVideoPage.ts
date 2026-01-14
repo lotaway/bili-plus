@@ -34,4 +34,29 @@ export class BilibiliVideoPage {
             await this.page.click('.bpx-player-ctrl-play');
         }
     }
+    async gotoHomePage() {
+        await this.page.goto('https://www.bilibili.com/');
+    }
+
+    async getInjectorButton() {
+        return this.page.locator('#bili-plus-home-generate-btn');
+    }
+
+    async clickInjectorButton() {
+        await (await this.getInjectorButton()).click();
+    }
+
+    async injectFakeVideoCard() {
+        await this.page.evaluate(() => {
+            const container = document.querySelector('.bili-feed4-layout') || document.body;
+            const card = document.createElement('div');
+            card.className = 'bili-video-card';
+            card.innerHTML = `
+                <div class="bili-video-card__info--tit" title="深度学习教程">深度学习教程</div>
+                <a href="https://www.bilibili.com/video/BV1test123"></a>
+            `;
+            container.appendChild(card);
+        });
+    }
+
 }
