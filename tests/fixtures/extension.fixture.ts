@@ -31,13 +31,15 @@ export const test = base.extend<ExtensionFixtures>({
         await use(extensionId);
     },
 
-    popupPage: async ({ context }, use: (r: Page) => Promise<void>) => {
-        const page = await context.waitForEvent('page', p => p.url().includes('popup'));
+    popupPage: async ({ context, extensionId }, use: (r: Page) => Promise<void>) => {
+        const page = await context.newPage();
+        await page.goto(`chrome-extension://${extensionId}/src/entry/popup/index.html`);
         await use(page);
     },
 
-    sidepanelPage: async ({ context }, use: (r: Page) => Promise<void>) => {
-        const page = await context.waitForEvent('page', p => p.url().includes('sidepanel'));
+    sidepanelPage: async ({ context, extensionId }, use: (r: Page) => Promise<void>) => {
+        const page = await context.newPage();
+        await page.goto(`chrome-extension://${extensionId}/src/entry/sidepanel/index.html`);
         await use(page);
     },
 });

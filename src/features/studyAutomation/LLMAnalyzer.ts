@@ -40,8 +40,8 @@ export class LLMAnalyzer {
     ${JSON.stringify(videoData)}`
     }
 
-    private parseResponse(result: LLMResponse): VideoAnalysis[] {
-        const content = result?.choices?.[0]?.message?.content || ''
+    private parseResponse(result: LLMResponse | any): VideoAnalysis[] {
+        const content = result?.choices?.[0]?.message?.content || result?.content || ''
 
         if (!content) {
             Logger.E(`${LOG_PREFIX} LLM returned empty content`)

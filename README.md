@@ -51,6 +51,7 @@ BILI PLUS 是一个增强 B 站体验的浏览器扩展，提供多种实用功�
 - `src/styles` - 公共UI样式
 - `src/types` - 类型定义文件
 - `src/utils` - 通用工具函数
+- `tests/specs` - e2e测试
 
 ## 代码规范
 

@@ -65,15 +65,43 @@ class HomeContentActivity {
 
   private async callLLMService(prompt: string): Promise<LLMResponse> {
     return new Promise((resolve, reject) => {
+      let fullContent = ''
+
+      const messageListener = (message: any) => {
+        if (message.type === MessageType.ASSISTANT_RESPONSE_STREAM) {
+          if (message.data.error) {
+            chrome.runtime.onMessage.removeListener(messageListener)
+            reject(new Error(message.data.error))
+            return
+          }
+
+          if (message.data.content) {
+            fullContent += message.data.content
+          }
+
+          if (message.data.done) {
+            chrome.runtime.onMessage.removeListener(messageListener)
+            resolve({
+              choices: [{
+                message: {
+                  content: fullContent
+                }
+              }]
+            } as any)
+          }
+        }
+      }
+
+      chrome.runtime.onMessage.addListener(messageListener)
+
       chrome.runtime.sendMessage({
-        type: MessageType.REQUEST_SUMMARIZE_SUBTITLE,
+        type: MessageType.REQUEST_START_ASSISTANT,
         payload: { prompt }
       }, (response) => {
         if (chrome.runtime.lastError) {
+          chrome.runtime.onMessage.removeListener(messageListener)
           reject(new Error(chrome.runtime.lastError.message))
-          return
         }
-        resolve(response)
       })
     })
   }

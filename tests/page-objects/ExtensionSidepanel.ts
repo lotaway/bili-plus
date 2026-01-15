@@ -6,7 +6,6 @@ export class ExtensionSidepanel {
     static async waitFor(context: BrowserContext) {
         const sidepanelUrlPattern = /sidepanel/;
 
-        // Wait for the sidepanel to possibly appear in pages using polling
         await expect.poll(async () => {
             const pages = context.pages();
             return pages.find(p => sidepanelUrlPattern.test(p.url()));

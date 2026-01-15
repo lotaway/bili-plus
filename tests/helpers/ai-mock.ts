@@ -1,6 +1,6 @@
 import { type Page } from '@playwright/test';
 
-export async function mockAISummaryResponse(page: Page, content: string) {
+async function mockJsonAiResponse(page: Page, content: string) {
     await page.route('**/v1/chat/completions', async route => {
         await route.fulfill({
             status: 200,
@@ -12,16 +12,12 @@ export async function mockAISummaryResponse(page: Page, content: string) {
     });
 }
 
+export async function mockAISummaryResponse(page: Page, content: string) {
+    await mockJsonAiResponse(page, content);
+}
+
 export async function mockAIChatResponse(page: Page, content: string) {
-    await page.route('**/v1/chat/completions', async route => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                choices: [{ message: { content } }]
-            })
-        });
-    });
+    await mockJsonAiResponse(page, content);
 }
 
 export async function mockAIStreamingResponse(page: Page, chunks: string[]) {
