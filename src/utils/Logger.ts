@@ -1,5 +1,5 @@
 function checkIsDev() {
-    return process.env.NEXT_PUBLIC_ENV === "DEV"
+    return process.env.NEXT_PUBLIC_ENV === "DEV" || process.env.NODE_ENV === "development"
 }
 
 export default class Logger {

@@ -94,12 +94,12 @@ export class StudyAutomationOrchestrator {
         const videos = await this.pageActionService.sendAction('extractVideosFromPage')
 
         if (!VideoFilter.isValidVideoArray(videos)) {
-            Logger.I(`${LOG_PREFIX} No videos found, retry ${retryCount + 1}/${maxRetries}`)
+            Logger.I(`${LOG_PREFIX} No videos found by extraction, retry ${retryCount + 1}/${maxRetries}`)
             await this.refreshPage()
             return null
         }
 
-        Logger.I(`${LOG_PREFIX} Extracted ${videos.length} videos, retry ${retryCount + 1}/${maxRetries}`)
+        Logger.I(`${LOG_PREFIX} Extracted ${videos.length} videos, now filtering...`)
 
         const filteredVideos = VideoFilter.filterByBlacklist(videos)
         Logger.I(`${LOG_PREFIX} Filtered ${filteredVideos.length} videos after blacklist filter`)

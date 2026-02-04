@@ -20,6 +20,10 @@ export class ExtensionSidepanel {
         return new ExtensionSidepanel(page);
     }
 
+    async setLimitCount(count: number) {
+        await this.page.fill('input[type="number"]', count.toString());
+    }
+
     async clickAutoStudy() {
         await this.page.locator('button', { hasText: '自动学习' }).click();
     }

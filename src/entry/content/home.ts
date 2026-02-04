@@ -69,7 +69,10 @@ class HomeContentActivity {
 
       const messageListener = (message: any) => {
         if (message.type === MessageType.ASSISTANT_RESPONSE_STREAM) {
+          Logger.D(`${LOG_PREFIX} Received AI stream message`, { done: message.data.done, hasContent: !!message.data.content })
+
           if (message.data.error) {
+            Logger.E(`${LOG_PREFIX} AI stream error:`, message.data.error)
             chrome.runtime.onMessage.removeListener(messageListener)
             reject(new Error(message.data.error))
             return
@@ -80,6 +83,9 @@ class HomeContentActivity {
           }
 
           if (message.data.done) {
+            Logger.I(`${LOG_PREFIX} AI stream complete. Full content length:`, fullContent.length)
+            Logger.D(`${LOG_PREFIX} Full content snippet:`, fullContent.substring(0, 100))
+
             chrome.runtime.onMessage.removeListener(messageListener)
             resolve({
               choices: [{
@@ -92,6 +98,7 @@ class HomeContentActivity {
         }
       }
 
+      const LOG_PREFIX = '[LLM Service Call]'
       chrome.runtime.onMessage.addListener(messageListener)
 
       chrome.runtime.sendMessage({

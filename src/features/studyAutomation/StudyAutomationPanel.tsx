@@ -42,11 +42,14 @@ const StudyAutomationPanel: React.FC = () => {
         if (responseError) {
           setError(responseError)
           setIsRunning(false)
-        } else if (submittedCount !== undefined) {
+        } else if (submittedCount !== undefined && submittedCount > 0) {
           setStatus(`自动化学习完成，已提交 ${submittedCount} 个视频到学习队列`)
           setIsRunning(false)
         } else if (responseMessage) {
           setStatus(responseMessage)
+          setIsRunning(false)
+        } else if (submittedCount === 0) {
+          setStatus('自动化学习完成，未发现符合条件的视频。')
           setIsRunning(false)
         }
         setLoading(false)
@@ -94,13 +97,15 @@ const StudyAutomationPanel: React.FC = () => {
     }
   }
 
-  const handleButtonClick = useCallback(async () => {
+  const handleButtonClick = async () => {
     if (isRunning) {
       await stopAutomation()
     } else {
       await startAutomation()
     }
-  }, [isRunning])
+  }
+
+  const [limitCount, setLimitCount] = useState(10)
 
   const startAutomation = async () => {
     setLoading(true)
@@ -125,7 +130,8 @@ const StudyAutomationPanel: React.FC = () => {
 
       const preError = chrome.runtime.lastError
       await chrome.tabs.sendMessage(tab.id, {
-        type: MessageType.START_STUDY_AUTOMATION
+        type: MessageType.START_STUDY_AUTOMATION,
+        payload: { limitCount }
       })
       if (chrome.runtime.lastError && preError !== chrome.runtime.lastError) {
         setError(`请先刷新 Bilibili 页面：${chrome.runtime.lastError.message}`)
@@ -146,6 +152,18 @@ const StudyAutomationPanel: React.FC = () => {
     <Container>
       <h3>自动学习机</h3>
       <p>自动扫描 B 站首页推荐，并筛选高质量知识视频加入学习队列。</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <label>目标数量:</label>
+        <input 
+          type="number" 
+          value={limitCount} 
+          onChange={(e) => setLimitCount(parseInt(e.target.value) || 1)} 
+          min="1" 
+          max="50"
+          style={{ width: '60px', padding: '4px' }}
+          disabled={isRunning}
+        />
+      </div>
       <Button onClick={handleButtonClick} disabled={loading}>
         {isRunning ? (loading ? '停止中...' : '停止自动扫描') : (loading ? '启动中...' : '开始自动扫描')}
       </Button>

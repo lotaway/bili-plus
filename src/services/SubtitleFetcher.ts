@@ -86,6 +86,19 @@ export class SubtitleFetcher {
     }
   }
 
+  async initByUrl(url: string) {
+    const bvidMatch = url.match(/BV[a-zA-Z0-9]+/)
+    if (!bvidMatch) {
+      throw new Error('Invalid Bilibili URL: missing BVID')
+    }
+    const bvid = bvidMatch[0]
+    const info = await this.api.getVideoInfo(bvid)
+    if (info.code !== 0) {
+      throw new Error(`Failed to get video info: ${info.message}`)
+    }
+    await this.init(info.data)
+  }
+
   async init(data: VideoData) {
     this.videoInfo.aid = data.aid ?? null
     this.videoInfo.cid =

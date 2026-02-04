@@ -84,10 +84,13 @@ class BackstageActivity {
   }
 
   handleRegisterContentJs(sender: chrome.runtime.MessageSender): boolean | void {
+    const id = sender.tab?.id?.toString() || sender.id
+    if (!id) return
+
     if (this.registedContentJss.size > this.registerMaxSize - 1) {
       this.registedContentJss.delete(this.registedContentJss.keys().next().value as string)
     }
-    this.registedContentJss.set(sender.id as string, true)
+    this.registedContentJss.set(id, true)
   }
 
   handleVideoInfoUpdate(message: any): boolean | void {
@@ -291,7 +294,8 @@ class BackstageActivity {
       case MessageType.REGISTER_CONTENT_JS:
         return this.handleRegisterContentJs(sender)
       case MessageType.REQUEST_SUMMARIZE_SUBTITLE:
-        return this.handleRequestSummarizeSubtitle(message, sender, sendResponse)
+        this.handleRequestSummarizeSubtitle(message, sender, sendResponse)
+        return true
       case MessageType.REQUEST_SUMMARIZE_SCREENSHOT:
         return this.handleRequestSummarizeScreenshot(message, sender, sendResponse)
       case MessageType.VIDEO_INFO_UPDATE:
@@ -299,13 +303,15 @@ class BackstageActivity {
       case MessageType.OPEN_SIDE_PANEL:
         return this.handleOpenSidePanel(sender)
       case MessageType.REQUEST_START_ASSISTANT:
-        return this.handleRequestStartAssistant(message, sender, sendResponse)
+        this.handleRequestStartAssistant(message, sender, sendResponse)
+        return true
       case MessageType.REQUEST_STOP_ASSISTANT:
         return this.handleRequestStopAssistant(sendResponse)
       case MessageType.REQUEST_VIDEO_INFO:
         return this.handleRequestVideoInfo(sendResponse)
       case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_BG:
-        return this.handleRequestDownloadVideo(message, sendResponse)
+        this.handleRequestDownloadVideo(message, sendResponse)
+        return true
       default:
         break
     }
@@ -336,29 +342,38 @@ class BackstageActivity {
     return true
   }
 
-  private handleRequestSummarizeSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean | void {
-    const isRegisted = this.registedContentJss.get(sender.id as string)
-    if (!isRegisted) {
+  private async handleRequestSummarizeSubtitle(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean | void> {
+    const id = sender.tab?.id?.toString() || sender.id
+    const isRegisted = id ? this.registedContentJss.get(id) : false
+
+    if (!isRegisted && !sender.tab) {
       sendResponse({
         error: 'content.js maybe not registed, please try refresh the page',
       })
       return true
     }
-    const preResult = this.videoInfoUtils.checkVideoInfo()
-    if (preResult?.error) {
-      sendResponse(preResult)
+
+    const { link, bvid: payloadBvid, cid: payloadCid } = message.payload || {}
+
+    try {
+      if (link) {
+        await this.subtitleFetcher.initByUrl(link)
+      } else if (payloadBvid && payloadCid) {
+        await this.subtitleFetcher.init({ bvid: payloadBvid, cid: payloadCid } as any)
+      }
+    } catch (err) {
+      Logger.E('Failed to initialize fetcher for summarize:', err)
+      sendResponse({ error: 'Failed to initialize video info' })
       return true
     }
+
     const bvid = this.subtitleFetcher.bvid
     const cid = this.subtitleFetcher.cid
     const EVENT_TYPE = MessageType.SUMMARIZE_SUBTITLE_RESPONSE_STREAM
 
     this.aiSubtitleHandler
       .summarizeSubtitlesHandler(this.subtitleFetcher, (chunk) => {
-        if (!sender.id) {
-          return
-        }
-        chrome.runtime.sendMessage(sender.id, {
+        chrome.runtime.sendMessage({
           type: EVENT_TYPE,
           data: {
             content: chunk,
@@ -386,10 +401,7 @@ class BackstageActivity {
               Logger.E('保存总结内容失败:', saveError)
             })
 
-        if (!sender.id) {
-          return null
-        }
-        return chrome.runtime.sendMessage(sender.id, {
+        return chrome.runtime.sendMessage({
           type: EVENT_TYPE,
           data: {
             think: summaryResult.data.think,
@@ -400,21 +412,19 @@ class BackstageActivity {
           } as SummarizeSuccessResponse,
         })
       })
-      .then(() => sendResponse({ done: true }))
+      .then(() => sendResponse({ success: true, done: true }))
       .catch((error) => {
         Logger.E('Failed to summarize subtitle:', error)
-        if (sender.id) {
-          chrome.runtime.sendMessage(sender.id, {
-            type: EVENT_TYPE,
-            data: {
-              error:
-                error instanceof Error ? error.message : JSON.stringify(error),
-              bvid,
-              cid,
-            } as SummarizeErrorResponse,
-          })
-        }
-        sendResponse({ done: true })
+        chrome.runtime.sendMessage({
+          type: EVENT_TYPE,
+          data: {
+            error:
+              error instanceof Error ? error.message : JSON.stringify(error),
+            bvid,
+            cid,
+          } as SummarizeErrorResponse,
+        })
+        sendResponse({ success: false, done: true })
       })
     return true
   }
@@ -494,43 +504,57 @@ class BackstageActivity {
     return true
   }
 
-  private handleRequestStartAssistant(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean | void {
+  private async handleRequestStartAssistant(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<boolean | void> {
     const EVENT_TYPE = MessageType.ASSISTANT_RESPONSE_STREAM
-    this.aiAgentRunner
-      .runAgent(message.payload, (content, metadata) => {
-        if (sender.id) {
-          chrome.runtime.sendMessage(sender.id, {
+    let fullContent = ''
+    const tabId = sender.tab?.id
+
+    this.llmProviderManager
+      .callLLM([{ role: 'user', content: message.payload.prompt || message.payload.message || '' }], {
+        stream: true,
+        onProgress: (content, metadata) => {
+          fullContent += content
+          const response = {
             type: EVENT_TYPE,
             data: {
               content: content,
               metadata: metadata,
               done: false,
             },
-          })
+          }
+          chrome.runtime.sendMessage(response)
+          if (tabId) {
+            chrome.tabs.sendMessage(tabId, response)
+          }
         }
       })
-      .then((summaryResult) => {
-        if (sender.id) {
-          chrome.runtime.sendMessage(sender.id, {
-            type: EVENT_TYPE,
-            data: {
-              ...summaryResult,
-              done: true,
-            },
-          })
+      .then((result) => {
+        const resultData = result && 'data' in result ? (result.data as any) : {}
+        const response = {
+          type: EVENT_TYPE,
+          data: {
+            ...resultData,
+            content: '', // Do not duplicate content in the final message
+            done: true,
+          },
+        }
+        chrome.runtime.sendMessage(response)
+        if (tabId) {
+          chrome.tabs.sendMessage(tabId, response)
         }
         sendResponse({ done: true })
       })
       .catch((error) => {
         Logger.E('Failed to start assistant:', error)
-        if (sender.id) {
-          chrome.runtime.sendMessage(sender.id, {
-            type: EVENT_TYPE,
-            data: {
-              error:
-                error instanceof Error ? error.message : JSON.stringify(error),
-            },
-          })
+        const response = {
+          type: EVENT_TYPE,
+          data: {
+            error: error instanceof Error ? error.message : JSON.stringify(error),
+          },
+        }
+        chrome.runtime.sendMessage(response)
+        if (tabId) {
+          chrome.tabs.sendMessage(tabId, response)
         }
         sendResponse({ done: true })
       })

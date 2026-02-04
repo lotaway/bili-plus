@@ -16,7 +16,7 @@ export class LLMAnalyzer {
         try {
             Logger.I(`${LOG_PREFIX} Calling LLM to analyze ${videos.length} videos`)
             const result = await this.callLLM(prompt)
-            return this.parseResponse(result)
+            return this.parseResponse(result, videos)
         } catch (e: any) {
             Logger.E(`${LOG_PREFIX} Failed to analyze videos with LLM:`, e)
             Logger.E(`${LOG_PREFIX} Error details:`, e.message, e.stack)
@@ -40,8 +40,8 @@ export class LLMAnalyzer {
     ${JSON.stringify(videoData)}`
     }
 
-    private parseResponse(result: LLMResponse | any): VideoAnalysis[] {
-        const content = result?.choices?.[0]?.message?.content || result?.content || ''
+    private parseResponse(result: LLMResponse | any, originalVideos: Video[]): VideoAnalysis[] {
+        const content = result?.choices?.[0]?.message?.content || result?.content || result?.data?.content || ''
 
         if (!content) {
             Logger.E(`${LOG_PREFIX} LLM returned empty content`)
@@ -53,18 +53,46 @@ export class LLMAnalyzer {
 
         if (!jsonStr) {
             Logger.E(`${LOG_PREFIX} No JSON array found in LLM response`)
-            Logger.D(`${LOG_PREFIX} LLM response:`, content.substring(0, 500))
             return []
         }
 
-        const parsed = JSON.parse(jsonStr)
+        try {
+            const parsed = JSON.parse(jsonStr) as any[]
+            if (!Array.isArray(parsed)) {
+                Logger.E(`${LOG_PREFIX} LLM response is not an array`)
+                return []
+            }
 
-        if (!Array.isArray(parsed)) {
-            Logger.E(`${LOG_PREFIX} LLM response is not an array:`, typeof parsed)
+            const results = parsed.map(item => {
+                const itemBvid = this.extractBvid(item.link)
+                const original = originalVideos.find(v => this.extractBvid(v.link) === itemBvid)
+
+                if (!original) {
+                    Logger.E(`${LOG_PREFIX} Could not find original video for link: ${item.link}`)
+                    return null
+                }
+
+                return {
+                    ...original,
+                    category: item.category,
+                    level: item.level,
+                    confidence: item.confidence,
+                    reason: item.reason,
+                    analysis: item.analysis
+                } as VideoAnalysis
+            }).filter(Boolean) as VideoAnalysis[]
+
+            Logger.I(`${LOG_PREFIX} Successfully analyzed ${results.length} videos`)
+            return results
+        } catch (err) {
+            Logger.E(`${LOG_PREFIX} Error parsing AI response JSON:`, err)
             return []
         }
+    }
 
-        Logger.I(`${LOG_PREFIX} LLM analyzed ${parsed.length} videos`)
-        return parsed
+    private extractBvid(link: string): string {
+        if (!link) return ''
+        const match = link.match(/BV[a-zA-Z0-9]+/)
+        return match ? match[0] : ''
     }
 }

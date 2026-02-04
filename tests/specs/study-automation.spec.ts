@@ -19,6 +19,7 @@ test.describe('Study Automation', () => {
     });
 
     test('should handle successful video scanning on homepage', async ({ context, sidepanelPage }) => {
+        test.setTimeout(60000);
         const sidepanel = new ExtensionSidepanel(sidepanelPage);
         const page = await context.newPage();
         const videoPage = new BilibiliVideoPage(page);
@@ -40,6 +41,7 @@ async function setupBilibiliHomepage(videoPage: BilibiliVideoPage, page: any) {
 
 async function triggerAutomation(sidepanel: ExtensionSidepanel, page: any) {
     await sidepanel.clickAutoStudy();
+    await sidepanel.setLimitCount(1);
     await TestPageHelper.activatePage(page);
     await sidepanel.clickStartScan();
 }

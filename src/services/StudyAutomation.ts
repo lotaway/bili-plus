@@ -66,21 +66,48 @@ export class StudyAutomationService {
         const cards = document.querySelectorAll(InjectConfig.selectors.videoCard)
         const results: Array<{ title: string; link: string; bvid: string }> = []
 
-        cards.forEach(card => {
+        Logger.D('[StudyAutomationService] Found potential video cards:', cards.length)
+
+        cards.forEach((card, index) => {
             const titleEl = card.querySelector(InjectConfig.selectors.videoCardTitle)
-            const linkEl = card.querySelector('a')
+            if (!titleEl) {
+                Logger.D(`[StudyAutomationService] Card ${index} missing title element`)
+                return
+            }
 
-            if (titleEl && linkEl) {
-                const title = titleEl.textContent?.trim() || ''
-                const link = linkEl.href
-                const bvidMatch = link.match(/BV[a-zA-Z0-9]+/)
+            // Find all links in the card and look for one with a BV ID
+            const links = Array.from(card.querySelectorAll('a'))
+            if (card.tagName.toLowerCase() === 'a') {
+                links.push(card as HTMLAnchorElement)
+            }
 
+            let videoLink = ''
+            let bvid = ''
+
+            for (const linkEl of links) {
+                const href = linkEl.href
+                if (!href) continue
+
+                Logger.D(`[StudyAutomationService] Card ${index} checking link:`, href)
+                const bvidMatch = href.match(/BV[a-zA-Z0-9]+/)
                 if (bvidMatch) {
-                    results.push({ title, link, bvid: bvidMatch[0] })
+                    videoLink = href
+                    bvid = bvidMatch[0]
+                    break
                 }
+            }
+
+            if (videoLink && bvid) {
+                const title = titleEl.textContent?.trim() || ''
+                if (title) {
+                    results.push({ title, link: videoLink, bvid })
+                }
+            } else {
+                Logger.D(`[StudyAutomationService] Card ${index} missing link or BVID. Links found:`, links.length)
             }
         })
 
+        Logger.I('[StudyAutomationService] Successfully extracted videos:', results.length)
         return results
     }
 

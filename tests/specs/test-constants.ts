@@ -5,7 +5,7 @@ export const TEST_URLS = {
 } as const;
 
 export const TEST_VIDEO_DATA = {
-    SAMPLE_BVID: 'BV1test123',
+    SAMPLE_BVID: 'BV1a2b3c4d5e',
     SAMPLE_TITLE: '深度学习教程',
     SAMPLE_CATEGORY: 'class',
     SAMPLE_LEVEL: 9,

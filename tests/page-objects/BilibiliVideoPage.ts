@@ -1,4 +1,5 @@
 import { type Page, expect } from '@playwright/test';
+import { TEST_VIDEO_DATA } from '../specs/test-constants';
 
 export class BilibiliVideoPage {
     constructor(public readonly page: Page) { }
@@ -47,16 +48,23 @@ export class BilibiliVideoPage {
     }
 
     async injectFakeVideoCard() {
-        await this.page.evaluate(() => {
-            const container = document.querySelector('.bili-feed4-layout') || document.body;
+        await this.page.evaluate((data) => {
+            const container = document.querySelector('.bili-feed4-layout') ||
+                document.querySelector('.bili-feed-layout') ||
+                document.querySelector('.feed-card-body') ||
+                document.body;
             const card = document.createElement('div');
             card.className = 'bili-video-card';
             card.innerHTML = `
-                <div class="bili-video-card__info--tit" title="深度学习教程">深度学习教程</div>
-                <a href="https://www.bilibili.com/video/BV1test123"></a>
+                <div class="bili-video-card__info--tit" title="${data.SAMPLE_TITLE}">${data.SAMPLE_TITLE}</div>
+                <div class="bili-video-card__info--ad"></div>
+                <a href="https://www.bilibili.com/video/${data.SAMPLE_BVID}" target="_blank">
+                    <img src="" alt="${data.SAMPLE_TITLE}">
+                </a>
             `;
-            container.appendChild(card);
-        });
+            container.prepend(card);
+            console.log('Fake video card injected into:', container.tagName, container.className);
+        }, TEST_VIDEO_DATA);
     }
 
 }

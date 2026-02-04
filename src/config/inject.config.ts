@@ -71,10 +71,10 @@ export const InjectConfig: InjectConfig = {
         eventType: 'REQUEST_OPEN_SIDE_PANEL',
     },
     selectors: {
-        homePageContainer: '.bili-feed4-layout',
-        videoCard: '.bili-video-card',
-        videoCardTitle: '.bili-video-card__info--tit',
-        rollButton: '.roll-btn',
+        homePageContainer: '.bili-feed4-layout,.bili-feed-layout',
+        videoCard: '.bili-video-card,.video-card,.v-card',
+        videoCardTitle: '.bili-video-card__info--tit,.bili-video-card h3,.video-card__info--tit',
+        rollButton: '.roll-btn,.feed-roll-btn',
     },
     syncIntervalMs: 5 * 1000,
 }

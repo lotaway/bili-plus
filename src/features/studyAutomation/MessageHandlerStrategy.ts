@@ -29,23 +29,19 @@ class StartStudyAutomationHandler implements MessageHandler {
 
             this.orchestrator.run(limitCount).then(result => {
                 Logger.I(`${LOG_PREFIX} Automation learning completed`, result)
-                if (sender.id) {
-                    chrome.runtime.sendMessage(sender.id, {
-                        type: MessageType.STUDY_AUTOMATION_RESPONSE,
-                        data: result
-                    })
-                }
+                chrome.runtime.sendMessage({
+                    type: MessageType.STUDY_AUTOMATION_RESPONSE,
+                    data: result
+                })
             }).catch(err => {
                 Logger.E(`${LOG_PREFIX} Automation learning failed:`, err)
-                if (sender.id) {
-                    chrome.runtime.sendMessage(sender.id, {
-                        type: MessageType.STUDY_AUTOMATION_RESPONSE,
-                        data: {
-                            error: err instanceof Error ? err.message : String(err),
-                            success: false
-                        }
-                    })
-                }
+                chrome.runtime.sendMessage({
+                    type: MessageType.STUDY_AUTOMATION_RESPONSE,
+                    data: {
+                        error: err instanceof Error ? err.message : String(err),
+                        success: false
+                    }
+                })
             })
         } catch (err: any) {
             Logger.E(`${LOG_PREFIX} Automation learning failed:`, err)
