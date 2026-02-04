@@ -310,7 +310,7 @@ class BackstageActivity {
       case MessageType.REQUEST_VIDEO_INFO:
         return this.handleRequestVideoInfo(sendResponse)
       case MessageType.REQUEST_DOWNLOAD_VIDEO_IN_BG:
-        this.handleRequestDownloadVideo(message, sendResponse)
+        this.handleDownloadVideo(message, sender, sendResponse)
         return true
       default:
         break

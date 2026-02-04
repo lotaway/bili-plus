@@ -1,4 +1,5 @@
 import { VideoDetailResponse } from '../types/video'
+import { selectAudioStream, selectVideoStream } from './StreamSelector'
 
 export type PlayUrlResult = {
   videoUrl: string
@@ -208,7 +209,7 @@ export class BilibiliApi {
   }
 
   async getCookies(): Promise<chrome.cookies.Cookie[]> {
-    if (typeof chrome !== undefined && chrome.cookies?.getAll) {
+    if (typeof chrome !== 'undefined' && chrome.cookies?.getAll) {
       return await chrome.cookies.getAll({
         domain: this.host.replace('https://api', ''),
       })
@@ -289,7 +290,7 @@ export class BilibiliApi {
     }
     const {
       quality = VideoQuality.FHD_1080P,
-      fnval = VideoFormat.MP4,
+      fnval = VideoFormat.ALL_DASH,
       fourk = 0,
       platform = Platform.PC
     } = options
@@ -316,28 +317,39 @@ export class BilibiliApi {
     const data = await resp.json() as PlayUrlResponse
 
     if (data.code !== 0) {
+      const fallbackParams = new URLSearchParams({
+        bvid,
+        cid: cid.toString(),
+        qn: (options.quality ?? VideoQuality.FHD_1080P).toString(),
+        fnval: VideoFormat.MP4.toString(),
+        fourk: (options.fourk ?? 0).toString(),
+        fnver: '0',
+        platform: (options.platform ?? Platform.PC),
+        otype: 'json'
+      })
+      const fallbackUrl = `${this.host}/x/player/wbi/playurl?${fallbackParams.toString()}`
+      const fallbackResp = await fetch(fallbackUrl, { headers: _headers })
+      const fallbackData = await fallbackResp.json() as PlayUrlResponse
+      if (fallbackData.code === 0 && fallbackData.data.durl && fallbackData.data.durl.length > 0) {
+        const d = fallbackData.data.durl[0]
+        return { videoUrl: d.url, audioUrl: '', title: fallbackData.data.accept_description?.[0] ?? bvid }
+      }
       throw new Error(`API 错误 ${data.code}: ${data.message}`)
     }
 
     if (data.data.dash) {
       const dash = data.data.dash
-
       if (!dash.video || dash.video.length === 0) {
         throw new Error("DASH 格式视频流数据为空")
       }
-
       if (!dash.audio || dash.audio.length === 0) {
         throw new Error("DASH 格式音频流数据为空")
       }
-
-      const videoStream = dash.video.sort((a, b) => b.bandwidth - a.bandwidth)[0]
-      const audioStream = dash.audio.sort((a, b) => b.bandwidth - a.bandwidth)[0]
-      const dolbyAudio = dash.dolby?.audio?.[0]
-      const flacAudio = dash.flac?.audio?.[0]
-
+      const videoStream = selectVideoStream(dash.video as any)
+      const audioStream = selectAudioStream(dash.audio as any)
       return {
         videoUrl: videoStream.baseUrl,
-        audioUrl: dolbyAudio?.baseUrl || flacAudio?.baseUrl || audioStream.baseUrl,
+        audioUrl: audioStream.baseUrl,
         title: data.data.accept_description?.[0] ?? bvid
       }
     }
