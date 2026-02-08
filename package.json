@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "watch": "gulp",
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "deploy": "node deploy.js"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
