@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { LLMProviderManager } from '../../services/LLMProviderManager'
 import { LLMProviderConfig } from '../../types/llm-provider'
 import Logger from '../../utils/Logger'
+import { PopupGlobalStyle } from './popupStyles'
 
 interface ModelInfo {
   name: string
@@ -251,7 +252,9 @@ const App: React.FC = () => {
   const currentProvider = providers.find(p => p.id === currentProviderId)
 
   return (
-    <div className="popup">
+    <>
+      <PopupGlobalStyle />
+      <div className="popup">
       <div className="popup-header">
         <p className="popup-kicker">BILI PLUS</p>
         <h3>Settings</h3>
@@ -452,12 +455,13 @@ const App: React.FC = () => {
         </p>
       </div>
 
-      {message && (
-        <div id="msg" className={`message ${message.type}`}>
-          {message.text}
-        </div>
-      )}
-    </div>
+        {message && (
+          <div id="msg" className={`message ${message.type}`}>
+            {message.text}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

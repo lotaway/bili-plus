@@ -8,6 +8,7 @@ import { VideoSummary } from '../../features/videoSummary/VideoSummary'
 import VideoDownload from '../../features/videoDownload/VideoDownload'
 import StudyAutomationPanel from '../../features/studyAutomation/StudyAutomationPanel'
 import Logger from '../../utils/Logger'
+import { SidepanelGlobalStyle } from './sidepanelStyles'
 
 const AppContent: React.FC = () => {
   useEffect(() => {
@@ -50,13 +51,23 @@ const AppContent: React.FC = () => {
   ]
 
   return (
-    <TabContainer tabs={tabs} defaultTab="subtitle" />
+    <div className="sidepanel-shell">
+      <header className="sidepanel-header">
+        <p className="sidepanel-kicker">BILI PLUS</p>
+        <h2>智能工具面板</h2>
+        <p className="sidepanel-subtitle">字幕、下载、学习与计算能力统一在一个工作区</p>
+      </header>
+      <main className="sidepanel-main">
+        <TabContainer tabs={tabs} defaultTab="subtitle" />
+      </main>
+    </div>
   )
 }
 
 const App: React.FC = () => {
   return (
     <Provider store={store}>
+      <SidepanelGlobalStyle />
       <AppContent />
     </Provider>
   )
