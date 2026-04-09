@@ -252,15 +252,19 @@ const App: React.FC = () => {
 
   return (
     <div className="popup">
-      <h3>Settings</h3>
+      <div className="popup-header">
+        <p className="popup-kicker">BILI PLUS</p>
+        <h3>Settings</h3>
+        <p className="popup-subtitle">管理 AI Provider 与插件运行配置</p>
+      </div>
 
-      <div className="config-section">
+      <div className="config-section popup-card">
         <h4>LLM Provider 管理</h4>
 
         <div className="providers-list">
-          {providers.length === 0 ? (
-            <p className="no-providers">暂无配置的provider</p>
-          ) : (
+        {providers.length === 0 ? (
+          <p className="no-providers">暂无配置的provider</p>
+        ) : (
             providers.map(provider => (
               <div key={provider.id} className={`provider-item ${provider.id === currentProviderId ? 'active' : ''}`}>
                 <div className="provider-info">
@@ -301,7 +305,7 @@ const App: React.FC = () => {
         </button>
 
         {editingProvider && (
-          <div className="provider-form">
+          <div className="provider-form popup-subcard">
             <h5>{isAddingNew ? '添加新的Provider' : '编辑Provider'}</h5>
             <div className="form-group">
               <label htmlFor="providerName">Provider名称</label>
@@ -394,7 +398,7 @@ const App: React.FC = () => {
         )}
 
         {apiStatus && (
-          <div className="api-status-section">
+          <div className="api-status-section popup-subcard">
             <h4>API 状态</h4>
             <div className={`api-status ${apiStatus.ok ? 'available' : 'unavailable'}`}>
               <span className="status-indicator"></span>
@@ -433,12 +437,12 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <button id="openSidePanel" onClick={handleOpenSidePanel}>
+        <button id="openSidePanel" className="secondary-btn" onClick={handleOpenSidePanel}>
           显示操作面板
         </button>
       </div>
 
-      <div className="storage-section">
+      <div className="storage-section popup-card">
         <h4>存储管理</h4>
         <button id="cleanupStorage" className="cleanup-btn" onClick={handleCleanupStorage}>
           清理存储空间
