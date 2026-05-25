@@ -3,12 +3,14 @@ import { RequestPageEventType } from '../../enums/PageEventType'
 import { createHomeButtonInjector } from '../../utils/inject/ButtonInjector'
 import { PageInfoSyncManager, HomePageInfo } from '../../utils/inject/PageInfoSyncManager'
 import { createStudyAutomationService, HomePageActionPayload } from '../../services/StudyAutomation'
+import { AgentPageActionHandler } from '../../services/agentActions/agentActionInjectHandler'
 import Logger from '../../utils/Logger'
 
 class HomePageInjectActivity {
     private buttonInjector = createHomeButtonInjector()
     private actionHandler = createStudyAutomationService()
     private syncManager: PageInfoSyncManager
+    private agentActionHandler = new AgentPageActionHandler(PageType.HOME_PAGE_INJECT)
 
     constructor() {
         this.syncManager = new PageInfoSyncManager(() => this.collectHomePageInfo())
@@ -37,6 +39,10 @@ class HomePageInjectActivity {
 
     @Logger.Mark("HomePageInject handleWindowMessage")
     async handleWindowMessage(event: MessageEvent): Promise<void> {
+        if (this.agentActionHandler.handle(event)) {
+            return
+        }
+
         if (!this.isValidMessage(event)) return
 
         const payload = this.extractPayload(event)
@@ -52,17 +58,14 @@ class HomePageInjectActivity {
 
     private isValidMessage(event: MessageEvent): boolean {
         if (event.source !== window) {
-            Logger.D('[HomePageInject] Message source is not window, ignoring')
             return false
         }
 
         if (event.data?.type !== RequestPageEventType.REQUEST_HOME_PAGE_ACTION) {
-            Logger.D('[HomePageInject] Message type is not REQUEST_HOME_PAGE_ACTION, ignoring')
             return false
         }
 
         if (event.data?.source !== PageType.CONTENT_SCRIPT) {
-            Logger.D('[HomePageInject] Message source is not CONTENT_SCRIPT, ignoring')
             return false
         }
 

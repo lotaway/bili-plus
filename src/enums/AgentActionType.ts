@@ -1,0 +1,15 @@
+export enum AgentActionType {
+    GET_TABS = 'get_tabs',
+    GET_PAGE_CONTENT = 'get_page_content',
+    NAVIGATE = 'navigate',
+    EXECUTE_SCRIPT = 'execute_script',
+    GET_COOKIES = 'get_cookies',
+    GET_LOCAL_STORAGE = 'get_local_storage',
+    GET_SESSION_STORAGE = 'get_session_storage',
+    SCREENSHOT = 'screenshot',
+    CLICK_ELEMENT = 'click_element',
+    GET_PAGE_INFO = 'get_page_info',
+    GET_SELECTED_TEXT = 'get_selected_text',
+    FILL_INPUT = 'fill_input',
+    SCROLL_PAGE = 'scroll_page',
+}

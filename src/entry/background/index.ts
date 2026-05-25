@@ -2,6 +2,7 @@ import { SubtitleFetcher } from '../../services/SubtitleFetcher'
 import { LLMProviderManager } from '../../services/LLMProviderManager'
 import { AISubtitleHandler } from '../../services/AISubtitleHandler'
 import { AIAgentRunner } from '../../services/AIAgentRunner'
+import { BackgroundAgentActionHandler } from '../../services/agentActions/BackgroundAgentActionHandler'
 import { StorageCleanupService } from '../../services/StorageCleanupService'
 import { StatusCheckService } from '../../services/StatusCheckService'
 import { DownloadUtils } from '../../utils/DownloadUtils'
@@ -20,6 +21,7 @@ class BackstageActivity {
   private readonly llmProviderManager = new LLMProviderManager();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmProviderManager);
   private readonly aiAgentRunner = new AIAgentRunner(this.llmProviderManager);
+  private readonly agentActionHandler = new BackgroundAgentActionHandler();
   private readonly storageCleanupService = new StorageCleanupService();
   private readonly statusCheckService = new StatusCheckService(this.llmProviderManager);
   private readonly downloadUtils = new DownloadUtils();
@@ -49,6 +51,7 @@ class BackstageActivity {
         })
       }
     })
+    this.agentActionHandler.setup()
   }
 
   @Logger.Mark()
@@ -463,19 +466,6 @@ class BackstageActivity {
         if ('error' in analysisResult) {
           throw new Error(analysisResult.error)
         }
-        // this.llmRunner.saveDocument({
-        //   title: 'Screenshot Analysis',
-        //   bvid: 'screenshot',
-        //   cid: Date.now(),
-        //   source: 'screenshot_analysis',
-        //   content: analysisResult.data.content,
-        // })
-        //   .then(() =>
-        //     Logger.I('Screenshot analysis content saved to database'))
-        //   .catch(saveError => {
-        //     Logger.E('Failed to save screenshot analysis content:', saveError)
-        //   })
-
         if (sender.id) {
           chrome.runtime.sendMessage(sender.id, {
             type: EVENT_TYPE,

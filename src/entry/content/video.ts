@@ -2,6 +2,7 @@ import { RequestPageEventType } from '../../enums/PageEventType'
 import { MessageType } from '../../enums/MessageType'
 import { PageType } from '../../enums/PageType'
 import { VideoData } from '../../types/video'
+import { ContentAgentActionBridge } from '../../services/agentActions/ContentAgentActionBridge'
 import Logger from '../../utils/Logger'
 
 export { }
@@ -9,6 +10,8 @@ export { }
 type ChromeMessageEvent = [message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void]
 
 class VideoContentActivity {
+  private readonly agentActionBridge = new ContentAgentActionBridge('VideoContent')
+
   @Logger.Mark("VideoContentActivity init")
   init() {
     this.addListener()
@@ -21,8 +24,9 @@ class VideoContentActivity {
     }).catch(err => Logger.E(err))
 
     chrome.runtime.onMessage.addListener(this.handleChromeMessage.bind(this))
-
     window.addEventListener('message', this.handlerWindowMessage.bind(this))
+
+    this.agentActionBridge.setup()
   }
 
   async handlerWindowMessage(event: MessageEvent) {

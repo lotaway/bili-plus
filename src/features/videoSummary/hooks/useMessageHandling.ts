@@ -88,14 +88,29 @@ export const useMessageHandling = () => {
       data.content && aiAnalyzer.inputStream(data.content, data.done)
     }
 
-    const handleAssistantResponseStream = (data: AgentResponse) => {
+    const handleAssistantResponseStream = (data: any) => {
       if ("error" in data) {
         dispatch(setMessage(data.error))
         dispatch(setAssistantRunning(false))
         return
       }
+
+      if (data.metadata?.type === 'action_executed') {
+        dispatch(setMessage(
+          `[自动执行] ${data.metadata.action}: ${data.metadata.success ? '成功' : '失败'}`
+        ))
+        return
+      }
+
       if (data.status === AgentRuntimeStatus.WAITING_HUMAN) {
-        const message = data.history[data.history.length - 1]
+        const history = data.history
+        const message = history?.[history.length - 1]
+        if (message?.data?.metadata?.action || message?.data?.metadata?.action_type) {
+          dispatch(setMessage(
+            `[自动执行] ${message.data.metadata.action || message.data.metadata.action_type}`
+          ))
+          return
+        }
         dispatch(setDecisionData({
           ...data,
           ...message?.data.metadata,

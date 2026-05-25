@@ -5,6 +5,7 @@ import { BilibiliApi } from '../../services/BilibiliApi'
 import { DownloadUtils } from '../../utils/DownloadUtils'
 import { DownloadType } from '../../enums/DownloadType'
 import { FFmpegUtils } from '../../utils/FFmpegUtils'
+import { AgentPageActionHandler } from '../../services/agentActions/agentActionInjectHandler'
 import Logger from '../../utils/Logger'
 
 let isWindowActivate = true
@@ -13,6 +14,7 @@ export { }
 
 class VideoPageInjectActivity {
   private ffmpegUtils?: FFmpegUtils
+  private agentActionHandler = new AgentPageActionHandler(PageType.VIDEO_PAGE_INJECT)
 
   @Logger.Mark("video inject.js")
   init() {
@@ -73,6 +75,11 @@ class VideoPageInjectActivity {
     if (event.source !== window) {
       return
     }
+
+    if (this.agentActionHandler.handle(event)) {
+      return
+    }
+
     switch (event.data?.type) {
       case RequestPageEventType.REQUEST_DOWNLOAD_VIDEO_IN_PAGE:
         return this.handleREquestVideoDownloadInPage(event)

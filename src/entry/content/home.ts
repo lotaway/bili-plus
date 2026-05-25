@@ -1,6 +1,7 @@
 import { MessageType } from '../../enums/MessageType'
 import { RequestPageEventType } from '../../enums/PageEventType'
 import { PageType } from '../../enums/PageType'
+import { ContentAgentActionBridge } from '../../services/agentActions/ContentAgentActionBridge'
 import Logger from '../../utils/Logger'
 import { PageActionService } from '../../features/studyAutomation/PageActionService'
 import { LLMAnalyzer } from '../../features/studyAutomation/LLMAnalyzer'
@@ -20,6 +21,7 @@ type ChromeMessageEvent = [
 class HomeContentActivity {
   private messageHandlerStrategy: MessageHandlerStrategy
   private orchestrator: StudyAutomationOrchestrator
+  private readonly agentActionBridge = new ContentAgentActionBridge('HomeContent')
 
   constructor() {
     this.orchestrator = this.createOrchestrator()
@@ -51,6 +53,7 @@ class HomeContentActivity {
     this.registerContentScript()
     chrome.runtime.onMessage.addListener(this.handleChromeMessage.bind(this))
     window.addEventListener('message', this.handleWindowMessage.bind(this))
+    this.agentActionBridge.setup()
   }
 
   private registerContentScript(): void {
@@ -62,147 +65,3 @@ class HomeContentActivity {
   private async handleChromeMessage(...args: ChromeMessageEvent): Promise<boolean> {
     return await this.messageHandlerStrategy.handle(...args)
   }
-
-  private async callLLMService(prompt: string): Promise<LLMResponse> {
-    return new Promise((resolve, reject) => {
-      let fullContent = ''
-
-      const messageListener = (message: any) => {
-        if (message.type === MessageType.ASSISTANT_RESPONSE_STREAM) {
-          Logger.D(`${LOG_PREFIX} Received AI stream message`, { done: message.data.done, hasContent: !!message.data.content })
-
-          if (message.data.error) {
-            Logger.E(`${LOG_PREFIX} AI stream error:`, message.data.error)
-            chrome.runtime.onMessage.removeListener(messageListener)
-            reject(new Error(message.data.error))
-            return
-          }
-
-          if (message.data.content) {
-            fullContent += message.data.content
-          }
-
-          if (message.data.done) {
-            Logger.I(`${LOG_PREFIX} AI stream complete. Full content length:`, fullContent.length)
-            Logger.D(`${LOG_PREFIX} Full content snippet:`, fullContent.substring(0, 100))
-
-            chrome.runtime.onMessage.removeListener(messageListener)
-            resolve({
-              choices: [{
-                message: {
-                  content: fullContent
-                }
-              }]
-            } as any)
-          }
-        }
-      }
-
-      const LOG_PREFIX = '[LLM Service Call]'
-      chrome.runtime.onMessage.addListener(messageListener)
-
-      chrome.runtime.sendMessage({
-        type: MessageType.REQUEST_START_ASSISTANT,
-        payload: { prompt }
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          chrome.runtime.onMessage.removeListener(messageListener)
-          reject(new Error(chrome.runtime.lastError.message))
-        }
-      })
-    })
-  }
-
-  private async submitStudyRequest(link: string): Promise<{ success: boolean }> {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({
-        type: MessageType.REQUEST_SUMMARIZE_SUBTITLE,
-        payload: {
-          action: 'submitStudyRequest',
-          link,
-          platform: 'bilibili'
-        }
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          Logger.E('Failed to submit study request:', chrome.runtime.lastError)
-          resolve({ success: false })
-          return
-        }
-        resolve(response || { success: true })
-      })
-    })
-  }
-
-  private isBilibiliHomepage(): boolean {
-    const url = window.location.href
-    const validPrefixes = [
-      'https://www.bilibili.com/',
-      'http://www.bilibili.com/',
-      'https://www.bilibili.com/?',
-      'http://www.bilibili.com/?'
-    ]
-    return validPrefixes.some(prefix => url === prefix || url.startsWith(prefix))
-  }
-
-  private async handleWindowMessage(event: MessageEvent): Promise<void> {
-    if (!this.isValidWindowMessage(event)) {
-      return
-    }
-
-    switch (event.data.type) {
-      case RequestPageEventType.HOME_INFO_INIT:
-        await this.handleHomeInfoInit(event.data.payload)
-        break
-      case RequestPageEventType.REQUEST_OPEN_SIDE_PANEL:
-        this.handleOpenSidePanel()
-        break
-    }
-  }
-
-  private isValidWindowMessage(event: MessageEvent): boolean {
-    return (
-      event.source === window &&
-      event.data?.source === PageType.HOME_PAGE_INJECT
-    )
-  }
-
-  private async handleHomeInfoInit(payload: any): Promise<void> {
-    await chrome.runtime.sendMessage({
-      type: MessageType.HOME_INFO_UPDATE,
-      payload,
-    })
-  }
-
-  private handleOpenSidePanel(): void {
-    chrome.runtime.sendMessage({
-      type: MessageType.OPEN_SIDE_PANEL,
-    })
-  }
-
-  private injectScript(): void {
-    const scriptId = "home_page_inject"
-    this.removeExistingScript(scriptId)
-    this.insertScript(scriptId)
-  }
-
-  private removeExistingScript(scriptId: string): void {
-    const existingScript = document.getElementById(scriptId)
-    if (existingScript) {
-      existingScript.remove()
-    }
-  }
-
-  private insertScript(scriptId: string): void {
-    const script = document.createElement('script')
-    script.id = scriptId
-    script.src = chrome.runtime.getURL('assets/home_page_inject.js')
-    document.documentElement.appendChild(script)
-  }
-}
-
-const activity = new HomeContentActivity()
-if (activity['isBilibiliHomepage']()) {
-  activity.init()
-} else {
-  Logger.D('[Bilibili Plus] Not homepage, skipping execution')
-}

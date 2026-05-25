@@ -5,7 +5,7 @@ import Logger from "./Logger"
 export class StreamUtils {
   async readStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    onProgress: (content: string, metadata: any) => void = (c, m) =>
+    onProgress: (content: string, metadata: any) => void | Promise<void> = (c, m) =>
       Logger.D('Content:', c, 'Metadata:', m),
     encoding: string = 'utf-8'
   ): Promise<string> {
@@ -41,12 +41,12 @@ export class StreamUtils {
             }
           }
           if (!content && metadata) {
-            onProgress?.('', metadata)
+            await onProgress?.('', metadata)
           }
 
           if (content) {
             fullResponse += content
-            onProgress?.(content, metadata)
+            await onProgress?.(content, metadata)
           }
         } catch (e) {
           Logger.E('Error parsing stream data:', e)

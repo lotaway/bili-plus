@@ -5,6 +5,7 @@ export enum RequestPageEventType {
     REQUEST_DOWNLOAD_VIDEO_IN_PAGE,
     DOWNLOAD_PROGRESS_UPDATE,
     REQUEST_HOME_PAGE_ACTION,
+    REQUEST_AGENT_PAGE_ACTION,
 }
 
 export type ReponsePageEventType = `Response[${RequestPageEventType}]`
