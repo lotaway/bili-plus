@@ -1,5 +1,6 @@
 import { VideoDetailResponse } from '../types/video'
 import { selectAudioStream, selectVideoStream } from './StreamSelector'
+import { IWbiSigner } from './WbiSigner'
 
 export type PlayUrlResult = {
   videoUrl: string
@@ -190,9 +191,14 @@ export type PlayUrlResponse = {
 
 export class BilibiliApi {
   private readonly host: string = '';
+  private readonly wbiSigner?: IWbiSigner;
 
-  constructor(host = 'https://api.bilibili.com') {
+  constructor(
+    host = 'https://api.bilibili.com',
+    wbiSigner?: IWbiSigner
+  ) {
     this.host = host
+    this.wbiSigner = wbiSigner
   }
 
   get websiteHost(): string {
@@ -243,6 +249,17 @@ export class BilibiliApi {
     return headers
   }
 
+  private async signWbiParams(params: Record<string, string>): Promise<void> {
+    if (!this.wbiSigner) return
+    try {
+      const { w_rid, wts } = await this.wbiSigner.sign(params)
+      params.w_rid = w_rid
+      params.wts = wts.toString()
+    } catch {
+      // fallback: proceed without WBI signing
+    }
+  }
+
   async getVideoInfo(bvid: string, headers?: HeadersInit): Promise<any> {
     headers = await this.fillHeader(headers)
     const url = `${this.host}/x/web-interface/view?bvid=${bvid}`
@@ -255,7 +272,9 @@ export class BilibiliApi {
     headers?: HeadersInit
   ): Promise<VideoDetailResponse> {
     headers = await this.fillHeader(headers)
-    const url = `${this.host}/x/player/wbi/v2?aid=${aid}&cid=${cid}`
+    const params: Record<string, string> = { aid: aid.toString(), cid: cid.toString() }
+    await this.signWbiParams(params)
+    const url = `${this.host}/x/player/wbi/v2?${new URLSearchParams(params).toString()}`
     return await fetch(url, { headers }).then((r) => r.json())
   }
 
@@ -295,7 +314,7 @@ export class BilibiliApi {
       platform = Platform.PC
     } = options
 
-    const params = new URLSearchParams({
+    const params: Record<string, string> = {
       bvid,
       cid: cid.toString(),
       qn: quality.toString(),
@@ -304,9 +323,9 @@ export class BilibiliApi {
       fnver: '0',
       platform,
       otype: 'json'
-    })
-
-    const url = `${this.host}/x/player/wbi/playurl?${params.toString()}`
+    }
+    await this.signWbiParams(params)
+    const url = `${this.host}/x/player/wbi/playurl?${new URLSearchParams(params).toString()}`
     const _headers = await this.fillHeader(options.headers)
     const resp = await fetch(url, { headers: _headers })
 
@@ -317,7 +336,7 @@ export class BilibiliApi {
     const data = await resp.json() as PlayUrlResponse
 
     if (data.code !== 0) {
-      const fallbackParams = new URLSearchParams({
+      const fallbackParams: Record<string, string> = {
         bvid,
         cid: cid.toString(),
         qn: (options.quality ?? VideoQuality.FHD_1080P).toString(),
@@ -326,8 +345,9 @@ export class BilibiliApi {
         fnver: '0',
         platform: (options.platform ?? Platform.PC),
         otype: 'json'
-      })
-      const fallbackUrl = `${this.host}/x/player/wbi/playurl?${fallbackParams.toString()}`
+      }
+      await this.signWbiParams(fallbackParams)
+      const fallbackUrl = `${this.host}/x/player/wbi/playurl?${new URLSearchParams(fallbackParams).toString()}`
       const fallbackResp = await fetch(fallbackUrl, { headers: _headers })
       const fallbackData = await fallbackResp.json() as PlayUrlResponse
       if (fallbackData.code === 0 && fallbackData.data.durl && fallbackData.data.durl.length > 0) {

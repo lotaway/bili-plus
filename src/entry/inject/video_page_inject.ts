@@ -2,6 +2,7 @@ import { PageType } from '../../enums/PageType'
 import { VideoData } from '../../types/video'
 import { RequestPageEventType } from '../../enums/PageEventType'
 import { BilibiliApi } from '../../services/BilibiliApi'
+import { WbiSigner } from '../../services/WbiSigner'
 import { DownloadUtils } from '../../utils/DownloadUtils'
 import { DownloadType } from '../../enums/DownloadType'
 import { FFmpegUtils } from '../../utils/FFmpegUtils'
@@ -115,7 +116,7 @@ class VideoPageInjectActivity {
     if (!videoData) {
       throw new Error('无法获取视频信息')
     }
-    const api = new BilibiliApi()
+    const api = new BilibiliApi(undefined, new WbiSigner())
     const playUrlInfo = await api.fetchPlayUrls(bvid, parseInt(cid))
     const VIDEO_FILE_NAME = `${videoData.title}.video.mp4`
     const AUDIO_FILE_NAME = `${videoData.title}.audio.m4a`

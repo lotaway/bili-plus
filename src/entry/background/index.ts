@@ -12,11 +12,12 @@ import { SummarizeErrorResponse, SummarizeSuccessResponse } from '../../types/su
 import { VideoData } from '../../types/video'
 import { BilibiliApi } from '../../services/BilibiliApi'
 import { DownloadType } from '../../enums/DownloadType'
+import { WbiSigner } from '../../services/WbiSigner'
 import { FFmpegUtils } from '../../utils/FFmpegUtils'
 import Logger from '../../utils/Logger'
 
 class BackstageActivity {
-  private readonly bilibiliApi = new BilibiliApi()
+  private readonly bilibiliApi = new BilibiliApi(undefined, new WbiSigner())
   private readonly subtitleFetcher = new SubtitleFetcher(this.bilibiliApi);
   private readonly llmProviderManager = new LLMProviderManager();
   private readonly aiSubtitleHandler = new AISubtitleHandler(this.llmProviderManager);
