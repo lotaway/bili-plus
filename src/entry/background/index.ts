@@ -564,20 +564,20 @@ class BackstageActivity {
 
   private handleRequestVideoInfo(sendResponse: (response?: any) => void): boolean | void {
     const videoInfo = this.videoInfoUtils.checkVideoInfo()
-    if (videoInfo.isOk) {
-      this.subtitleFetcher.getTitle().then(title => {
-        sendResponse({
-          bvid: this.subtitleFetcher.bvid,
-          cid: this.subtitleFetcher.cid,
-          aid: this.subtitleFetcher.aid,
-          title,
-        })
-      }).catch(error => {
-        sendResponse({ error: new Error(`Get title failed: ${error}`) })
-      })
-    } else {
+    if (!videoInfo.isOk) {
       sendResponse({ error: videoInfo.error })
+      return
     }
+    this.subtitleFetcher.getTitle().then(title => {
+      sendResponse({
+        bvid: this.subtitleFetcher.bvid,
+        cid: this.subtitleFetcher.cid,
+        aid: this.subtitleFetcher.aid,
+        title,
+      })
+    }).catch(error => {
+      sendResponse({ error: new Error(`Get title failed: ${error}`) })
+    })
     return true
   }
 

@@ -172,7 +172,12 @@ const VideoDownload: React.FC = () => {
         type: MessageType.REQUEST_VIDEO_INFO
       })
 
-      if (response?.error) {
+      if (!response) {
+        setStatus({ type: 'error', message: '无法获取视频信息，请确保在B站视频页面打开侧边栏' })
+        return
+      }
+
+      if (response.error) {
         setStatus({ type: 'error', message: response.error })
         return
       }
