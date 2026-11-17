@@ -11,11 +11,11 @@ export class BackgroundAgentActionHandler {
         Logger.I('[BackgroundAgentActionHandler] Registered')
     }
 
-    private async handleMessage(
+    private handleMessage(
         message: any,
         _sender: chrome.runtime.MessageSender,
         sendResponse: (response?: any) => void
-    ): Promise<boolean | void> {
+    ): boolean | void {
         if (message.type === MessageType.AGENT_ACTION_REQUEST) {
             this.handleActionRequest(message, sendResponse)
             return true

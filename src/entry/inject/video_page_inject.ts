@@ -27,9 +27,6 @@ class VideoPageInjectActivity {
       isWindowActivate = document.visibilityState === 'visible'
       this.syncVideoInfo()
     })
-    window.addEventListener('unload', () => {
-      clearInterval(timer)
-    })
     this.initButtonInjection()
     window.addEventListener('message', this.handleWindowMessage.bind(this))
   }

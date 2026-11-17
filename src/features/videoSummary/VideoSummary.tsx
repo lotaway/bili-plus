@@ -59,30 +59,39 @@ export const VideoSummary = () => {
 
   const handleExtract = useCallback(async (mode: DownloadType) => {
     setMessageWithScrollReset('正在提取字幕...')
-    const res = await chrome.runtime.sendMessage({
-      type: MessageType.REQUEST_FETCH_SUBTITLE,
-      payload: { mode },
-    })
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MessageType.REQUEST_FETCH_SUBTITLE,
+        payload: { mode },
+      })
 
-    if (res?.error) {
-      setMessageWithScrollReset(res.error)
-      return
-    }
-
-    let downloadId = -1
-    if (mode === DownloadType.MARKDOWN || mode === DownloadType.SRT) {
-      const ext = mode === DownloadType.MARKDOWN ? DownloadType.MARKDOWN : DownloadType.SRT
-      const textData = FileUtils.text2url(res.data, mode)
-      try {
-        downloadId = await downloadFile(
-          textData.url,
-          `${res.bvid}-${res.cid}.${ext}`
-        )
-      } finally {
-        textData.destory()
+      if (!res) {
+        setMessageWithScrollReset('提取失败：后台未返回响应，请刷新视频页面后重试')
+        return
       }
+      if (res.error) {
+        setMessageWithScrollReset(res.error)
+        return
+      }
+
+      let downloadId = -1
+      if (mode === DownloadType.MARKDOWN || mode === DownloadType.SRT) {
+        const ext = mode === DownloadType.MARKDOWN ? DownloadType.MARKDOWN : DownloadType.SRT
+        const textData = FileUtils.text2url(res.data, mode)
+        try {
+          downloadId = await downloadFile(
+            textData.url,
+            `${res.bvid}-${res.cid}.${ext}`
+          )
+        } finally {
+          textData.destory()
+        }
+      }
+      setMessageWithScrollReset(`字幕提取完成:${downloadId}`)
+    } catch (error) {
+      Logger.E('提取字幕失败:', error)
+      setMessageWithScrollReset(`提取失败：${error instanceof Error ? error.message : '未知错误'}`)
     }
-    setMessageWithScrollReset(`字幕提取完成:${downloadId}`)
   }, [setMessageWithScrollReset])
 
   const handleRequestSubtitleSummarize = useCallback(async () => {
