@@ -163,7 +163,7 @@ class VideoPageInjectActivity {
   async downloadFile(url: string, filename: string, onProgress?: (progress: { loaded: number; total: number }) => void) {
     const utils = new DownloadUtils()
     const blob = await utils.downloadToBlob(url, undefined, onProgress)
-    utils.saveBlob(blob, filename)
+    await utils.saveBlob(blob, filename)
   }
 
   initFFmpeg() {

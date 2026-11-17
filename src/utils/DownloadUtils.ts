@@ -1,14 +1,17 @@
+import { BILIBILI_REFERER, DEFAULT_USER_AGENT } from '../config/bilibili.config'
+
 export class DownloadUtils {
   async downloadToBlob(
     url: string,
-    host = 'https://www.bilibili.com/',
+    host = BILIBILI_REFERER,
     onProgress?: (progress: { loaded: number; total: number }) => void
   ): Promise<Blob> {
+    // credentials: 'include' 让浏览器自动携带目标域 Cookie（含 httpOnly 的 SESSDATA）
     const res = await fetch(url, {
       credentials: "include",
       headers: {
         'Referer': host,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': DEFAULT_USER_AGENT,
       }
     })
 
@@ -41,9 +44,30 @@ export class DownloadUtils {
     return blob
   }
 
-  saveBlob(blob: Blob, filename: string) {
-    const a = document.createElement("a")
+  async saveBlob(blob: Blob, filename: string): Promise<void> {
     const url = URL.createObjectURL(blob)
+
+    // background service worker 中没有 document，改用 chrome.downloads 落盘
+    if (typeof document === 'undefined') {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          chrome.downloads.download({
+            url,
+            filename,
+            saveAs: false
+          }, () => {
+            const error = chrome.runtime.lastError
+            if (error) reject(new Error(error.message))
+            else resolve()
+          })
+        })
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+      return
+    }
+
+    const a = document.createElement("a")
     a.href = url
     a.download = filename
     document.body.appendChild(a)
@@ -67,10 +91,11 @@ export class DownloadUtils {
             url: blobUrl,
             filename: filename,
             saveAs: false
-          }, (downloadId) => {
+          }, () => {
             URL.revokeObjectURL(blobUrl)
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message))
+            const error = chrome.runtime.lastError
+            if (error) {
+              reject(new Error(error.message))
             } else {
               resolve()
             }
@@ -86,9 +111,10 @@ export class DownloadUtils {
         url: url,
         filename: filename,
         saveAs: false
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message))
+      }, () => {
+        const error = chrome.runtime.lastError
+        if (error) {
+          reject(new Error(error.message))
         } else {
           resolve()
         }

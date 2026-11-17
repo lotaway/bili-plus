@@ -1,6 +1,20 @@
 import { VideoDetailResponse } from '../types/video'
 import { selectAudioStream, selectVideoStream } from './StreamSelector'
 import { IWbiSigner } from './WbiSigner'
+import {
+  BILIBILI_API_HOST,
+  BILIBILI_WEBSITE_HOST,
+  BUVID3_COOKIE_NAME,
+  FINGER_SPI_URL,
+  PLAYURL_DEFAULT_FOURK,
+  PLAYURL_DEFAULT_FNVAL,
+  PLAYURL_DEFAULT_PLATFORM,
+  PLAYURL_DEFAULT_QUALITY,
+  PLAYURL_FALLBACK_QUALITY,
+  VideoFormat,
+  VideoQuality,
+  Platform,
+} from '../config/bilibili.config'
 
 export type PlayUrlResult = {
   videoUrl: string
@@ -8,42 +22,8 @@ export type PlayUrlResult = {
   title: string
 }
 
-// 视频流格式常量
-export const VideoFormat = {
-  MP4: 1,        // MP4 格式
-  DASH: 16,      // DASH 格式
-  DASH_HDR: 80,  // DASH + HDR (16 | 64)
-  DASH_DOLBY: 272, // DASH + 杜比音频 (16 | 256)
-  DASH_DOLBY_VISION: 528, // DASH + 杜比视界 (16 | 512)
-  DASH_4K: 144,  // DASH + 4K (16 | 128)
-  DASH_8K: 1040, // DASH + 8K (16 | 1024)
-  DASH_AV1: 2064, // DASH + AV1 (16 | 2048)
-  ALL_DASH: 4048 // 所有可用 DASH 流
-} as const
-
-// 视频清晰度常量
-export const VideoQuality = {
-  LD_240P: 6,    // 240P 极速
-  SD_360P: 16,   // 360P 流畅
-  SD_480P: 32,   // 480P 清晰
-  HD_720P: 64,   // 720P 高清
-  HD_720P60: 74, // 720P 60帧
-  FHD_1080P: 80, // 1080P 高清
-  AI_ENHANCED: 100, // 智能修复
-  FHD_1080P_PLUS: 112, // 1080P+ 高码率
-  FHD_1080P60: 116, // 1080P 60帧
-  UHD_4K: 120,   // 4K 超清
-  HDR: 125,      // HDR 真彩色
-  DOLBY_VISION: 126, // 杜比视界
-  UHD_8K: 127,   // 8K 超高清
-  HDR_VIVID: 129 // HDR Vivid
-} as const
-
-// 平台常量
-export const Platform = {
-  PC: 'pc',      // Web 端
-  HTML5: 'html5' // 移动端 HTML5
-} as const
+// 兼容旧引用，常量实际定义在 config 文件中
+export { VideoFormat, VideoQuality, Platform }
 
 export type PlayUrlResponse = {
   code: number
@@ -190,19 +170,16 @@ export type PlayUrlResponse = {
 }
 
 export class BilibiliApi {
-  private readonly host: string = '';
-  private readonly wbiSigner?: IWbiSigner;
+  private readonly host: string
+  private readonly wbiSigner?: IWbiSigner
 
-  constructor(
-    host = 'https://api.bilibili.com',
-    wbiSigner?: IWbiSigner
-  ) {
+  constructor(host = BILIBILI_API_HOST, wbiSigner?: IWbiSigner) {
     this.host = host
     this.wbiSigner = wbiSigner
   }
 
   get websiteHost(): string {
-    return "https://www.bilibili.com"
+    return BILIBILI_WEBSITE_HOST
   }
 
   getVideoDetailPageUrl(bvid: string, p?: number): URL {
@@ -214,23 +191,20 @@ export class BilibiliApi {
     return url
   }
 
+  /** 扩展后台能拿到完整 Cookie（含 httpOnly 的 SESSDATA）；页面上下文拿不到，交给浏览器自动携带 */
+  private get isExtensionContext(): boolean {
+    return typeof chrome !== 'undefined' && !!chrome.cookies?.getAll
+  }
+
   async getCookies(): Promise<chrome.cookies.Cookie[]> {
-    if (typeof chrome !== 'undefined' && chrome.cookies?.getAll) {
+    if (this.isExtensionContext) {
       return await chrome.cookies.getAll({
-        domain: this.host.replace('https://api', ''),
+        domain: '.bilibili.com',
       })
     }
-    return document.cookie.split(";").map(item => {
-      const [name, value] = item.trim().split("=")
-      return {
-        domain: this.host.replace('https://api', ''),
-        name,
-        value,
-        path: '/',
-        secure: true,
-        httpOnly: false,
-      } as chrome.cookies.Cookie
-    })
+    // 页面上下文中 document.cookie 读不到 httpOnly 的 SESSDATA，
+    // 返回空数组，避免手写不完整的 Cookie 头反而覆盖浏览器自动携带的完整 Cookie。
+    return []
   }
 
   buildCookieHeader(cookies: chrome.cookies.Cookie[]): string {
@@ -242,28 +216,51 @@ export class BilibiliApi {
   }
 
   async fillHeader(headers?: HeadersInit): Promise<HeadersInit> {
-    if (!headers) {
-      const cookieHeader = this.buildCookieHeader(await this.getCookies())
-      headers = this.buildHeader(cookieHeader)
-    }
-    return headers
+    if (headers) return headers
+    const cookies = await this.getCookies()
+    if (cookies.length === 0) return {}
+    return this.buildHeader(this.buildCookieHeader(cookies))
   }
 
-  private async signWbiParams(params: Record<string, string>): Promise<void> {
-    if (!this.wbiSigner) return
+  /** B 站风控要求取流请求带 buvid3，缺失时从 finger/spi 获取并写回 Cookie */
+  private async ensureBuvid3(): Promise<void> {
+    const cookies = await this.getCookies()
+    if (cookies.some(c => c.name.toLowerCase() === BUVID3_COOKIE_NAME)) return
+
     try {
-      const { w_rid, wts } = await this.wbiSigner.sign(params)
-      params.w_rid = w_rid
-      params.wts = wts.toString()
+      const resp = await fetch(FINGER_SPI_URL, { credentials: 'include' })
+      if (!resp.ok) return
+      const body = await resp.json()
+      const buvid: string = body?.data?.b_3 ?? ''
+      if (!buvid) return
+
+      if (this.isExtensionContext) {
+        await chrome.cookies.set({
+          url: `${BILIBILI_WEBSITE_HOST}/`,
+          domain: '.bilibili.com',
+          path: '/',
+          name: BUVID3_COOKIE_NAME,
+          value: buvid,
+        })
+      } else if (typeof document !== 'undefined') {
+        document.cookie = `${BUVID3_COOKIE_NAME}=${buvid}; domain=.bilibili.com; path=/`
+      }
     } catch {
-      // fallback: proceed without WBI signing
+      // buvid3 获取失败不阻断主流程，后续请求仍可能成功
     }
+  }
+
+  /** 签名失败直接抛出，避免静默降级成无签名请求导致难排查的 -403 */
+  private async signWbiParams(params: Record<string, string>): Promise<Record<string, string>> {
+    if (!this.wbiSigner) return params
+    const result = await this.wbiSigner.sign(params)
+    return result.params
   }
 
   async getVideoInfo(bvid: string, headers?: HeadersInit): Promise<any> {
     headers = await this.fillHeader(headers)
     const url = `${this.host}/x/web-interface/view?bvid=${bvid}`
-    return await fetch(url, { headers }).then((r) => r.json())
+    return await fetch(url, { headers, credentials: 'include' }).then((r) => r.json())
   }
 
   async getVideoDetailInfo(
@@ -271,11 +268,11 @@ export class BilibiliApi {
     cid: string | number,
     headers?: HeadersInit
   ): Promise<VideoDetailResponse> {
+    await this.ensureBuvid3()
     headers = await this.fillHeader(headers)
-    const params: Record<string, string> = { aid: aid.toString(), cid: cid.toString() }
-    await this.signWbiParams(params)
+    const params = await this.signWbiParams({ aid: aid.toString(), cid: cid.toString() })
     const url = `${this.host}/x/player/wbi/v2?${new URLSearchParams(params).toString()}`
-    return await fetch(url, { headers }).then((r) => r.json())
+    return await fetch(url, { headers, credentials: 'include' }).then((r) => r.json())
   }
 
   async getVideoSubtitle(
@@ -289,7 +286,68 @@ export class BilibiliApi {
   async getSubtitleJson(url: string, headers?: HeadersInit): Promise<any> {
     headers = await this.fillHeader(headers)
     const subUrl = url.startsWith('http') ? url : 'https:' + url
-    return await fetch(subUrl, { headers }).then((r) => r.json())
+    return await fetch(subUrl, { headers, credentials: 'include' }).then((r) => r.json())
+  }
+
+  private async requestPlayUrl(
+    params: {
+      bvid: string
+      cid: number
+      qn: number
+      fnval: number
+      fourk: number
+      platform: string
+    },
+    headers: HeadersInit
+  ): Promise<PlayUrlResponse> {
+    const signed = await this.signWbiParams({
+      bvid: params.bvid,
+      cid: params.cid.toString(),
+      qn: params.qn.toString(),
+      fnval: params.fnval.toString(),
+      fourk: params.fourk.toString(),
+      fnver: '0',
+      platform: params.platform,
+      otype: 'json',
+    })
+    const url = `${this.host}/x/player/wbi/playurl?${new URLSearchParams(signed).toString()}`
+    const resp = await fetch(url, { headers, credentials: 'include' })
+
+    if (resp.status === 412) {
+      throw new Error('B 站风控拦截了取流请求（HTTP 412），请稍后重试或检查登录状态与 buvid3')
+    }
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
+    }
+    return await resp.json() as PlayUrlResponse
+  }
+
+  private parsePlayUrlResponse(data: PlayUrlResponse, bvid: string): PlayUrlResult | null {
+    if (data.code !== 0) return null
+
+    const dash = data.data?.dash
+    if (dash) {
+      if (!Array.isArray(dash.video) || dash.video.length === 0) return null
+      if (!Array.isArray(dash.audio) || dash.audio.length === 0) return null
+      const videoStream = selectVideoStream(dash.video as any)
+      const audioStream = selectAudioStream(dash.audio as any)
+      return {
+        videoUrl: videoStream.baseUrl,
+        audioUrl: audioStream.baseUrl,
+        title: data.data.accept_description?.[0] ?? bvid,
+      }
+    }
+
+    if (Array.isArray(data.data?.durl) && data.data.durl.length > 0) {
+      const d = data.data.durl[0]
+      return {
+        videoUrl: d.url,
+        audioUrl: '', // MP4 格式音频视频合并
+        title: data.data.accept_description?.[0] ?? bvid,
+      }
+    }
+
+    return null
   }
 
   // [DOC](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/video/videostream_url.md)
@@ -308,81 +366,34 @@ export class BilibiliApi {
       throw new Error("bvid 和 cid 参数不能为空")
     }
     const {
-      quality = VideoQuality.FHD_1080P,
-      fnval = VideoFormat.ALL_DASH,
-      fourk = 0,
-      platform = Platform.PC
+      quality = PLAYURL_DEFAULT_QUALITY,
+      fnval = PLAYURL_DEFAULT_FNVAL,
+      fourk = PLAYURL_DEFAULT_FOURK,
+      platform = PLAYURL_DEFAULT_PLATFORM,
     } = options
 
-    const params: Record<string, string> = {
-      bvid,
-      cid: cid.toString(),
-      qn: quality.toString(),
-      fnval: fnval.toString(),
-      fourk: fourk.toString(),
-      fnver: '0',
-      platform,
-      otype: 'json'
-    }
-    await this.signWbiParams(params)
-    const url = `${this.host}/x/player/wbi/playurl?${new URLSearchParams(params).toString()}`
-    const _headers = await this.fillHeader(options.headers)
-    const resp = await fetch(url, { headers: _headers })
+    await this.ensureBuvid3()
+    const headers = await this.fillHeader(options.headers)
 
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
-    }
+    // 依次降级：目标清晰度 DASH -> qn=80 DASH -> qn=80 MP4
+    const attempts = [
+      { qn: quality, fnval },
+      { qn: PLAYURL_FALLBACK_QUALITY, fnval },
+      { qn: PLAYURL_FALLBACK_QUALITY, fnval: VideoFormat.MP4 },
+    ]
 
-    const data = await resp.json() as PlayUrlResponse
-
-    if (data.code !== 0) {
-      const fallbackParams: Record<string, string> = {
-        bvid,
-        cid: cid.toString(),
-        qn: (options.quality ?? VideoQuality.FHD_1080P).toString(),
-        fnval: VideoFormat.MP4.toString(),
-        fourk: (options.fourk ?? 0).toString(),
-        fnver: '0',
-        platform: (options.platform ?? Platform.PC),
-        otype: 'json'
+    let lastError = '未知错误'
+    for (const attempt of attempts) {
+      const data = await this.requestPlayUrl({ bvid, cid, ...attempt, fourk, platform }, headers)
+      if (data.code !== 0) {
+        lastError = `API 错误 ${data.code}: ${data.message}`
+        continue
       }
-      await this.signWbiParams(fallbackParams)
-      const fallbackUrl = `${this.host}/x/player/wbi/playurl?${new URLSearchParams(fallbackParams).toString()}`
-      const fallbackResp = await fetch(fallbackUrl, { headers: _headers })
-      const fallbackData = await fallbackResp.json() as PlayUrlResponse
-      if (fallbackData.code === 0 && fallbackData.data.durl && fallbackData.data.durl.length > 0) {
-        const d = fallbackData.data.durl[0]
-        return { videoUrl: d.url, audioUrl: '', title: fallbackData.data.accept_description?.[0] ?? bvid }
-      }
-      throw new Error(`API 错误 ${data.code}: ${data.message}`)
+      const result = this.parsePlayUrlResponse(data, bvid)
+      if (result) return result
+      lastError = '响应中未包含有效的视频流数据'
     }
 
-    if (data.data.dash) {
-      const dash = data.data.dash
-      if (!dash.video || dash.video.length === 0) {
-        throw new Error("DASH 格式视频流数据为空")
-      }
-      if (!dash.audio || dash.audio.length === 0) {
-        throw new Error("DASH 格式音频流数据为空")
-      }
-      const videoStream = selectVideoStream(dash.video as any)
-      const audioStream = selectAudioStream(dash.audio as any)
-      return {
-        videoUrl: videoStream.baseUrl,
-        audioUrl: audioStream.baseUrl,
-        title: data.data.accept_description?.[0] ?? bvid
-      }
-    }
-    if (data.data.durl && data.data.durl.length > 0) {
-      const durl = data.data.durl[0]
-      const videoUrl = durl.url
-      return {
-        videoUrl: videoUrl,
-        audioUrl: '', // MP4 格式音频视频合并
-        title: data.data.accept_description?.[0] ?? bvid
-      }
-    }
-
-    throw new Error(`无法获取视频播放地址：响应中未包含有效的视频流数据。API 响应: ${JSON.stringify(data, null, 2)}`)
+    throw new Error(lastError)
   }
 }

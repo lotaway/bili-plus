@@ -1,23 +1,22 @@
 import md5 from '../utils/md5'
+import {
+  MIXIN_KEY_ENC_TAB,
+  NAV_URL,
+  WBI_FILTER_CHARS,
+  WBI_KEYS_TTL_MS,
+} from '../config/bilibili.config'
 
 // [exp](https://github.com/xifangczy/cat-catch)
 export interface WbiSignResult {
   w_rid: string
   wts: number
+  /** 已过滤特殊字符并附带 w_rid/wts 的最终参数，调用方必须用这个构建 URL */
+  params: Record<string, string>
 }
 
 export interface IWbiSigner {
   sign(params: Record<string, string>): Promise<WbiSignResult>
 }
-
-const NAV_URL = 'https://api.bilibili.com/x/web-interface/nav'
-
-const MIXIN_TABLE: number[] = [
-  46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
-  27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 37, 12, 52, 56, 7,
-  42, 61, 37, 61, 57, 20, 60, 46, 16, 17, 55, 44, 24, 44, 30, 36,
-  26, 25, 21, 54, 22, 51, 11, 38, 6, 59, 40, 57, 13, 1, 1, 18,
-]
 
 function extractKey(url: string): string {
   const idx = url.lastIndexOf('/')
@@ -29,20 +28,34 @@ function extractKey(url: string): string {
 function mixKey(imgKey: string, subKey: string): string {
   const raw = imgKey + subKey
   let result = ''
-  for (let i = 0; i < 32; i++) result += raw[MIXIN_TABLE[i]]
+  // 官方算法拼接 64 个字符后只取前 32 位
+  for (const i of MIXIN_KEY_ENC_TAB.slice(0, 32)) {
+    result += raw[i] ?? ''
+  }
   return result
 }
 
+/** 按 WBI 规范剔除参数值中的特殊字符 */
+function filterValue(value: string): string {
+  let result = ''
+  for (const char of value) {
+    if (!WBI_FILTER_CHARS.includes(char)) result += char
+  }
+  return result
+}
+
+/** 排序 + URL 编码后拼接查询串，用于计算签名 */
 function buildSortedQuery(params: Record<string, string>): string {
   return Object.keys(params)
     .sort()
-    .map(k => `${k}=${params[k]}`)
+    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
     .join('&')
 }
 
 interface WbiKeys {
   imgKey: string
   subKey: string
+  fetchedAt: number
 }
 
 export class WbiSigner implements IWbiSigner {
@@ -52,15 +65,24 @@ export class WbiSigner implements IWbiSigner {
 
   private async fetchKeys(): Promise<WbiKeys> {
     const resp = await fetch(NAV_URL, { credentials: 'include' })
+    if (!resp.ok) throw new Error(`获取 WBI key 失败: HTTP ${resp.status}`)
     const body = await resp.json()
-    if (body.code !== 0) throw new Error(`WBI nav API error: ${body.code}`)
+    // 未登录时 nav 返回 -101，但 wbi_img 仍然有效，不能因此放弃签名
     const img = body.data?.wbi_img
-    if (!img?.img_url || !img?.sub_url) throw new Error('WBI keys not found in nav response')
-    return { imgKey: extractKey(img.img_url), subKey: extractKey(img.sub_url) }
+    if (!img?.img_url || !img?.sub_url) {
+      throw new Error(`WBI keys not found in nav response (code: ${body.code})`)
+    }
+    return {
+      imgKey: extractKey(img.img_url),
+      subKey: extractKey(img.sub_url),
+      fetchedAt: Date.now(),
+    }
   }
 
   private async getKeys(): Promise<WbiKeys> {
-    if (this.cachedKeys) return this.cachedKeys
+    if (this.cachedKeys && Date.now() - this.cachedKeys.fetchedAt < WBI_KEYS_TTL_MS) {
+      return this.cachedKeys
+    }
     if (this.fetching) {
       return new Promise<WbiKeys>((resolve, reject) => {
         this.pending.push({ resolve, reject })
@@ -70,11 +92,14 @@ export class WbiSigner implements IWbiSigner {
     try {
       const keys = await this.fetchKeys()
       this.cachedKeys = keys
+      this.pending.forEach(p => p.resolve(keys))
       return keys
+    } catch (err) {
+      this.pending.forEach(p => p.reject(err instanceof Error ? err : new Error(String(err))))
+      throw err
     } finally {
-      this.fetching = false
-      this.pending.forEach(p => p.resolve(this.cachedKeys!))
       this.pending = []
+      this.fetching = false
     }
   }
 
@@ -86,9 +111,16 @@ export class WbiSigner implements IWbiSigner {
     const keys = await this.getKeys()
     const mixinKey = mixKey(keys.imgKey, keys.subKey)
     const wts = Math.floor(Date.now() / 1000)
-    const all: Record<string, string> = { ...params, wts: wts.toString() }
-    const query = buildSortedQuery(all)
+
+    // 签名与最终 URL 必须使用同一份参数，否则 w_rid 校验失败
+    const filtered: Record<string, string> = {}
+    for (const [key, value] of Object.entries(params)) {
+      filtered[key] = filterValue(value)
+    }
+    filtered.wts = wts.toString()
+
+    const query = buildSortedQuery(filtered)
     const w_rid = md5(query + mixinKey)
-    return { w_rid, wts }
+    return { w_rid, wts, params: { ...filtered, w_rid } }
   }
 }

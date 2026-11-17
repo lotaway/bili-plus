@@ -203,7 +203,7 @@ class BackstageActivity {
             await this.downloadUtils.downloadWithChromeAPI(audioUrl, `${title}.audio.m4a`, createProgressCallback('audio'))
           } else {
             const audioBlob = await this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
-            this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
+            await this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
           }
           break
 
@@ -212,7 +212,7 @@ class BackstageActivity {
             await this.downloadUtils.downloadWithChromeAPI(videoUrl, `${title}.video.mp4`, createProgressCallback('video'))
           } else {
             const videoBlob = await this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video'))
-            this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+            await this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
           }
           break
 
@@ -227,8 +227,8 @@ class BackstageActivity {
               this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video')),
               this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
             ])
-            this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
-            this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
+            await this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+            await this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
           }
           break
 
@@ -244,7 +244,7 @@ class BackstageActivity {
               await this.downloadUtils.downloadWithChromeAPI(mergedUrl, `${title}.mp4`)
               URL.revokeObjectURL(mergedUrl)
             } else {
-              this.downloadUtils.saveBlob(mergedBlob, `${title}.mp4`)
+              await this.downloadUtils.saveBlob(mergedBlob, `${title}.mp4`)
             }
           } catch (mergeError) {
             Logger.E('Merge failed, falling back to separate downloads:', mergeError)
@@ -258,8 +258,8 @@ class BackstageActivity {
                 this.downloadUtils.downloadToBlob(videoUrl, undefined, createProgressCallback('video')),
                 this.downloadUtils.downloadToBlob(audioUrl, undefined, createProgressCallback('audio'))
               ])
-              this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
-              this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
+              await this.downloadUtils.saveBlob(videoBlob, `${title}.video.mp4`)
+              await this.downloadUtils.saveBlob(audioBlob, `${title}.audio.m4a`)
             }
             sendResponse({
               success: true,

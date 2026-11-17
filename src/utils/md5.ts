@@ -3,7 +3,10 @@ function leftRotate(x: number, c: number): number {
 }
 
 function toHex(n: number): string {
-  return n.toString(16).padStart(8, '0')
+  // MD5 摘要按小端序输出每个 32 位字，直接 toString(16) 会得到字节反序的错误结果
+  return [0, 8, 16, 24]
+    .map(shift => ((n >>> shift) & 0xff).toString(16).padStart(2, '0'))
+    .join('')
 }
 
 function padMessage(bytes: Uint8Array): Uint8Array {
