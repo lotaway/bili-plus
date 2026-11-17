@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/extension.fixture'
 
-const VIDEO_URL = 'https://www.bilibili.com/video/BV19PFGzMENr/?'
+const VIDEO_URL = 'https://www.bilibili.com/video/BV1L3sz6vEza/?'
 // 真实网络下载
 
 test('从指定视频页面解析并进行页面上下文下载（真实网络）', async ({ context, extensionId, sidepanelPage }) => {
