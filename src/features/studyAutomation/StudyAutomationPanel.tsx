@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import styled from 'styled-components'
 import { MessageType } from '../../enums/MessageType'
+import { isBilibiliHomepageUrl } from '../../utils/url'
 
 const Container = styled.div`
   padding: 16px;
@@ -117,12 +118,7 @@ const StudyAutomationPanel: React.FC = () => {
         throw new Error('未找到活动标签页')
       }
 
-      const isHomepage = tab.url === 'https://www.bilibili.com/' || 
-                        tab.url === 'http://www.bilibili.com/' || 
-                        tab.url?.startsWith('https://www.bilibili.com/?') ||
-                        tab.url?.startsWith('http://www.bilibili.com/?');
-
-      if (!isHomepage) {
+      if (!isBilibiliHomepageUrl(tab.url)) {
         setStatus('自动学习机目前仅支持在 Bilibili 首页运行，请先切换到首页。')
         setLoading(false)
         return

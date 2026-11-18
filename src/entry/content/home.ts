@@ -9,6 +9,7 @@ import { StudyTaskSubmitter } from '../../features/studyAutomation/StudyTaskSubm
 import { StudyAutomationOrchestrator } from '../../features/studyAutomation/StudyAutomationOrchestrator'
 import { MessageHandlerStrategy } from '../../features/studyAutomation/MessageHandlerStrategy'
 import { LLMResponse } from '../../features/studyAutomation/types'
+import { isBilibiliHomepageUrl } from '../../utils/url'
 
 export { }
 
@@ -136,17 +137,6 @@ class HomeContentActivity {
     })
   }
 
-  private isBilibiliHomepage(): boolean {
-    const url = window.location.href
-    const validPrefixes = [
-      'https://www.bilibili.com/',
-      'http://www.bilibili.com/',
-      'https://www.bilibili.com/?',
-      'http://www.bilibili.com/?'
-    ]
-    return validPrefixes.some(prefix => url === prefix || url.startsWith(prefix))
-  }
-
   private async handleWindowMessage(event: MessageEvent): Promise<void> {
     if (!this.isValidWindowMessage(event)) {
       if (this.isAgentActionResponse(event)) {
@@ -223,7 +213,7 @@ class HomeContentActivity {
 }
 
 const activity = new HomeContentActivity()
-if (activity['isBilibiliHomepage']()) {
+if (isBilibiliHomepageUrl(window.location.href)) {
   activity.init()
 } else {
   Logger.D('[Bilibili Plus] Not homepage, skipping execution')

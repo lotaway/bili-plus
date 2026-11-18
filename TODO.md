@@ -1,6 +1,6 @@
 # TODO
 
-## [待解决] GitHub Actions E2E 测试在 CI 上持续失败
+## [已修复，待 CI 验证] GitHub Actions E2E 测试在 CI 上持续失败
 
 ### 现象
 - 工作流 `.github/workflows/e2e.yml`（E2E Tests）在每次 push 后运行，持续失败。
@@ -11,38 +11,57 @@
   - step 8 上传 artifact 成功（说明 playwright-report 已生成）。
 - Annotation 仅有 `Process completed with exit code 1.`，无具体测试失败信息。
 
-### 已确认的事实
-1. 曾因 Playwright 1.57.0 不支持 Ubuntu 26 导致 step 5（浏览器安装）失败；
-   升级到 `@playwright/test@^1.65.1` 后已修复，step 5 现通过。
-2. 历史 run #17 之前失败在 step 5；#18/#19/#20 失败在 step 7。
-3. 测试套件中 `tests/specs/video_download_e2e.spec.ts` 是"真实网络下载"测试，
-   原视频 `BV19PFGzMENr` 已失效，已在 #20 提交中改为有效视频 `BV1L3sz6vEza`。
-4. 本地用系统 Edge（临时把 fixture 的 launcher 改为 `channel: 'msedge'`）跑测试：
-   - 纯 UI / mock 类测试（basic、debug、tab-switch、subtitle、integration）全部通过；
-   - `video_download_e2e.spec.ts` 换成有效 BV 号后本地也通过（约 9s）。
-   - 即：**本地全通过，但 CI 仍失败**。
+### 根因（来自 run #20 的 playwright-report artifact）
+CI 的真实失败为 4 个用例（其余 13 个通过）：
 
-### 待排查方向
-- CI 的 Ubuntu + xvfb + bundled Chromium 环境与本地 macOS + Edge 存在差异，
-  需拿到 CI 的真实失败日志才能定位具体失败用例。
-- CI 日志和 artifact 通过匿名 API 无法下载（需仓库管理员权限 / 认证）：
-  - `GET /actions/jobs/{job_id}/logs` 返回 403 "Must have admin rights to Repository."
-  - artifact zip 返回 401 "Requires authentication"
-  - `check-runs/.../annotations` 只有 `exit code 1`，无细节。
-- **下一步（需要仓库所有者配合任一）**：
-  1. 在 GitHub Actions 页面打开 run #20，展开 step 7 的日志，把失败用例名与错误贴出；
-     或
-  2. 提供有权限的 GitHub token（`gh` CLI 登录后可用 `gh run view <id> --log-failed`），
-     以便下载日志/artifact 定位；
-  3. 或在 workflow 中为 step 7 增加日志输出（如 `--reporter=list` 已经有了，可加
-     `DEBUG=pw:api` 或把 `playwright-report` 的内容在失败时打印），再跑一次拿日志。
-- 拿到日志后重点怀疑：
-  - `video_download_e2e.spec.ts` 的真实网络下载在 CI 无登录 cookie / 风控下失败；
-  - extension 加载 / service worker 就绪时序在无头 xvfb 下不稳定；
-  - 其它尚未在 CI 环境验证过的用例。
+1. `ai-summary.spec.ts`
+2. `integration.spec.ts`
+3. `study-automation.spec.ts`（首页校验那条）
+4. `video_download_e2e.spec.ts`
+
+CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首页和视频页
+重定向到英文站点 `/en`、`/en/video/...`。而此前扩展只声明/识别：
+
+- 内容脚本 match pattern：`*://www.bilibili.com/video/*`、`.../`（根路径）；
+- `home.ts` 与 `StudyAutomationPanel.tsx` 的首页判断也只认 `/` 与 `/?...`。
+
+于是：
+
+- 首页上 `home.js` 不会注入 → `#bili-plus-home-generate-btn` 不存在（integration 失败）；
+  学习机面板判定当前标签页不是首页（study-automation 失败）。
+- 视频页 `video.js` 不会注入 → `chrome.tabs.sendMessage` 没有接收方，
+  下载请求从未发出，测试等待下载超时（video_download_e2e 失败）；
+  trace 中可见 `GET /video/BV... -> 412` 后跳转 `/en/video/...`，
+  且请求头为 `Accept-Language: en-US`。
+- `ai-summary.spec.ts` 断言的是一个会被后台错误响应瞬间覆盖的临时文案
+  “正在使用AI处理字幕...”，实际稳定出现的是 `Video info not initialized`。
+
+### 修复
+1. `public/manifest.json`
+   - 视频页内容脚本增加 `*://www.bilibili.com/en/video/*`、
+     `*://www.bilibili.com/en/list/watchlater?*`。
+   - 首页内容脚本增加 `/en`、`/en/`、`/en/?*`（http/https）。
+2. 新增 `src/utils/url.ts::isBilibiliHomepageUrl()`，统一判断首页：
+   `www.bilibili.com` / `bilibili.com` 上的 `/`、`/index.html`、`/en`、`/en/`、
+   `/en/index.html`，并忽略 query。
+   - `src/entry/content/home.ts` 与
+     `src/features/studyAutomation/StudyAutomationPanel.tsx` 改为使用它。
+3. `tests/specs/ai-summary.spec.ts` 改为断言确定性的错误路径
+   `Video info not initialized`（非视频页面打开侧边栏时的真实行为）。
+4. 新增 `tests/specs/url.spec.ts`，覆盖中文首页、`/en` 首页及非首页的回归用例。
+
+### 验证
+- `yarn build` 通过。
+- 本地以系统 Edge，并模拟 CI 的 `locale: 'en-US'` 跑目标用例：
+  `ai-summary`、`integration`、`study-automation`、`video_download_e2e`
+  全部通过（真实网络下载，未 mock）。
+- 单独脚本验证 `/en` 与 `/en/video/BV1L3sz6vEza/` 均能注入对应内容脚本。
+- `tests/specs/url.spec.ts` 4 个用例通过。
+- 说明：以上 Edge/locale 仅为本地复现 CI 的临时手段，已从
+  `tests/fixtures/extension.fixture.ts` 还原，测试仍使用默认 Chromium。
 
 ### 备注
-- 用户明确要求：不允许跳过流程、不允许 mock 真实 e2e（`video_download_e2e.spec.ts`
-  必须保持真实网络下载），仅修正数据（BV 号）。
-- 因此解决方向应是在保持完整真实流程的前提下，让 CI 环境具备通过条件
-  （例如处理未登录/风控、增加重试、改善时序等待），而不是跳过或 mock。
+- 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
+  仍为真实网络下载；仅修正了失效数据（BV 号）与 `/en` 适配。
+- 剩余动作：推送后观察 CI 是否全绿。若仍有失败，重点看
+  `video_download_e2e.spec.ts` 在无登录 cookie / 风控下的表现。

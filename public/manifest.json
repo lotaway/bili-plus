@@ -29,7 +29,9 @@
         {
             "matches": [
                 "*://www.bilibili.com/video/*",
-                "*://www.bilibili.com/list/watchlater?*"
+                "*://www.bilibili.com/en/video/*",
+                "*://www.bilibili.com/list/watchlater?*",
+                "*://www.bilibili.com/en/list/watchlater?*"
             ],
             "js": [
                 "assets/video.js"
@@ -40,7 +42,13 @@
                 "https://www.bilibili.com/",
                 "http://www.bilibili.com/",
                 "https://www.bilibili.com/?*",
-                "http://www.bilibili.com/?*"
+                "http://www.bilibili.com/?*",
+                "https://www.bilibili.com/en",
+                "http://www.bilibili.com/en",
+                "https://www.bilibili.com/en/",
+                "http://www.bilibili.com/en/",
+                "https://www.bilibili.com/en/?*",
+                "http://www.bilibili.com/en/?*"
             ],
             "js": [
                 "assets/home.js"
