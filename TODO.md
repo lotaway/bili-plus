@@ -13,6 +13,23 @@
 - 第二轮修复：`video_download_e2e.spec.ts` 增加 `test.setTimeout(180_000)`，
   用 `expect().toPass()` 重试解析直到出现 `已解析: BVID=`，
   并为下载事件单独设置 120s 超时；仍然是真实网络下载，未 mock、未跳过。
+- 第二轮修复（`a0a9a45`）推送后 CI run `44254113689`：仍然 21 个用例
+  20 通过，仅 `video_download_e2e` 失败（3 次重试，共 ~417s）。
+  此时解析已成功（trace 中第二次重试出现 `已解析: BVID=BV1L3sz6vEza`），
+  但等待 120s 仍没有 download 事件，侧边栏显示
+  `页面上下文下载失败: Failed to fetch`。
+- 第三轮根因（来自 run `44254113689` 的 trace）：
+  1. B 站按 `Accept-Language` 在文档加载完成后再做一次整页跳转；
+     trace 中 `/video/BV1L3sz6vEza/` 先 `412`、再 `200`，
+     随后在点击下载约 900ms 后跳转到 `/en/video/BV1L3sz6vEza/`。
+  2. 整页跳转会销毁页面上下文，使页面内的 `fetch`（WBI nav / playurl）
+     被中止并抛出 `Failed to fetch`，于是从未发起真正的取流下载。
+     测试恰好在这个跳转窗口内点击了下载。
+- 第三轮修复：`video_download_e2e.spec.ts` 在解析前先等待页面稳定
+  （URL 连续 5s 不变，覆盖 CI 的延迟跳转），并等内容脚本按钮
+  `#bili-plus-generate-btn` 与 `__INITIAL_STATE__.videoData` 就绪；
+  解析成功后再做一次 2s 稳定检查，然后 `page.bringToFront()` 让下载模块
+  向视频标签页发消息。仍是真实网络下载，未 mock、未跳过。
 
 ### 现象
 - 工作流 `.github/workflows/e2e.yml`（E2E Tests）在每次 push 后运行，持续失败。
@@ -69,6 +86,10 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
   全部通过（真实网络下载，未 mock）。
 - 第二轮修复后，本地以同样的 CI 模拟环境单独运行
   `video_download_e2e.spec.ts`：22.1s 通过。
+- 第三轮修复后，本地同样环境连续运行 2 次：27.7s / 28.1s 均通过。
+  注意：本地（国内网络）不会出现 `/en` 跳转，故跳转本身无法本地复现；
+  稳定等待逻辑按 run `44254113689` trace 中“加载后约 2.5s 才跳转”的时间线
+  设定了 5s 的稳定窗口，并同时校验内容脚本与 `__INITIAL_STATE__.videoData`。
 - 单独脚本验证 `/en` 与 `/en/video/BV1L3sz6vEza/` 均能注入对应内容脚本。
 - `tests/specs/url.spec.ts` 4 个用例通过。
 - 说明：以上 Edge/locale 仅为本地复现 CI 的临时手段，已从
@@ -77,4 +98,4 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 ### 备注
 - 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
   仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配与测试时序/超时。
-- 剩余动作：推送第二轮修复后观察 CI 是否全绿。
+- 剩余动作：推送第三轮修复后观察 CI 是否全绿。
