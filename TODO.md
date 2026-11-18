@@ -2,6 +2,18 @@
 
 ## [已修复，待 CI 验证] GitHub Actions E2E 测试在 CI 上持续失败
 
+### 进展
+- 第一轮修复（`daf68da`）推送后 CI run `44252136657`：
+  **21 个用例 20 通过，仅剩 `video_download_e2e.spec.ts` 失败**；
+  原先的 `ai-summary`、`integration`、`study-automation` 均已通过。
+- 剩余失败的根因是测试竞态：点击“从当前页面解析”后没有等待解析完成，
+  CI 较慢时立即点击下载，页面提示 `请先输入BVID和CID`，
+  因此从未发出下载请求（trace 中可见该错误状态）。30s 的默认超时对
+  “真实网络加载 + 完整音视频下载”也偏紧。
+- 第二轮修复：`video_download_e2e.spec.ts` 增加 `test.setTimeout(180_000)`，
+  用 `expect().toPass()` 重试解析直到出现 `已解析: BVID=`，
+  并为下载事件单独设置 120s 超时；仍然是真实网络下载，未 mock、未跳过。
+
 ### 现象
 - 工作流 `.github/workflows/e2e.yml`（E2E Tests）在每次 push 后运行，持续失败。
 - 最新失败 run: #20 (`44137070001`)，提交 `70958fe`，链接:
@@ -55,6 +67,8 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 - 本地以系统 Edge，并模拟 CI 的 `locale: 'en-US'` 跑目标用例：
   `ai-summary`、`integration`、`study-automation`、`video_download_e2e`
   全部通过（真实网络下载，未 mock）。
+- 第二轮修复后，本地以同样的 CI 模拟环境单独运行
+  `video_download_e2e.spec.ts`：22.1s 通过。
 - 单独脚本验证 `/en` 与 `/en/video/BV1L3sz6vEza/` 均能注入对应内容脚本。
 - `tests/specs/url.spec.ts` 4 个用例通过。
 - 说明：以上 Edge/locale 仅为本地复现 CI 的临时手段，已从
@@ -62,6 +76,5 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 
 ### 备注
 - 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
-  仍为真实网络下载；仅修正了失效数据（BV 号）与 `/en` 适配。
-- 剩余动作：推送后观察 CI 是否全绿。若仍有失败，重点看
-  `video_download_e2e.spec.ts` 在无登录 cookie / 风控下的表现。
+  仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配与测试时序/超时。
+- 剩余动作：推送第二轮修复后观察 CI 是否全绿。
