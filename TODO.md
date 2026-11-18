@@ -38,11 +38,16 @@
      `The value of the 'Access-Control-Allow-Origin' header ... must not be the wildcard '*' when the request's credentials mode is 'include'`；
   3. 本地（国内节点）CDN 返回精确 origin + `credentials: true`，
      所以 `include` 在本地一直能过，问题只在 CI 暴露。
-- 最终修复：`DownloadUtils.downloadToBlob` 改为 `credentials: 'omit'`。
-  取流 URL 本身已带签名（upsig/hdnts/buvid），不需要 Cookie；
-  不再触发 CORS 的 credentialed 校验。新增
-  `tests/specs/download_utils_credentials.spec.ts` 回归断言，
-  防止重新引入 `include`。`/en` 等待逻辑保留（它避免了跳转中止 fetch）。
+- CORS 修复（`765f51a`）推送后 CI run `44261664251`：22 个用例 21 通过，
+  新回归测试通过，但 `video_download_e2e` 仍失败（~426s）。
+  CORS 错误确实消失了，取流请求真的发到了 CDN，但 CDN 返回 HTTP 567
+  （`content-type: text/html` 的错误页）。
+- 567 的差异点：播放器自己的成功请求全部带 `Range` 头并返回 206，
+  而 `downloadToBlob` 是一次性请求完整文件。海外 CDN 拒绝无 Range 的取流。
+- 最终修复：`DownloadUtils.downloadToBlob` 改为 2 MiB 的 **Range 分段下载**，
+  按 `content-range` 解析总长度、拼接分片，保留 `credentials: 'omit'`
+  以避免 CORS。对应回归测试也断言 `Range` 头与 omit 凭据。
+  本地真实网络下载 27.8s 通过，未 mock。
 
 ### 现象
 - 工作流 `.github/workflows/e2e.yml`（E2E Tests）在每次 push 后运行，持续失败。
@@ -103,11 +108,11 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
   `#bili-plus-generate-btn` 与 `__INITIAL_STATE__.videoData` 就绪，并在下载前
   再做一次 2s 稳定检查 + `page.bringToFront()`。这消除了跳转中止 fetch 的风险，
   但 run `44257593003` 表明它不是 CI 失败的根因。
-- 最终修复（CORS）：`src/utils/DownloadUtils.ts` 的 `downloadToBlob`
-  改用 `credentials: 'omit'`，取流 URL 已带签名无需 Cookie；
+- 最终修复（CORS + 567）：`src/utils/DownloadUtils.ts` 的 `downloadToBlob`
+  改用 `credentials: 'omit'` 并按 2 MiB 分段带 `Range` 请求；
   新增 `tests/specs/download_utils_credentials.spec.ts` 回归测试。
 - 验证：`yarn build` 通过；新单元测试通过；本地同样环境真实网络下载
-  27.2s 通过；第三轮修复后本地连续 2 次 27.7s / 28.1s 通过。
+  27.8s 通过；第三轮修复后本地连续 2 次 27.7s / 28.1s 通过。
 - 单独脚本验证 `/en` 与 `/en/video/BV1L3sz6vEza/` 均能注入对应内容脚本。
 - `tests/specs/url.spec.ts` 4 个用例通过。
 - 说明：以上 Edge/locale 仅为本地复现 CI 的临时手段，已从
@@ -116,5 +121,5 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 ### 备注
 - 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
   仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配、
-  测试时序/超时，以及 CDN 下载的 CORS credentials 问题。
+  测试时序/超时，以及 CDN 下载的 CORS credentials 与 Range 分段问题。
 - 剩余动作：推送最终修复后观察 CI 是否全绿。
