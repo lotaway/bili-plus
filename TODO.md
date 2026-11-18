@@ -25,11 +25,24 @@
   2. 整页跳转会销毁页面上下文，使页面内的 `fetch`（WBI nav / playurl）
      被中止并抛出 `Failed to fetch`，于是从未发起真正的取流下载。
      测试恰好在这个跳转窗口内点击了下载。
-- 第三轮修复：`video_download_e2e.spec.ts` 在解析前先等待页面稳定
-  （URL 连续 5s 不变，覆盖 CI 的延迟跳转），并等内容脚本按钮
-  `#bili-plus-generate-btn` 与 `__INITIAL_STATE__.videoData` 就绪；
-  解析成功后再做一次 2s 稳定检查，然后 `page.bringToFront()` 让下载模块
-  向视频标签页发消息。仍是真实网络下载，未 mock、未跳过。
+- 第三轮修复（`7f4a654`）推送后 CI run `44257593003`：仍是 21 个用例
+  20 通过、仅 `video_download_e2e` 失败（~435s），但失败点后移了：
+  解析成功、侧边栏进入 `开始页面上下文下载...`，最终仍是
+  `页面上下文下载失败: Failed to fetch`，trace 里出现取流 CDN 的
+  `net::ERR_FAILED`。
+- 真正根因（run `44257593003` 的 console）：**CORS，而非跳转**。
+  1. `DownloadUtils.downloadToBlob` 用 `credentials: 'include'` 跨域请求
+     取流 CDN；
+  2. CI 海外节点下 CDN 返回 `Access-Control-Allow-Origin: *`，或
+     `Access-Control-Allow-Credentials` 为空，与 `include` 冲突，控制台明确报
+     `The value of the 'Access-Control-Allow-Origin' header ... must not be the wildcard '*' when the request's credentials mode is 'include'`；
+  3. 本地（国内节点）CDN 返回精确 origin + `credentials: true`，
+     所以 `include` 在本地一直能过，问题只在 CI 暴露。
+- 最终修复：`DownloadUtils.downloadToBlob` 改为 `credentials: 'omit'`。
+  取流 URL 本身已带签名（upsig/hdnts/buvid），不需要 Cookie；
+  不再触发 CORS 的 credentialed 校验。新增
+  `tests/specs/download_utils_credentials.spec.ts` 回归断言，
+  防止重新引入 `include`。`/en` 等待逻辑保留（它避免了跳转中止 fetch）。
 
 ### 现象
 - 工作流 `.github/workflows/e2e.yml`（E2E Tests）在每次 push 后运行，持续失败。
@@ -86,10 +99,15 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
   全部通过（真实网络下载，未 mock）。
 - 第二轮修复后，本地以同样的 CI 模拟环境单独运行
   `video_download_e2e.spec.ts`：22.1s 通过。
-- 第三轮修复后，本地同样环境连续运行 2 次：27.7s / 28.1s 均通过。
-  注意：本地（国内网络）不会出现 `/en` 跳转，故跳转本身无法本地复现；
-  稳定等待逻辑按 run `44254113689` trace 中“加载后约 2.5s 才跳转”的时间线
-  设定了 5s 的稳定窗口，并同时校验内容脚本与 `__INITIAL_STATE__.videoData`。
+- 第三轮修复：E2E 在解析前等待页面稳定（URL 连续 5s 不变）、等
+  `#bili-plus-generate-btn` 与 `__INITIAL_STATE__.videoData` 就绪，并在下载前
+  再做一次 2s 稳定检查 + `page.bringToFront()`。这消除了跳转中止 fetch 的风险，
+  但 run `44257593003` 表明它不是 CI 失败的根因。
+- 最终修复（CORS）：`src/utils/DownloadUtils.ts` 的 `downloadToBlob`
+  改用 `credentials: 'omit'`，取流 URL 已带签名无需 Cookie；
+  新增 `tests/specs/download_utils_credentials.spec.ts` 回归测试。
+- 验证：`yarn build` 通过；新单元测试通过；本地同样环境真实网络下载
+  27.2s 通过；第三轮修复后本地连续 2 次 27.7s / 28.1s 通过。
 - 单独脚本验证 `/en` 与 `/en/video/BV1L3sz6vEza/` 均能注入对应内容脚本。
 - `tests/specs/url.spec.ts` 4 个用例通过。
 - 说明：以上 Edge/locale 仅为本地复现 CI 的临时手段，已从
@@ -97,5 +115,6 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 
 ### 备注
 - 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
-  仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配与测试时序/超时。
-- 剩余动作：推送第三轮修复后观察 CI 是否全绿。
+  仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配、
+  测试时序/超时，以及 CDN 下载的 CORS credentials 问题。
+- 剩余动作：推送最终修复后观察 CI 是否全绿。

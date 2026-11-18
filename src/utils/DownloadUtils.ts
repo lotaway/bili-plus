@@ -6,9 +6,12 @@ export class DownloadUtils {
     host = BILIBILI_REFERER,
     onProgress?: (progress: { loaded: number; total: number }) => void
   ): Promise<Blob> {
-    // credentials: 'include' 让浏览器自动携带目标域 Cookie（含 httpOnly 的 SESSDATA）
+    // 取流 URL 本身已带签名（upsig/hdnts/buvid），不需要携带 Cookie。
+    // 若用 credentials: 'include'，CDN 必须返回精确的 Access-Control-Allow-Origin
+    // 且 Access-Control-Allow-Credentials: true；海外节点常返回 `*` 或空值，
+    // 会被 CORS 拒绝并让 fetch 抛出 "Failed to fetch"。
     const res = await fetch(url, {
-      credentials: "include",
+      credentials: 'omit',
       headers: {
         'Referer': host,
         'User-Agent': DEFAULT_USER_AGENT,
