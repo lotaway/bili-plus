@@ -1,6 +1,6 @@
 # TODO
 
-## [已修复，待 CI 验证] GitHub Actions E2E 测试在 CI 上持续失败
+## [已修复，CI 全绿] GitHub Actions E2E 测试在 CI 上持续失败
 
 ### 进展
 - 第一轮修复（`daf68da`）推送后 CI run `44252136657`：
@@ -48,6 +48,8 @@
   按 `content-range` 解析总长度、拼接分片，保留 `credentials: 'omit'`
   以避免 CORS。对应回归测试也断言 `Range` 头与 omit 凭据。
   本地真实网络下载 27.8s 通过，未 mock。
+- 最终验证：CI run `44264339049`（#26，提交 `797f098`）**全部 22 个用例通过**，
+  workflow conclusion = `SUCCESS`，耗时 2m20s。
 
 ### 现象
 - 工作流 `.github/workflows/e2e.yml`（E2E Tests）在每次 push 后运行，持续失败。
@@ -122,4 +124,4 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 - 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
   仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配、
   测试时序/超时，以及 CDN 下载的 CORS credentials 与 Range 分段问题。
-- 剩余动作：推送最终修复后观察 CI 是否全绿。
+- 结论：CI run `44264339049` 已全绿，无需进一步改动。
