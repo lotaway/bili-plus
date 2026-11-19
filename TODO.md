@@ -24,10 +24,12 @@
    fetch 该 worker 并转成 blob URL，通过 `classWorkerURL` 交给 FFmpeg。
 3. `FFmpegUtils.load()`：core/wasm 从 `/dist/umd/` 换成 `/dist/esm/`，
    module worker 才能通过 `import()` 拿到 `createFFmpegCore`。
-4. 下载仍走页面上下文（Range 分段 + `credentials: 'omit'`）。
+4. 下载仍走页面上下文，`credentials: 'omit'`。按用户要求已删除我加的
+   Range 分段，恢复原本的一次性完整 GET。
 
 ### 验证
-- 本地真实网络合并下载成功，得到 `.mp4`（43.5s）。
+- 本地真实网络合并下载成功，得到 `.mp4`（删除 Range 后 60s；
+   有一次完整 GET 卡住 240s 的偶发情况）。
 - 本地全量 22 个用例通过（含真实网络下载，未 mock）。
 - CI run `44475131962`（#28，提交 `9527d22`）`SUCCESS`，1m44s。
 
@@ -141,11 +143,12 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
   `#bili-plus-generate-btn` 与 `__INITIAL_STATE__.videoData` 就绪，并在下载前
   再做一次 2s 稳定检查 + `page.bringToFront()`。这消除了跳转中止 fetch 的风险，
   但 run `44257593003` 表明它不是 CI 失败的根因。
-- 最终修复（CORS + 567）：`src/utils/DownloadUtils.ts` 的 `downloadToBlob`
-  改用 `credentials: 'omit'` 并按 2 MiB 分段带 `Range` 请求；
-  新增 `tests/specs/download_utils_credentials.spec.ts` 回归测试。
+- 最终修复：`src/utils/DownloadUtils.ts` 的 `downloadToBlob` 改用
+  `credentials: 'omit'` 修复 CORS；Range 分段已按要求删除，恢复原本的
+  一次性完整 GET。新增 `tests/specs/download_utils_credentials.spec.ts`
+  回归测试（断言 omit、无 Range）。
 - 验证：`yarn build` 通过；新单元测试通过；本地同样环境真实网络下载
-  27.8s 通过；第三轮修复后本地连续 2 次 27.7s / 28.1s 通过。
+  26.4s 通过；删除 Range 后本地全量 22 个用例通过。
 - 单独脚本验证 `/en` 与 `/en/video/BV1L3sz6vEza/` 均能注入对应内容脚本。
 - `tests/specs/url.spec.ts` 4 个用例通过。
 - 说明：以上 Edge/locale 仅为本地复现 CI 的临时手段，已从
