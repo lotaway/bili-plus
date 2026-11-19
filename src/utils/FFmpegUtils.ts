@@ -10,15 +10,21 @@ export class FFmpegUtils {
     this.ffmpeg = new FFmpeg()
   }
 
-  async load(): Promise<void> {
+  async load(classWorkerURL?: string): Promise<void> {
     if (this.loaded) return
 
-    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd'
+    // 必须用 ESM core：FFmpeg 的 worker 是 module worker，无法用 importScripts 加载
+    // UMD core，而 UMD 脚本通过 import() 又拿不到 default 导出，会报
+    // "failed to import ffmpeg-core.js" / "network error"。
+    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
     this.ffmpeg.on('log', ({ message }) => {
       Logger.D('[FFmpeg]', message)
     })
     try {
       await this.ffmpeg.load({
+        // 页面上下文不能从 bilibili.com 构造 chrome-extension:// 的 Worker，
+        // 调用方会传入由扩展资源转成的 blob URL。
+        ...(classWorkerURL ? { classWorkerURL } : {}),
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       })
@@ -30,9 +36,9 @@ export class FFmpegUtils {
     }
   }
 
-  async mergeVideoAudio(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+  async mergeVideoAudio(videoBlob: Blob, audioBlob: Blob, classWorkerURL?: string): Promise<Blob> {
     if (!this.loaded) {
-      await this.load()
+      await this.load(classWorkerURL)
     }
 
     try {
@@ -67,9 +73,9 @@ export class FFmpegUtils {
     }
   }
 
-  async extractAudio(videoBlob: Blob): Promise<Blob> {
+  async extractAudio(videoBlob: Blob, classWorkerURL?: string): Promise<Blob> {
     if (!this.loaded) {
-      await this.load()
+      await this.load(classWorkerURL)
     }
 
     try {
@@ -96,9 +102,9 @@ export class FFmpegUtils {
     }
   }
 
-  async convertToMp4(videoBlob: Blob): Promise<Blob> {
+  async convertToMp4(videoBlob: Blob, classWorkerURL?: string): Promise<Blob> {
     if (!this.loaded) {
-      await this.load()
+      await this.load(classWorkerURL)
     }
 
     try {

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { readdirSync } from 'fs'
+import { copyFileSync, readdirSync } from 'fs'
 import { build } from 'vite'
 
 function scanScriptFiles(dir: string) {
@@ -77,11 +77,30 @@ function buildScriptsPlugin(type: 'content' | 'inject') {
   }
 }
 
+/** 将 FFmpeg worker 复制成固定文件名，供页面上下文 fetch 后转成 blob URL 加载 */
+function copyFfmpegWorkerPlugin() {
+  return {
+    name: 'copy-ffmpeg-worker',
+    closeBundle() {
+      const assetsDir = resolve(__dirname, 'dist/assets')
+      try {
+        const worker = readdirSync(assetsDir).find((file) => /^worker-.*\.js$/.test(file))
+        if (worker) {
+          copyFileSync(resolve(assetsDir, worker), resolve(assetsDir, 'ffmpeg-worker.js'))
+        }
+      } catch {
+        // 主构建之前 assets 目录可能还不存在，忽略即可。
+      }
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     react(),
     buildScriptsPlugin('content'),
     buildScriptsPlugin('inject'),
+    copyFfmpegWorkerPlugin(),
   ],
   build: {
     rollupOptions: {

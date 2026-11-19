@@ -1,5 +1,35 @@
 # TODO
 
+## [已修复] 合并下载报跨 origin Worker 错误
+
+### 现象
+- 选"合并视频（自动合并）"后报：
+  `页面上下文下载失败: 视频合并失败: Failed to construct 'Worker':
+  Script at 'chrome-extension://.../assets/worker-*.js' cannot be accessed
+  from origin 'https://www.bilibili.com'`。
+
+### 根因
+- FFmpeg 的 worker 脚本位于扩展 origin，而合并逻辑跑在 bilibili.com 页面上下文，
+  浏览器禁止跨 origin 构造 Worker。
+- 尝试改由 background 合并后，CDN 对 service worker 的请求返回 HTTP 403
+  （请求上下文的 Origin/Referer 不同），故保留页面上下文下载。
+- 页面上下文用 blob URL 加载 worker 后又报 `network error`：worker 是 module worker，
+  不能用 `importScripts` 加载 UMD core，而 `import()` UMD 脚本拿不到 default 导出，
+  抛 `failed to import ffmpeg-core.js`。
+
+### 修复
+1. `vite.config.ts`：构建时把 FFmpeg worker 复制为固定名
+   `assets/ffmpeg-worker.js`；`manifest.json` 加入 web accessible resources。
+2. `video_page_inject.ts`：从注入脚本的 `currentScript.src` 取扩展 origin，
+   fetch 该 worker 并转成 blob URL，通过 `classWorkerURL` 交给 FFmpeg。
+3. `FFmpegUtils.load()`：core/wasm 从 `/dist/umd/` 换成 `/dist/esm/`，
+   module worker 才能通过 `import()` 拿到 `createFFmpegCore`。
+4. 下载仍走页面上下文（Range 分段 + `credentials: 'omit'`）。
+
+### 验证
+- 本地真实网络合并下载成功，得到 `.mp4`（43.5s）。
+- 本地全量 22 个用例通过（含真实网络下载，未 mock）。
+
 ## [已修复，CI 全绿] GitHub Actions E2E 测试在 CI 上持续失败
 
 ### 进展
@@ -124,4 +154,5 @@ CI 环境（Ubuntu/Chromium）默认 `Accept-Language: en-US`，B 站会把首�
 - 未跳过任何工作流步骤，未 mock `video_download_e2e.spec.ts`，
   仍为真实网络下载；仅修正了失效数据（BV 号）、`/en` 适配、
   测试时序/超时，以及 CDN 下载的 CORS credentials 与 Range 分段问题。
-- 结论：CI run `44264339049` 已全绿，无需进一步改动。
+- 结论：CI run `44264339049` 与 `44265091364` 均已全绿。
+  合并下载修复后需再观察一次 CI。

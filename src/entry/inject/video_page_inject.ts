@@ -11,6 +11,16 @@ import Logger from '../../utils/Logger'
 
 let isWindowActivate = true
 
+/** 注入脚本由 content script 以 classic <script src="chrome-extension://..."> 注入 */
+const EXTENSION_ORIGIN = (() => {
+  try {
+    const script = document.currentScript as HTMLScriptElement | null
+    return script ? new URL(script.src).origin : ''
+  } catch {
+    return ''
+  }
+})()
+
 export { }
 
 class VideoPageInjectActivity {
@@ -170,10 +180,25 @@ class VideoPageInjectActivity {
     return this.ffmpegUtils
   }
 
+  /** 把扩展里的 FFmpeg worker 脚本转成页面上下文可用的 blob URL */
+  async getPageFfmpegWorkerURL(): Promise<string | undefined> {
+    if (!EXTENSION_ORIGIN) return undefined
+    try {
+      const res = await fetch(`${EXTENSION_ORIGIN}/assets/ffmpeg-worker.js`)
+      if (!res.ok) return undefined
+      const source = await res.text()
+      return URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))
+    } catch (error) {
+      Logger.E('Failed to load FFmpeg worker for page context:', error)
+      return undefined
+    }
+  }
+
   @Logger.Mark()
   async mergeVideoAudioWithFFmpeg(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
     try {
-      const mergedBlob = await this.initFFmpeg().mergeVideoAudio(videoBlob, audioBlob)
+      const workerURL = await this.getPageFfmpegWorkerURL()
+      const mergedBlob = await this.initFFmpeg().mergeVideoAudio(videoBlob, audioBlob, workerURL)
       return mergedBlob
     } catch (error) {
       Logger.E('FFmpeg合并失败:', error)
