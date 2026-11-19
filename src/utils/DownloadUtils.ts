@@ -1,43 +1,61 @@
 import { BILIBILI_REFERER, DEFAULT_USER_AGENT } from '../config/bilibili.config'
 
+/** 取流 CDN 按 Range 提供媒体；完整 GET 在海外节点会被拒绝（HTTP 567）。 */
+const DOWNLOAD_CHUNK_SIZE = 2 * 1024 * 1024
+
 export class DownloadUtils {
   async downloadToBlob(
     url: string,
     host = BILIBILI_REFERER,
     onProgress?: (progress: { loaded: number; total: number }) => void
   ): Promise<Blob> {
-    // 取流 URL 已带签名，不需要 Cookie；用 omit 避免 CDN 的 credentialed CORS 校验失败。
-    const res = await fetch(url, {
-      credentials: 'omit',
-      headers: {
-        'Referer': host,
-        'User-Agent': DEFAULT_USER_AGENT,
-      }
-    })
-
-    if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`)
-
-    const reader = res.body?.getReader()
-    if (!reader) throw new Error('无法读取响应流')
-
-    const contentLength = parseInt(res.headers.get('content-length') || '0')
-    let receivedLength = 0
     const chunks: Uint8Array[] = []
+    let offset = 0
+    let total = 0
 
     while (true) {
-      const { done, value } = await reader.read()
+      // 取流 URL 已带签名，不需要 Cookie；omit 避免 CDN 的 credentialed CORS 校验。
+      const res = await fetch(url, {
+        credentials: 'omit',
+        headers: {
+          'Referer': host,
+          'User-Agent': DEFAULT_USER_AGENT,
+          // 完整 GET 在海外节点会返回 567，播放器也是按 Range 取流的。
+          'Range': `bytes=${offset}-${offset + DOWNLOAD_CHUNK_SIZE - 1}`
+        }
+      })
 
-      if (done) break
+      if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`)
 
-      chunks.push(value)
-      receivedLength += value.length
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('无法读取响应流')
 
-      if (onProgress) {
-        onProgress({
-          loaded: receivedLength,
-          total: contentLength
-        })
+      const part: Uint8Array[] = []
+      let received = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        part.push(value)
+        received += value.length
       }
+      if (received === 0) break
+
+      chunks.push(...part)
+      offset += received
+
+      // 服务器忽略 Range 时一次返回完整文件（200），无需再分段。
+      if (res.status === 200) {
+        if (onProgress) onProgress({ loaded: offset, total: offset })
+        break
+      }
+
+      const range = res.headers.get('content-range')
+      const totalMatch = range && /\/(\d+)\s*$/.exec(range)
+      if (totalMatch) total = parseInt(totalMatch[1], 10)
+      if (onProgress) onProgress({ loaded: offset, total: total || offset })
+
+      if (total && offset >= total) break
+      if (received < DOWNLOAD_CHUNK_SIZE) break
     }
 
     return new Blob(chunks as any)
